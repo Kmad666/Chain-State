@@ -79,6 +79,8 @@ func _build() -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_smooth_group(-1)
 	var lines := PackedVector3Array()
+	var edge_count := {}
+	var edge_pts := {}
 	for tri in tris:
 		var centre: Vector3 = (tri[0] + tri[1] + tri[2]) / 3.0
 		if rad_to_deg(centre.normalized().angle_to(_open)) < open_angle_deg:
@@ -93,6 +95,10 @@ func _build() -> void:
 			c = tmp
 		st.add_vertex(a); st.add_vertex(b); st.add_vertex(c)
 		lines.append_array([a, b, b, c, c, a])
+		for e in [[a, b], [b, c], [c, a]]:
+			var key := _edge_key(e[0], e[1])
+			edge_count[key] = edge_count.get(key, 0) + 1
+			edge_pts[key] = e
 	st.generate_normals()
 	var mesh := st.commit()
 
@@ -125,6 +131,64 @@ func _build() -> void:
 	var col := CollisionShape3D.new()
 	col.shape = mesh.create_trimesh_shape()
 	add_child(col)
+
+	# the opening's rim: edges used by only one kept face. Traced in thick glowing gold.
+	var rim: Array = []
+	for key in edge_count:
+		if edge_count[key] == 1:
+			rim.append(edge_pts[key])
+	_build_rim(rim)
+
+
+func _edge_key(a: Vector3, b: Vector3) -> String:
+	var ka := "%.3f,%.3f,%.3f" % [a.x, a.y, a.z]
+	var kb := "%.3f,%.3f,%.3f" % [b.x, b.y, b.z]
+	return ka + "|" + kb if ka < kb else kb + "|" + ka
+
+
+const GOLD := Color(1.0, 0.8, 0.25)
+var rim_edges := 0               # how many edges the gold rim traces (tests read it)
+
+
+func _build_rim(edges: Array) -> void:
+	rim_edges = edges.size()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = GOLD
+	var thick := 0.22
+	var tube := CylinderMesh.new()
+	tube.top_radius = thick
+	tube.bottom_radius = thick
+	tube.height = 1.0
+	tube.radial_segments = 8
+	tube.rings = 1
+	var knob := SphereMesh.new()
+	knob.radius = thick * 1.9
+	knob.height = thick * 3.8
+	knob.radial_segments = 10
+	knob.rings = 5
+	var corners := {}
+	for e in edges:
+		var a: Vector3 = e[0]
+		var b: Vector3 = e[1]
+		var mi := MeshInstance3D.new()
+		mi.mesh = tube
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var y := (b - a).normalized()
+		var x := y.cross(Vector3.UP if absf(y.dot(Vector3.UP)) < 0.95 else Vector3.RIGHT).normalized()
+		var z := x.cross(y)
+		mi.transform = Transform3D(Basis(x, y * a.distance_to(b), z), (a + b) * 0.5)
+		add_child(mi)
+		corners["%.3f,%.3f,%.3f" % [a.x, a.y, a.z]] = a
+		corners["%.3f,%.3f,%.3f" % [b.x, b.y, b.z]] = b
+	for k in corners:
+		var s := MeshInstance3D.new()
+		s.mesh = knob
+		s.material_override = mat
+		s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		s.position = corners[k]
+		add_child(s)
 
 
 ## The ward is hookable (it's magic). Hooking it never needs a free air grapple.

@@ -231,7 +231,8 @@ func _build_enemy_test_air() -> void:
 	tree.position = base
 	add_child(tree)
 	ward = Ward.new()
-	ward.position = base + Vector3(0, tree.height + 13.0, 0)
+	ward.radius = 17.0                                            # twice the old 8.5
+	ward.position = base + Vector3(0, tree.height + 4.5 + ward.radius, 0)   # same gap above the tree
 	ward.open_dir = Vector3(0, -0.5, 1.0)
 	add_child(ward)
 	var witch := _sentry("air", PackedVector3Array([ward.position]))

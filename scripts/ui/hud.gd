@@ -154,7 +154,7 @@ func _process(_dt: float) -> void:
 		_prompt.text = ("[E]  Examine: %s" if npc.is_in_group("evidence") else "[E]  Talk to %s") % npc.display_name
 	elif player.aim_enemy and is_instance_valid(player.aim_enemy) and player.aim_enemy.is_in_group("enemy"):
 		var dist: float = player.cam.global_position.distance_to(player.aim_enemy.global_position)
-		var close: bool = dist <= player.aim_enemy.SUBDUE_RANGE
+		var close: bool = dist <= player.aim_enemy.subdue_range()
 		col = Color(1.0, 0.35, 0.3, 0.95) if close else Color(1.0, 0.75, 0.5, 0.7)
 		_info.text = ("%d m  ·  in range to wrap" if close else "%d m  ·  too far to wrap") % roundi(dist)
 	elif player.aim_enemy and is_instance_valid(player.aim_enemy) and player.aim_enemy.is_in_group("ward"):

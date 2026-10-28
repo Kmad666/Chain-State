@@ -237,12 +237,20 @@ func _fire_line() -> void:
 
 # ---------------------------------------------------------------- the wrap
 ## Called by the player's grapple when the arrowhead bites. False = shaken off.
+## How close you must be to hook it for a wrap. A witch's ward pushes this out,
+## so you can still hook her through the opening from just outside the shell.
+func subdue_range() -> float:
+	if ward and is_instance_valid(ward):
+		return maxf(SUBDUE_RANGE, ward.radius + 8.0)
+	return SUBDUE_RANGE
+
+
 func on_hooked(p: Node) -> bool:
 	if is_subdued:
 		return false
-	if p.global_position.distance_to(global_position) > SUBDUE_RANGE:
+	if p.global_position.distance_to(global_position) > subdue_range():
 		if p.has_signal("notice"):
-			p.notice.emit("Too far: the %s shakes the chain off. Get within %d m." % [title, int(SUBDUE_RANGE)])
+			p.notice.emit("Too far: the %s shakes the chain off. Get within %d m." % [title, int(subdue_range())])
 		return false
 	_hooked_by = p
 	_slip_t = -1.0

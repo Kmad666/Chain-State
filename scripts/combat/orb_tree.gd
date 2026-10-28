@@ -1,6 +1,6 @@
 extends Node3D
 ## The witch's tree: a tall, wide cone of magic orbs, slowly turning, set out as a
-## platforming climb. RED_COUNT dark red orbs stun on touch; BLUE_COUNT blue orbs
+## platforming climb. RED_COUNT (40) large dark red orbs stun on touch; BLUE_COUNT blue orbs
 ## spiral up the cone as the route, and can be hooked as often as you like
 ## (magic grapples are free). Hooked blue orbs keep riding the tree; your anchor
 ## moves with them.
@@ -14,10 +14,11 @@ const HookOrb := preload("res://scripts/combat/hook_orb.gd")
 @export var spin := 0.06                      # radians per second
 @export var tiers := 9
 
-const RED_COUNT := 80
+const RED_COUNT := 40
 const BLUE_COUNT := 10
-const RED_SIZE := 0.6
-const CLEAR := 4.5               # red orbs keep this far from any blue, so you can swing in
+const RED_SIZE := 1.8           # 3x the old 0.6: big, slow, readable hazards
+const CLEAR := 6.5               # red orbs keep this far from any blue, so you can swing in
+const SPACING := 4.8             # and this far from each other, so the big ones never clump
 
 var player: Node
 var _angle := 0.0
@@ -35,8 +36,8 @@ func _ready() -> void:
 	var s := SphereMesh.new()
 	s.radius = RED_SIZE
 	s.height = RED_SIZE * 2.0
-	s.radial_segments = 14
-	s.rings = 7
+	s.radial_segments = 20
+	s.rings = 10
 	_mm.mesh = s
 	_mm.instance_count = _red_local.size()
 	var mi := MultiMeshInstance3D.new()
@@ -101,9 +102,24 @@ func _layout() -> void:
 					break
 			if ok:
 				cands.append(p)
-	# take exactly RED_COUNT, spread evenly through the candidates
+	# take RED_COUNT, spread evenly through the candidates, skipping any that would crowd another
+	var step := float(cands.size()) / RED_COUNT
+	var used := {}
 	for i in RED_COUNT:
-		_red_local.append(cands[int(float(i) * cands.size() / RED_COUNT)])
+		var start := int(i * step)
+		for j in cands.size():
+			var idx := (start + j) % cands.size()
+			if used.has(idx):
+				continue
+			var ok := true
+			for q in _red_local:
+				if q.distance_to(cands[idx]) < SPACING:
+					ok = false
+					break
+			if ok:
+				used[idx] = true
+				_red_local.append(cands[idx])
+				break
 
 
 func _physics_process(dt: float) -> void:

@@ -284,7 +284,14 @@ func _ready() -> void:
 	var tr = aw.tree
 	var wd = aw.ward
 	check(aw.sentries.size() == 1 and witch.kind == "air" and witch.title == "witch", "one witch")
-	check(tr.red_count() == 80 and tr.blue_orbs().size() == 10, "her tree: 80 red orbs, 10 blue")
+	check(tr.red_count() == 40 and tr.blue_orbs().size() == 10, "her tree: 40 red orbs, 10 blue")
+	var min_gap := INF
+	for i in tr._red_local.size():
+		for j in range(i + 1, tr._red_local.size()):
+			min_gap = minf(min_gap, tr._red_local[i].distance_to(tr._red_local[j]))
+	check(tr.RED_SIZE >= 1.8 and min_gap >= tr.SPACING, "the red orbs are big (r %.1f m) and never clump (closest pair %.1f m)" % [tr.RED_SIZE, min_gap])
+	check(wd.radius >= 17.0 and wd.global_position.y - wd.radius > tr.global_position.y + tr.height, "her ward is twice the size and still clears the tree")
+	check(wd.rim_edges >= 3, "the opening is traced in gold (%d edges)" % wd.rim_edges)
 	var b0: Vector3 = tr.blue_orbs()[0].global_position
 	for i in 60:
 		await get_tree().physics_frame
@@ -336,7 +343,7 @@ func _ready() -> void:
 	ap.tune.lock_cone = 30.0
 
 	# aim assist on surfaces: dead centre on open sky, but the ward's edge is inside the circle
-	ap.global_position = wd.global_position + Vector3(-30, 0, -30)
+	ap.global_position = wd.global_position + Vector3(-24, 0, -24)
 	var to_w: Vector3 = (wd.global_position - ap.global_position).normalized()
 	var edge_ang: float = asin(wd.radius / ap.global_position.distance_to(wd.global_position))
 	var dir: Vector3 = to_w.rotated(Vector3.UP, edge_ang + deg_to_rad(1.5))
@@ -443,7 +450,7 @@ func _ready() -> void:
 	check(wd.is_inside(ap.global_position) and ap.stunned == 0.0, "inside the ward you're safe")
 
 	ap.invuln = 999.0
-	ap.global_position = wd.global_position + Vector3(2, -5, 17)
+	ap.global_position = wd.global_position + wd.open_dir.normalized() * (wd.radius + 16.0)
 	_aim(ap, wd.global_position)
 	await shot("16_ward")
 	# wraps only count inside
@@ -455,7 +462,7 @@ func _ready() -> void:
 	var wc: Vector3 = witch.global_position
 	for k in 30:
 		var a3 := TAU * k / 24.0
-		witch._track_wrap(wc + Vector3(cos(a3) * 14.0, 0, sin(a3) * 14.0))
+		witch._track_wrap(wc + Vector3(cos(a3) * (wd.radius + 2.0), 0, sin(a3) * (wd.radius + 2.0)))
 	check(witch.wraps < 0.1, "laps outside the ward don't count")
 	for k in 3 * 24 + 6:
 		var a3 := TAU * k / 24.0
