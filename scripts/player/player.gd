@@ -60,6 +60,7 @@ var tune := {
 	"release_boost": 0.15,
 	"dash_speed": 10.0,
 	"mouse_sensitivity": 0.25,
+	"aim_assist": 70.0,
 }
 const TUNING := [
 	{"key": "gravity", "label": "Gravity", "min": 4.0, "max": 30.0, "step": 0.5},
@@ -77,6 +78,7 @@ const TUNING := [
 	{"key": "release_boost", "label": "Release boost", "min": 0.0, "max": 0.6, "step": 0.01},
 	{"key": "dash_speed", "label": "Dash speed", "min": 0.0, "max": 30.0, "step": 0.5},
 	{"key": "mouse_sensitivity", "label": "Mouse sensitivity", "min": 0.05, "max": 1.0, "step": 0.01},
+	{"key": "aim_assist", "label": "Reticle size (aim assist)", "min": 0.0, "max": 160.0, "step": 5.0},
 ]
 const PRESETS := [
 	{"name": "Float", "desc": "No gravity on the rope. Drift on your momentum.",
@@ -194,13 +196,85 @@ func _ray(mask: int, length: float) -> Dictionary:
 	return get_world_3d().direct_space_state.intersect_ray(q)
 
 
+## The reticle's radius in screen pixels (tune.aim_assist is given at 1080p).
+func reticle_px() -> float:
+	return tune.aim_assist * get_viewport().get_visible_rect().size.y / 1080.0
+
+
+func _ray_dir(dir: Vector3, mask: int, length: float) -> Dictionary:
+	var from := cam.global_position
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * length, mask)
+	q.exclude = [get_rid()]
+	return get_world_3d().direct_space_state.intersect_ray(q)
+
+
+## Aim assist. What the grapple would bite if fired now, anywhere inside the reticle:
+##  1. magic (blue orbs, casters) inside the circle and in sight: the nearest to you;
+##  2. else whatever surface is dead centre;
+##  3. else the surface closest to the centre of the circle, scanning outward ring by ring.
+## Returns a ray-style hit {collider, position} or {} if nothing is in reach.
+func find_target() -> Dictionary:
+	const MASK := LAYER_WORLD | LAYER_HOOK
+	var r_px := reticle_px()
+	var centre := get_viewport().get_visible_rect().size * 0.5
+	var reach: float = tune.grapple_range
+	var space := get_world_3d().direct_space_state
+	var eye := cam.global_position
+
+	if r_px > 0.0:
+		var best: Dictionary = {}
+		var best_d := INF
+		for n in get_tree().get_nodes_in_group("hook_orb") + get_tree().get_nodes_in_group("enemy"):
+			if not is_instance_valid(n) or not (n is Node3D):
+				continue
+			var p: Vector3 = n.global_position
+			var d := eye.distance_to(p)
+			if d > reach or d >= best_d or cam.is_position_behind(p):
+				continue
+			if cam.unproject_position(p).distance_to(centre) > r_px:
+				continue
+			var q := PhysicsRayQueryParameters3D.create(eye, p, MASK)
+			q.exclude = [get_rid()]
+			var h := space.intersect_ray(q)
+			if h.is_empty() or h.collider == n:
+				best = {"collider": n, "position": h.position if not h.is_empty() else p}
+				best_d = d
+		if not best.is_empty():
+			return best
+
+	var hit := _ray(MASK, reach)
+	if not hit.is_empty() or r_px <= 0.0:
+		return hit
+
+	# nothing dead centre: sweep rings outward and take the first ring that finds a surface
+	const RINGS := 4
+	const SPOKES := 16
+	for ring in range(1, RINGS + 1):
+		var rr := r_px * ring / RINGS
+		var found: Dictionary = {}
+		var found_off := INF
+		for k in SPOKES:
+			var a := TAU * (k + 0.5 * (ring % 2)) / SPOKES
+			var sp := centre + Vector2(cos(a), sin(a)) * rr
+			var h := _ray_dir(cam.project_ray_normal(sp), MASK, reach)
+			if h.is_empty():
+				continue
+			var off := cam.unproject_position(h.position).distance_to(centre)
+			if off < found_off:
+				found = h
+				found_off = off
+		if not found.is_empty():
+			return found
+	return {}
+
+
 # ---------------------------------------------------------------- grapple
 ## Fire the arrowhead at whatever surface is under the crosshair.
 func try_grapple() -> void:
 	if hook_state == Chain.FLYING or attached or stunned > 0.0:
 		return
-	var hit := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, tune.grapple_range)
-	if hit.is_empty() or (hit.collider.collision_layer & (LAYER_WORLD | LAYER_HOOK)) == 0:
+	var hit := find_target()
+	if hit.is_empty():
 		return
 	# grapples on ordinary things are limited per jump; on magic they're free
 	if not is_on_floor() and not is_magic(hit.collider):
@@ -452,18 +526,17 @@ func _process(dt: float) -> void:
 	aim_valid = false
 	aim_enemy = null
 	if Game.playing():
-		var hit := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, tune.grapple_range)
-		if not hit.is_empty():
-			var d := cam.global_position.distance_to(hit.position)
-			if hit.collider.is_in_group("npc") or hit.collider.is_in_group("evidence"):
-				if d <= TALK_RANGE:
-					look_npc = hit.collider
-			else:
+		var near := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, TALK_RANGE)
+		if not near.is_empty() and (near.collider.is_in_group("npc") or near.collider.is_in_group("evidence")):
+			look_npc = near.collider
+		else:
+			var hit := find_target()
+			if not hit.is_empty():
 				if hit.collider.is_in_group("enemy") or hit.collider.is_in_group("hook_orb") or hit.collider.is_in_group("ward"):
 					aim_enemy = hit.collider
 				aim_valid = true
 				aim_point = hit.position
-				aim_distance = d
+				aim_distance = cam.global_position.distance_to(hit.position)
 
 	var spd := velocity.length()
 	cam.fov = lerpf(cam.fov, 80.0 + clampf((spd - 6.0) * 0.8, 0.0, 18.0), 0.08)

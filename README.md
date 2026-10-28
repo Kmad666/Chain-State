@@ -14,7 +14,7 @@
 | Input | Action |
 |---|---|
 | Mouse | Look |
-| Hold **Left Click** | Fire the silver chain at **any surface** under the crosshair (green = in reach). You swing once it lands |
+| Hold **Left Click** | Fire the silver chain at **anything inside the reticle circle** (green = in reach). A small diamond shows exactly where it will bite. You swing once it lands |
 | Release Left Click | Let go. Letting go at speed gives a small boost |
 | **Space** | Jump; while hooked, reel in |
 | Right Click / Wheel Up | Reel in |
@@ -32,7 +32,7 @@
 You get 3 grapples in the air by default; touching the ground refills them.
 
 ## Tuning the feel
-Pause with **Esc**. On the right there's a slider for every movement number: gravity, walk speed, jump, gravity while hooked, rope pull, swing push, reel speed, top speed, reach, air grapples, hook speed, release boost, dash and mouse sensitivity. Changes apply instantly and are saved. Three presets give starting points:
+Pause with **Esc**. On the right there's a slider for every movement number: gravity, walk speed, jump, gravity while hooked, rope pull, swing push, reel speed, top speed, reach, air grapples, hook speed, release boost, dash, mouse sensitivity and reticle size (aim assist). Changes apply instantly and are saved. Three presets give starting points:
 
 1. **Float**: no gravity on the rope, so you drift on momentum.
 2. **Pendulum**: full gravity on a rigid rope, for classic Verlet swing arcs.
@@ -53,6 +53,13 @@ The islands have flat, grassy tops to walk on and jagged rock cones underneath. 
 
 ## Grapple economy
 Grapples on **ordinary** things (islands, rock, the test cube) are limited: 3 per jump, refilled when you land. Grapples on **magic** are free and unlimited: blue orbs, a witch's ward and the casters themselves. The crosshair says "magic, free grapple" when you're aiming at something free.
+
+**Aim assist.** You don't need pinpoint aim at swing speed. Anything inside the big reticle circle counts:
+1. If a blue orb or a caster is in the circle and in sight, the chain goes to the **nearest** one.
+2. Otherwise it bites whatever surface is dead centre.
+3. If the centre is open sky, it scans the circle outward and takes the surface **closest to the centre**, such as an island edge you just missed.
+
+The diamond marker shows the pick before you fire. You can resize the circle (or turn it off at 0) with the "Reticle size" slider.
 
 ## Stun
 Touching **magic that isn't safe**, meaning any red orb, any projectile or the outside of a ward, **stuns you for 3 seconds**: the chain drops, you can't move or grapple, your sideways motion dies and you fall straight down, passing through wards. A purple flash and a **STUNNED** countdown (top left) make it clear. Control returns when it wears off, followed by a short grace period. Stuns replace the old hearts: falling is the punishment.

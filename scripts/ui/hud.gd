@@ -169,9 +169,8 @@ func _process(_dt: float) -> void:
 	elif player.aim_valid and (player.is_on_floor() or player.air_left > 0):
 		col = Color(0.45, 1.0, 0.6, 0.85)
 		_info.text = "%d m" % roundi(player.aim_distance)
-	if col != _cross_col:
-		_cross_col = col
-		queue_redraw()
+	_cross_col = col
+	queue_redraw()          # the landing marker moves every frame
 
 	var pips := ""
 	for i in int(player.tune.air_grapples):
@@ -182,5 +181,19 @@ func _process(_dt: float) -> void:
 
 func _draw() -> void:
 	var c := size * 0.5
-	draw_arc(c, 10.0, 0, TAU, 32, _cross_col, 2.0, true)
+	var r: float = maxf(10.0, player.reticle_px()) if player else 10.0
+	var shade := Color(0, 0, 0, 0.35)
+	var faint := Color(_cross_col, maxf(0.5, _cross_col.a * 0.8))
+	draw_arc(c, r, 0, TAU, 72, shade, 4.5, true)          # dark under-stroke: readable on bright sky
+	draw_arc(c, r, 0, TAU, 72, faint, 2.0, true)
+	draw_circle(c, 3.0, shade)
 	draw_circle(c, 2.0, _cross_col)
+	# where the hook will land: a small diamond, with a tick from the centre if it's off-centre
+	if player and player.aim_valid and not player.cam.is_position_behind(player.aim_point):
+		var m: Vector2 = player.cam.unproject_position(player.aim_point)
+		var k := 8.0
+		var pts := PackedVector2Array([m + Vector2(0, -k), m + Vector2(k, 0), m + Vector2(0, k), m + Vector2(-k, 0), m + Vector2(0, -k)])
+		draw_polyline(pts, shade, 4.5, true)
+		draw_polyline(pts, Color(_cross_col, 1.0), 2.0, true)
+		if m.distance_to(c) > 14.0:
+			draw_line(c + (m - c).normalized() * 5.0, m - (m - c).normalized() * 10.0, faint, 1.5, true)

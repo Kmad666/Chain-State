@@ -302,6 +302,45 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	check(ap.attached and ap.hook_node == blue and blue.orbiting, "the hooked blue orb keeps riding the tree")
 	ap.release()
+	for i in 20:
+		await get_tree().physics_frame
+
+	# aim assist: a near miss on a blue orb still catches it
+	var blue2 = tr.blue_orbs()[4]
+	ap.global_position = blue2.global_position + Vector3(0, -3, 10)
+	_aim(ap, blue2.global_position)
+	await get_tree().physics_frame
+	var aimed: Vector3 = blue2.global_position
+	_aim(ap, aimed + (ap.cam.global_basis.x * 0.6))
+	await get_tree().physics_frame
+	var off_px: float = ap.cam.unproject_position(blue2.global_position).distance_to(ap.get_viewport().get_visible_rect().size * 0.5)
+	var ft: Dictionary = ap.find_target()
+	check(off_px > 4.0 and off_px < ap.reticle_px() and not ft.is_empty() and ft.collider == blue2,
+		"aim assist: a blue orb %d px off-centre (inside the %d px reticle) is the target" % [roundi(off_px), roundi(ap.reticle_px())])
+	await shot("17_aim_assist")
+	ap.try_grapple()
+	for i in 30:
+		await get_tree().physics_frame
+	check(ap.attached and ap.hook_node == blue2, "...and the chain catches it")
+	ap.release()
+	for i in 20:
+		await get_tree().physics_frame
+	var keep: float = ap.tune.aim_assist
+	ap.tune.aim_assist = 0.0
+	check(ap.find_target().is_empty() or ap.find_target().collider != blue2, "with the reticle at 0, the same near miss misses")
+	ap.tune.aim_assist = keep
+
+	# aim assist on surfaces: dead centre on open sky, but the ward's edge is inside the circle
+	ap.global_position = wd.global_position + Vector3(-30, 0, -30)
+	var to_w: Vector3 = (wd.global_position - ap.global_position).normalized()
+	var edge_ang: float = asin(wd.radius / ap.global_position.distance_to(wd.global_position))
+	var dir: Vector3 = to_w.rotated(Vector3.UP, edge_ang + deg_to_rad(1.5))
+	_aim(ap, ap.cam.global_position + dir * 10.0 + Vector3(0, 0, 0))
+	await get_tree().physics_frame
+	var centre_hit: Dictionary = ap._ray(1 | 4, ap.tune.grapple_range)
+	ft = ap.find_target()
+	check(centre_hit.is_empty() and not ft.is_empty() and ft.collider == wd, "aim assist: just past the ward's edge still finds the ward")
+
 	ap.air_left = 0
 	ap.global_position = Vector3(0, 6, 20)
 	_aim(ap, Vector3(0, -2, 0))
