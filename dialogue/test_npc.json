@@ -1,0 +1,48 @@
+{
+  "npc_id": "test_npc",
+  "name": "NPC",
+  "start": "start",
+  "nodes": {
+    "start": {
+      "speaker": "",
+      "text": "test test test",
+      "pos": [0, 180],
+      "choices": [
+        {"text": "Dialogue option A", "next": "a"},
+        {"text": "Dialogue option B", "next": "b"},
+        {"text": "Dialogue option C", "next": "c"},
+        {"text": "[Leave]", "next": ""}
+      ]
+    },
+    "a": {
+      "speaker": "",
+      "text": "test test test (you picked A)",
+      "pos": [560, -300],
+      "choices": [
+        {"text": "Dialogue option B", "next": "b"},
+        {"text": "Dialogue option C", "next": "c"},
+        {"text": "Back to the start", "next": "start"}
+      ]
+    },
+    "b": {
+      "speaker": "",
+      "text": "test test test (you picked B)",
+      "pos": [560, 200],
+      "choices": [
+        {"text": "Dialogue option A", "next": "a"},
+        {"text": "Dialogue option C", "next": "c"},
+        {"text": "Back to the start", "next": "start"}
+      ]
+    },
+    "c": {
+      "speaker": "",
+      "text": "test test test (you picked C)",
+      "pos": [560, 700],
+      "choices": [
+        {"text": "Dialogue option A", "next": "a"},
+        {"text": "Dialogue option B", "next": "b"},
+        {"text": "[Leave]", "next": ""}
+      ]
+    }
+  }
+}

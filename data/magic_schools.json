@@ -1,0 +1,72 @@
+{
+  "schools": [
+    {
+      "id": "fire",
+      "name": "Fire",
+      "color": "#e8743b",
+      "lens": "Orange-red residue that glows like a cooling ember",
+      "summary": "Fire practitioners command heat directly. They don't need fuel, and the flame goes where they will it, not where it would naturally spread.",
+      "evidence": [
+        {"sign": "Scorching with no fuel", "means": "Burn marks on stone, brick or iron, which can't catch fire on their own. The heat was put there, not fed."},
+        {"sign": "Clean-edged burns", "means": "Natural fire spreads raggedly. Willed fire leaves sharp, shaped edges: a perfect circle, a straight line, the outline of a hand."},
+        {"sign": "Selective damage", "means": "A melted lock beside an unburnt letter. The heat was aimed at one thing and spared what was next to it."},
+        {"sign": "Embers that stay warm", "means": "Ash or char that is still warm hours after any ordinary fire would have gone cold."},
+        {"sign": "Smoke that smells of hot copper", "means": "No lamp oil, no pitch, no sulphur. Magical fire burns clean and leaves a metallic tang in the air."}
+      ],
+      "mistaken_for": "Ordinary arson. That leaves an accelerant smell, a fuel source, and a V-shaped burn pattern climbing from one point of origin."
+    },
+    {
+      "id": "nature",
+      "name": "Nature",
+      "color": "#5aa65c",
+      "lens": "Green residue that seems to creep slowly along surfaces",
+      "summary": "Nature practitioners quicken or wither living things: plants, roots, rot and sometimes animals.",
+      "evidence": [
+        {"sign": "Growth out of season or out of place", "means": "Flowers blooming in winter, moss on a polished floor, a sapling inside a locked room."},
+        {"sign": "Roots through stone", "means": "Cracked flagstones or split walls with roots or vines driven through them faster than years could do."},
+        {"sign": "Furniture that has sprouted", "means": "Cut timber, such as a chair leg or a door frame, putting out buds or green shoots again."},
+        {"sign": "A withered patch", "means": "A ring where everything living died at once. Life was drawn out of that spot, often to feed growth somewhere else."},
+        {"sign": "Ligature marks like vines", "means": "Bruises or welts with a twisting, leafy pattern, or seed dust and pollen on a victim indoors."},
+        {"sign": "Animals behaving wrongly", "means": "Birds that won't leave, a guard dog that let a stranger pass, insects swarming one spot."}
+      ],
+      "mistaken_for": "A neglected garden, an animal attack, or ordinary damp rot. Those take weeks or seasons; nature magic does it overnight."
+    },
+    {
+      "id": "ice",
+      "name": "Ice",
+      "color": "#8ccbe6",
+      "lens": "Pale blue-white residue that frosts over as you watch",
+      "summary": "Ice practitioners draw the heat out of things. They freeze, preserve and shatter.",
+      "evidence": [
+        {"sign": "Frost that radiates from a point", "means": "Rime patterns spreading outward from one spot, like a star, instead of settling evenly as weather frost does."},
+        {"sign": "Cold in a warm room", "means": "Frost on a window beside a lit hearth, or frostbite on a victim found indoors in summer."},
+        {"sign": "Burst pipes and cracked glass", "means": "Sudden freezing splits whatever holds water. The cracks are fresh, and there's been no cold snap."},
+        {"sign": "Shattered, brittle materials", "means": "Leather, rubber or wood that broke like glass. Something froze it hard, then struck it."},
+        {"sign": "A false time of death", "means": "A body cooled unnaturally fast to look like it died hours earlier. Check the room, not just the corpse."},
+        {"sign": "A ring of drying water", "means": "A puddle in a perfect ring where ice melted after the practitioner left."}
+      ],
+      "mistaken_for": "An ice-house delivery, cold storage, or a winter night. Check the weather, the season and whether anything nearby should have been cold."
+    },
+    {
+      "id": "water",
+      "name": "Water",
+      "color": "#3a72c9",
+      "lens": "Deep blue residue that beads and runs, sometimes uphill",
+      "summary": "Water practitioners move and shape water: they raise it, hold it, and fill a space with it.",
+      "evidence": [
+        {"sign": "Drowned on dry land", "means": "A drowning victim found in a dry room, far from any river, cistern or rain barrel."},
+        {"sign": "Water against gravity", "means": "Water marks on a ceiling or the upper wall with nothing above to leak, or puddles that have crept uphill."},
+        {"sign": "One wet room in a dry house", "means": "A soaked room, sometimes to the ceiling, with dry corridors and dry floors on every side."},
+        {"sign": "Water from the wrong source", "means": "River silt, pond weed or rain in a sealed room. Note where the water could have come from."},
+        {"sign": "Tide lines indoors", "means": "A level band of staining around a room's walls, as if it had been filled like a tank and then drained."},
+        {"sign": "Locks rusted through overnight", "means": "Iron fittings corroded far faster than weather could manage, where water was forced into the mechanism."}
+      ],
+      "mistaken_for": "A burst pipe, a flood or a leaking roof. Those follow gravity, leave a trail from the source and soak what's below."
+    }
+  ],
+  "general": [
+    "Magic leaves residue that fades with time. Note how long ago the crime happened.",
+    "A practitioner can be framed. Residue shows which school was used, not who used it.",
+    "Guild-patented magic items leave residue too. Ask whether a household item could explain it."
+  ]
+}

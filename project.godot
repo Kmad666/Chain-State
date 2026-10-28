@@ -1,0 +1,37 @@
+; Engine configuration file.
+; Chain State (working title): first-person grapple platforming + magic-crime investigation.
+
+config_version=5
+
+[application]
+
+config/name="Chain State"
+config/description="First-person Verlet grapple, NPC dialogue and a dialogue tree editor. Test range."
+run/main_scene="res://scenes/test_range.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+Game="*res://scripts/autoload/game.gd"
+DialogueDB="*res://scripts/autoload/dialogue_db.gd"
+Logbook="*res://scripts/autoload/logbook.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/mode=2
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+common/physics_ticks_per_second=120
+
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+anti_aliasing/quality/msaa_3d=2

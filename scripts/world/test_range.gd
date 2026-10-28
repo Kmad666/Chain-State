@@ -1,0 +1,338 @@
+extends Node3D
+## Test range: a big flat plane, one floating cube to swing from, and one NPC to
+## talk to. Wires the player, HUD, pause menu, dialogue panel and editor together.
+
+const Player := preload("res://scripts/player/player.gd")
+const Npc := preload("res://scripts/world/npc.gd")
+const Hud := preload("res://scripts/ui/hud.gd")
+const DialoguePanel := preload("res://scripts/ui/dialogue_panel.gd")
+const DialogueEditor := preload("res://scripts/ui/dialogue_editor.gd")
+const PauseMenu := preload("res://scripts/ui/pause_menu.gd")
+const LogbookPanel := preload("res://scripts/ui/logbook_panel.gd")
+const Evidence := preload("res://scripts/world/evidence.gd")
+
+const START_POS := Vector3(0, 1.0, 14)
+const SKY_SAVE := "user://sky.txt"
+
+## Kenney "Skyboxes" (CC0): 360-degree panoramas. `u` and `elev` locate the painted
+## sun in the image so the real light comes from the same place.
+const SKIES := {
+	"day": {"name": "Day", "u": 0.916, "elev": 49.9, "light": Color(1.0, 0.97, 0.90), "energy": 0.8,
+		"ambient": 0.45, "fog": Color(0.685, 0.766, 0.949)},
+	"morning": {"name": "Morning", "u": 0.912, "elev": 51.3, "light": Color(1.0, 0.84, 0.66), "energy": 0.75,
+		"ambient": 0.45, "fog": Color(0.977, 0.874, 0.765)},
+	"night": {"name": "Night", "u": 0.916, "elev": 51.3, "light": Color(0.62, 0.72, 1.0), "energy": 0.35,
+		"ambient": 1.7, "fog": Color(0.179, 0.229, 0.407)},
+	"space": {"name": "Space", "u": 0.623, "elev": 9.1, "light": Color(0.72, 0.76, 1.0), "energy": 0.35,
+		"ambient": 1.9, "fog": Color(0.143, 0.181, 0.381)},
+	"alien": {"name": "Alien", "u": 0.889, "elev": 62.6, "light": Color(1.0, 0.86, 1.0), "energy": 0.8,
+		"ambient": 0.45, "fog": Color(0.843, 0.777, 0.914)},
+}
+
+var player: CharacterBody3D
+var hud: Control
+var panel: Control
+var editor: Control
+var pause_menu: Control
+var logbook: Control
+var env: Environment
+var sun: DirectionalLight3D
+var sky_id := "day"
+var _talking_to: Node = null
+var _had_capture := false
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS   # menus keep working while paused...
+	_build_environment()
+	_build_world()
+
+	player = Player.new()
+	player.process_mode = Node.PROCESS_MODE_PAUSABLE   # ...but the player freezes
+	add_child(player)
+	player.global_position = START_POS
+	player.spawn = player.global_transform
+	player.talk_requested.connect(_talk)
+
+	var ui := CanvasLayer.new()
+	ui.layer = 10
+	add_child(ui)
+	hud = Hud.new()
+	hud.player = player
+	ui.add_child(hud)
+	panel = DialoguePanel.new()
+	panel.closed.connect(_on_dialogue_closed)
+	ui.add_child(panel)
+	pause_menu = PauseMenu.new()
+	pause_menu.editor_requested.connect(open_editor)
+	pause_menu.sky_selected.connect(set_sky)
+	ui.add_child(pause_menu)
+	pause_menu.bind(player)
+	editor = DialogueEditor.new()
+	editor.close_requested.connect(close_editor)
+	editor.play_test_requested.connect(_play_test)
+	ui.add_child(editor)
+	logbook = LogbookPanel.new()
+	logbook.closed.connect(func(): Game.set_ui_mode("play"))
+	ui.add_child(logbook)
+
+	Game.set_ui_mode("play")
+
+
+# ---------------------------------------------------------------- world
+func _build_environment() -> void:
+	env = Environment.new()
+	env.background_mode = Environment.BG_SKY
+	env.sky = Sky.new()
+	# ambient comes from a colour matched to each sky: lighting straight from the
+	# bright panoramas washes the ground out in the Compatibility renderer
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_white = 6.0
+	env.fog_enabled = true
+	env.fog_density = 0.0025
+	env.fog_sky_affect = 0.0
+	var we := WorldEnvironment.new()
+	we.environment = env
+	add_child(we)
+
+	sun = DirectionalLight3D.new()
+	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 150.0
+	add_child(sun)
+
+	var saved := "day"
+	if FileAccess.file_exists(SKY_SAVE):
+		saved = FileAccess.get_file_as_string(SKY_SAVE).strip_edges()
+	set_sky(saved if SKIES.has(saved) else "day")
+
+
+## Swap the panorama and move the sun, its colour and the fog to match it.
+func set_sky(id: String) -> void:
+	if not SKIES.has(id):
+		return
+	sky_id = id
+	var s: Dictionary = SKIES[id]
+	var mat := PanoramaSkyMaterial.new()
+	mat.panorama = load("res://assets/skyboxes/skybox-%s.png" % id)
+	env.sky.sky_material = mat
+	env.ambient_light_color = s.fog
+	env.ambient_light_energy = s.ambient
+	env.fog_light_color = s.fog
+	# Godot's panorama yaw is the negative of the image's horizontal position
+	var sun_dir := Basis.from_euler(Vector3(deg_to_rad(s.elev), -s.u * TAU, 0)) * Vector3.FORWARD
+	sun.basis = Basis.looking_at(-sun_dir, Vector3.UP if absf(sun_dir.y) < 0.99 else Vector3.BACK)
+	sun.light_color = s.light
+	sun.light_energy = s.energy
+	var f := FileAccess.open(SKY_SAVE, FileAccess.WRITE)
+	if f:
+		f.store_string(id)
+
+
+func _build_world() -> void:
+	# the plane: 400 x 400 m, top surface at y = 0
+	_box(Vector3(400, 1, 400), Vector3(0, -0.5, 0), Mats.grid(Color(0.46, 0.56, 0.36), Color(0.42, 0.52, 0.33)))
+
+	# one floating cube to swing from
+	var cube := _box(Vector3(6, 6, 6), Vector3(0, 18, -24), Mats.grid(Color(0.92, 0.80, 0.45), Color(0.86, 0.72, 0.38), 1))
+	cube.rotation_degrees.y = 20
+
+	# a rectangle with an NPC label
+	var npc := Npc.new()
+	npc.npc_id = "test_npc"
+	npc.display_name = "NPC"
+	npc.position = Vector3(4, 0, 7)
+	add_child(npc)
+	npc.look_at(Vector3(START_POS.x, 0, START_POS.z), Vector3.UP, true)
+
+	_build_evidence()
+
+
+## Four practice clues, one per school of magic, in a row near the start.
+func _build_evidence() -> void:
+	var char_mat := Mats.lit(Color(0.12, 0.10, 0.09))
+	var wood := Mats.lit(Color(0.55, 0.40, 0.25))
+	var stone := Mats.lit(Color(0.62, 0.62, 0.60))
+
+	# fire: a stone block with a perfect circle burnt into it, still warm
+	var fire := _evidence("ev_fire_circle", "fire", "A ring burnt into stone",
+		"A perfectly round scorch on a stone block. Stone doesn't burn, there's no fuel or oil smell, and the char is still warm to the touch.", Vector3(-9, 0, 9))
+	fire.part(Vector3(1.2, 0.9, 1.2), Vector3(0, 0.45, 0), stone)
+	var ring: MeshInstance3D = fire.part(Vector3(0.8, 0.02, 0.8), Vector3(0, 0.91, 0), char_mat, Vector3.ZERO, false)
+	ring.mesh = _disc(0.42)
+	var ember: MeshInstance3D = fire.part(Vector3(0.3, 0.03, 0.3), Vector3(0, 0.925, 0), _glow(Color(1.0, 0.45, 0.15)), Vector3.ZERO, false)
+	ember.mesh = _disc(0.16)
+
+	# nature: a cut-timber crate putting out fresh green shoots
+	var nat := _evidence("ev_nature_crate", "nature", "A crate that has sprouted",
+		"A shipping crate of cut, dried timber with green shoots and buds growing from its planks. Cut wood doesn't grow back.", Vector3(-3, 0, 9))
+	nat.part(Vector3(1.1, 0.9, 1.1), Vector3(0, 0.45, 0), wood)
+	var leaf := Mats.lit(Color(0.30, 0.62, 0.28))
+	for i in 7:
+		var a := i * 0.9
+		nat.part(Vector3(0.06, 0.5 + (i % 3) * 0.2, 0.06), Vector3(cos(a) * 0.4, 1.1, sin(a) * 0.4), leaf, Vector3(sin(a) * 0.4, 0, cos(a) * 0.4), false)
+
+	# ice: a post rimed with frost radiating from one point, on a warm day
+	var ice := _evidence("ev_ice_post", "ice", "Frost on a summer post",
+		"A wooden post coated in rime that spreads outward from one point like a star. It's a warm day, and nothing else nearby is cold.", Vector3(3, 0, 9))
+	ice.part(Vector3(0.35, 1.8, 0.35), Vector3(0, 0.9, 0), wood)
+	var frost := _glow(Color(0.75, 0.9, 1.0), 0.6)
+	for i in 6:
+		var a := i * TAU / 6.0
+		ice.part(Vector3(0.05, 0.05, 0.6), Vector3(cos(a) * 0.2, 1.2 + sin(a) * 0.25, 0.2), frost, Vector3(0, 0, a), false)
+	ice.part(Vector3(0.42, 0.25, 0.42), Vector3(0, 1.2, 0), frost, Vector3.ZERO, false)
+
+	# water: a crate soaked to a tide line, with a puddle sitting on its lid
+	var water := _evidence("ev_water_tideline", "water", "A tide line on a dry crate",
+		"A crate with a level band of water staining around its sides and a puddle sitting on its lid, though the ground around it is bone dry.", Vector3(9, 0, 9))
+	water.part(Vector3(1.1, 0.9, 1.1), Vector3(0, 0.45, 0), wood)
+	water.part(Vector3(1.12, 0.06, 1.12), Vector3(0, 0.62, 0), Mats.lit(Color(0.32, 0.25, 0.18)), Vector3.ZERO, false)
+	var pool: MeshInstance3D = water.part(Vector3(0.7, 0.02, 0.7), Vector3(0, 0.91, 0), _glow(Color(0.25, 0.45, 0.85), 0.35), Vector3.ZERO, false)
+	pool.mesh = _disc(0.35)
+
+
+func _evidence(id: String, school: String, title: String, note: String, pos: Vector3) -> Node:
+	var ev := Evidence.new()
+	ev.evidence_id = id
+	ev.school = school
+	ev.title = title
+	ev.note = note
+	ev.position = pos
+	add_child(ev)
+	return ev
+
+
+func _disc(r: float) -> CylinderMesh:
+	var m := CylinderMesh.new()
+	m.top_radius = r
+	m.bottom_radius = r
+	m.height = 0.02
+	m.radial_segments = 24
+	return m
+
+
+func _glow(c: Color, energy := 1.2) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.emission_enabled = true
+	m.emission = c
+	m.emission_energy_multiplier = energy
+	return m
+
+
+func _box(size: Vector3, pos: Vector3, mat: Material) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.collision_layer = Player.LAYER_WORLD
+	body.position = pos
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	body.add_child(col)
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	body.add_child(mi)
+	add_child(body)
+	return body
+
+
+# ---------------------------------------------------------------- dialogue
+func _talk(npc: Node) -> void:
+	if not Game.playing():
+		return
+	if npc.is_in_group("evidence"):
+		_examine(npc)
+		return
+	_talking_to = npc
+	player.halt()
+	Game.set_ui_mode("dialogue")
+	panel.open(DialogueDB.load_tree(npc.npc_id, npc.display_name))
+
+
+func _examine(ev: Node) -> void:
+	if ev.examine():
+		hud.toast("Logged: %s.  Press L to open your logbook." % ev.title)
+	else:
+		hud.toast("Already in your logbook: %s" % ev.title, 2.0)
+
+
+func open_logbook(page := "") -> void:
+	if Game.ui_mode != "play":
+		return
+	Game.set_ui_mode("log")
+	logbook.open(page)
+
+
+func _play_test(data: Dictionary) -> void:
+	editor.visible = false
+	_talking_to = null
+	Game.set_ui_mode("dialogue")
+	panel.open(data)
+	panel.set_meta("from_editor", true)
+
+
+func _on_dialogue_closed() -> void:
+	if panel.has_meta("from_editor"):
+		panel.remove_meta("from_editor")
+		open_editor()
+		return
+	_talking_to = null
+	Game.set_ui_mode("play")
+
+
+# ---------------------------------------------------------------- editor
+func open_editor() -> void:
+	var npcs := []
+	for n in get_tree().get_nodes_in_group("npc"):
+		npcs.append({"id": n.npc_id, "name": n.display_name})
+	Game.set_ui_mode("editor")
+	editor.open(npcs, editor.npc_id)
+
+
+func close_editor() -> void:
+	editor.visible = false
+	Game.set_ui_mode("play")
+
+
+# ---------------------------------------------------------------- menus
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("logbook") and Game.playing():
+		open_logbook()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("toggle_editor"):
+		if Game.ui_mode == "editor":
+			close_editor()
+		elif Game.ui_mode != "dialogue":
+			open_editor()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("pause"):
+		match Game.ui_mode:
+			"play":
+				_set_paused(true)
+			"pause":
+				_set_paused(false)
+			"editor":
+				close_editor()
+		get_viewport().set_input_as_handled()
+	elif Game.playing() and event is InputEventMouseButton and event.pressed \
+			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		# browsers only grant mouse capture on a click
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		get_viewport().set_input_as_handled()
+
+
+func _set_paused(on: bool) -> void:
+	Game.set_ui_mode("pause" if on else "play")
+
+
+func _process(_dt: float) -> void:
+	# In a browser, Esc releases the mouse before the game sees the key: treat that as pause.
+	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	if OS.has_feature("web") and Game.playing() and _had_capture and not captured:
+		_set_paused(true)
+	_had_capture = captured and Game.playing()
