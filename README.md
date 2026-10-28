@@ -47,21 +47,25 @@ The game opens on a **level select**. Click a level or press its number. In a le
 - **Test Range:** the flat plane with the floating cube, the NPC and four practice clues.
 - **Level 1:** two floating islands level with each other, with a short gap. Start near the edge facing the far island.
 - **Level 2:** two floating islands, the far one further away and 16 m higher, so you need height and momentum.
-- **Enemy Test (Ground)** and **Enemy Test (Air):** one caster each, a wizard and a witch (see below).
+- **Enemy Test (Ground)** and **Enemy Test (Air):** a wizard, and the witch's tree (see below).
 
 The islands have flat, grassy tops to walk on and jagged rock cones underneath. Every surface can be grappled, including the cliffs and the undersides. There are no obstacles or details yet: this is a blank countryside for practising level design. Falling off sends you back to the start.
 
+## Grapple economy
+Grapples on **ordinary** things (islands, rock, the test cube) are limited: 3 per jump, refilled when you land. Grapples on **magic** are free and unlimited: blue orbs, a witch's ward and the casters themselves. The crosshair says "magic, free grapple" when you're aiming at something free.
+
+## Stun
+Touching **magic that isn't safe**, meaning any red orb, any projectile or the outside of a ward, **stuns you for 3 seconds**: the chain drops, you can't move or grapple, your sideways motion dies and you fall straight down, passing through wards. A purple flash and a **STUNNED** countdown (top left) make it clear. Control returns when it wears off, followed by a short grace period. Stuns replace the old hearts: falling is the punishment.
+
 ## Enemies: witches and wizards
-Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a broom, a glowing casting hand) loop a set path. The glow in the casting hand swells before each volley. There are two kinds, each with its own test level:
+Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a broom, a glowing casting hand).
 
-- **Wizard, ground kind (Enemy Test (Ground)):** blue robe and white beard; flies low over the island. Once you come within **38 m** its core turns red, it slows and faces you, and after a warning swell it fires a **spread-out line of five large dark red orbs** straight across, parallel to the ground (NieR-style). Alternate volleys shift by half a gap, so stepping between the orbs works but standing still doesn't.
-- **Witch, air kind (Enemy Test (Air)):** purple robe and black hat; flies high and doesn't shoot. A **constellation of dark red orbs** spins around it, and **blue orbs** ride a wider ring. Grab a blue orb and it leaves the ring and holds still, a swing point to get close. A new one grows back after a few seconds.
+- **Wizard (Enemy Test (Ground)):** blue robe and white beard; flies low over the island. Within **38 m** his casting hand glows red, he slows and faces you, and after a warning swell he fires a **spread-out line of five large dark red orbs** straight across, parallel to the ground (NieR-style). Alternate volleys shift by half a gap. Hook him from within **20 m** and swing around.
+- **Witch (Enemy Test (Air)):** she doesn't shoot. Her **tree** is a tall, wide cone of **80 dark red orbs** and **10 blue orbs**, spaced far apart and slowly turning, high above the island: a platforming climb in its own right. The blue orbs spiral up the cone as the route (free grapples, and they keep riding the tree while you hang from them). At the top she hovers inside her **ward**, a large faceted forcefield with one small opening. You can grapple the ward, but touching it stuns you. You can hook her through the opening from outside, but **laps only count once you're inside**.
 
-**Getting hit** costs one heart (top left), knocks you back and gives you a moment of safety. Lose all three and you restart at full health.
+**Subduing (both):** swing around the caster. Each full lap adds a silver coil. On the third lap a **purple magic burst** goes off and the chain snaps: purple flash, **SUBDUED** banner, a split-second of slow motion, and your speed capped at 9 m/s in the direction you were going. A witch's ward breaks with her. Let go mid-wrap and the coils slip loose after a moment.
 
-**Subduing:** hook a caster from **within 20 m** (the crosshair turns red: "in range to wrap"). From further away it shakes the chain off. While hooked it stops moving and holds fire. **Swing around it**: each full lap adds a silver coil, and the rope stays the length you hooked at. On the **third lap** it releases a **purple magic burst** and the chain snaps. To make that unmistakable: the screen pulses purple, **SUBDUED** flashes in the centre, time slows for a split second, and your speed is capped at 9 m/s in the direction you were already going, so you don't get flung somewhere unexpected. Let go mid-wrap and the coils slip loose after a moment.
-
-Code: `scripts/combat/sentry.gd` (both kinds, the broom-rider model, the wrap), `bullet_field.gd` (projectiles, drawn in one batch), `hook_orb.gd` (the blue grab-orbs), `magic_burst.gd` (the purple burst).
+Code: `scripts/combat/sentry.gd` (casters, the wrap), `orb_tree.gd` (the witch's tree), `ward.gd` (the forcefield), `bullet_field.gd` (projectiles), `hook_orb.gd` (blue orbs), `magic_burst.gd`.
 
 ## Skies
 The range uses Kenney's free CC0 skybox pack: **Day** (default), **Morning**, **Night**, **Space** and **Alien**. Switch between them in the pause menu (Esc → Sky); your choice is remembered. Each sky moves the sun light to where the painted sun sits, and matches the light colour, ambient light and fog to that sky.

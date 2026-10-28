@@ -226,11 +226,18 @@ func _ready() -> void:
 	_aim(ep, s.global_position + Vector3(0, 0.8, 0))
 	await shot("16_wizard_close")
 	ep.invuln = 0.0
-	var hp: int = ep.health
+	ep.global_position = s.global_position + Vector3(0, 6, 12)
+	ep.attached = true
+	ep.hook_node = null
+	ep.velocity = Vector3(12, 3, 0)
 	ep.hit(Vector3.FORWARD)
-	check(ep.health == hp - 1 and ep.invuln > 0.0, "a hit costs one health and grants a moment of safety")
-	ep.hit(Vector3.FORWARD)
-	check(ep.health == hp - 1, "no double hits during the safety window")
+	check(ep.stunned > 2.9 and not ep.attached, "a hit stuns: the chain drops")
+	check(absf(ep.velocity.x) < 2.0 and ep.velocity.y <= 0.0, "stunned, you drop straight down")
+	ep.try_grapple()
+	check(ep.hook_state == 0 or ep.hook_state == 3, "no grappling while stunned")
+	for i in int(3.2 * 120):
+		await get_tree().physics_frame
+	check(ep.stunned == 0.0, "control returns after 3 seconds")
 	ep.invuln = 999.0
 
 	ep.global_position = s.global_position + Vector3(30, 0, 0)
@@ -264,37 +271,97 @@ func _ready() -> void:
 	ew.queue_free()
 	await get_tree().process_frame
 
-	print("== Enemy test (air)")
+	print("== Enemy test (air): the witch's tree")
 	Game.level = "enemy_test_air"
 	var aw = load("res://scenes/world.tscn").instantiate()
 	get_tree().root.add_child(aw)
 	for i in 30:
 		await get_tree().physics_frame
 	var ap = aw.player
-	var air = aw.sentries[0]
-	check(aw.sentries.size() == 1 and air.kind == "air" and air.title == "witch", "one flying Sentry, a witch on a broom")
-	check(air._reds.size() == 10, "a constellation of red orbs spins around it")
-	for i in 10:
+	var witch = aw.sentries[0]
+	var tr = aw.tree
+	var wd = aw.ward
+	check(aw.sentries.size() == 1 and witch.kind == "air" and witch.title == "witch", "one witch")
+	check(tr.red_count() == 80 and tr.blue_orbs().size() == 10, "her tree: 80 red orbs, 10 blue")
+	var b0: Vector3 = tr.blue_orbs()[0].global_position
+	for i in 60:
 		await get_tree().physics_frame
-	var blues: Array = air._blues.filter(func(o): return o != null and is_instance_valid(o))
-	check(blues.size() == 3, "blue orbs ride the constellation to grab onto")
-	var r0: Vector3 = air._reds[0].global_position
-	await get_tree().physics_frame
-	check(air._reds[0].global_position.distance_to(r0) > 0.01, "the constellation turns")
-	ap.invuln = 0.0
-	var hp2: int = ap.health
-	ap.global_position = air._reds[0].global_position
-	air._update_constellation(0.0)
-	check(ap.health < hp2, "touching a red orb hurts")
+	check(tr.blue_orbs()[0].global_position.distance_to(b0) > 0.05, "the tree slowly turns")
+	check(wd.is_inside(witch.global_position), "the witch hovers inside her ward")
+
+	# free magic grapples vs limited ordinary ones
 	ap.invuln = 999.0
-	var b = blues[0]
-	check(b.on_hooked(ap) and not b.orbiting, "a hooked blue orb leaves the constellation and holds still")
-	ap.global_position = air.global_position + Vector3(3.2, 0.2, -2.8)
-	_aim(ap, air.global_position + Vector3(0, 0.8, 0))
-	await shot("17_witch_close")
-	ap.global_position = air.global_position + Vector3(0, -6, 16)
-	_aim(ap, air.global_position)
-	await shot("15_enemy_air")
+	var blue = tr.blue_orbs()[3]
+	ap.global_position = blue.global_position + Vector3(0, -4, 6)
+	_aim(ap, blue.global_position)
+	ap.air_left = 0
+	await get_tree().physics_frame
+	ap.try_grapple()
+	check(ap.hook_state == 1, "out of air grapples, you can still hook a blue orb (magic is free)")
+	for i in 30:
+		await get_tree().physics_frame
+	check(ap.attached and ap.hook_node == blue and blue.orbiting, "the hooked blue orb keeps riding the tree")
+	ap.release()
+	ap.air_left = 0
+	ap.global_position = Vector3(0, 6, 20)
+	_aim(ap, Vector3(0, -2, 0))
+	await get_tree().physics_frame
+	ap.try_grapple()
+	check(ap.hook_state != 1, "out of air grapples, an ordinary surface can't be hooked")
+
+	# touching a red orb stuns
+	ap.invuln = 0.0
+	var red_world: Vector3 = tr.global_position + Basis(Vector3.UP, tr._angle) * tr._red_local[10]
+	ap.global_position = red_world
+	await get_tree().physics_frame
+	check(ap.stunned > 0.0, "touching a red orb stuns you")
+	ap.stunned = 0.0
+	ap.invuln = 0.0
+
+	# the ward: touching its outside stuns; the opening is safe
+	var outside: Vector3 = wd.global_position + Vector3(-1, 0, 0) * (wd.radius + 0.2)
+	ap.global_position = outside
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	check(ap.stunned > 0.0, "touching the ward's shell stuns you")
+	ap.stunned = 0.0
+	ap.invuln = 0.0
+	var hole: Vector3 = wd.global_position + wd.open_dir.normalized() * wd.radius
+	ap.global_position = hole
+	await get_tree().physics_frame
+	check(ap.stunned == 0.0, "the opening is safe to fly through")
+	ap.global_position = wd.global_position + Vector3(4, 0, 0)
+	await get_tree().physics_frame
+	check(wd.is_inside(ap.global_position) and ap.stunned == 0.0, "inside the ward you're safe")
+
+	ap.invuln = 999.0
+	ap.global_position = wd.global_position + Vector3(2, -5, 17)
+	_aim(ap, wd.global_position)
+	await shot("16_ward")
+	# wraps only count inside
+	ap.invuln = 999.0
+	ap.global_position = wd.global_position + Vector3(0, 0, wd.radius + 6)
+	check(witch.on_hooked(ap), "you can hook her through the opening from outside")
+	ap.attached = true
+	ap.hook_node = witch
+	var wc: Vector3 = witch.global_position
+	for k in 30:
+		var a3 := TAU * k / 24.0
+		witch._track_wrap(wc + Vector3(cos(a3) * 14.0, 0, sin(a3) * 14.0))
+	check(witch.wraps < 0.1, "laps outside the ward don't count")
+	for k in 3 * 24 + 6:
+		var a3 := TAU * k / 24.0
+		witch._track_wrap(wc + Vector3(cos(a3) * 4.0, -1.0, sin(a3) * 4.0))
+		if witch.is_subdued:
+			break
+	check(witch.is_subdued, "three laps inside the ward subdue her")
+	await get_tree().process_frame
+	check(not is_instance_valid(wd) or wd.is_queued_for_deletion(), "her ward breaks with her")
+	for i in 90:
+		await get_tree().process_frame
+	ap.global_position = Vector3(0, 8, 40)
+	_aim(ap, tr.global_position + Vector3(0, 26, 0))
+	await shot("15_witch_tree")
 	aw.queue_free()
 	await get_tree().process_frame
 	Game.level = "range"

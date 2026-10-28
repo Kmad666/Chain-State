@@ -9,7 +9,8 @@ var life := 8.0
 var field: Node                 # the BulletField, for the player reference
 var hooked := false
 var orbiting := false            # placed by a Sentry's constellation each frame
-var harmless := false            # constellation blue orbs don't hurt
+var harmless := false            # tree / constellation blue orbs don't hurt
+var persistent := false          # stays in its tree when hooked or released
 var _released_t := -1.0
 var _core: MeshInstance3D
 var _ring: MeshInstance3D
@@ -17,6 +18,7 @@ var _ring: MeshInstance3D
 
 func _ready() -> void:
 	add_to_group("hook_orb")
+	add_to_group("magic")
 	collision_layer = 4
 	collision_mask = 0
 	var shape := SphereShape3D.new()
@@ -75,12 +77,16 @@ func _physics_process(dt: float) -> void:
 
 ## Called by the player's grapple when the arrowhead bites.
 func on_hooked(_player: Node) -> bool:
+	if persistent:
+		return true              # keeps riding its tree; the anchor follows it
 	hooked = true
 	orbiting = false             # caught: it leaves the constellation and holds still
 	return true
 
 
 func on_released(_player: Node) -> void:
+	if persistent:
+		return
 	hooked = false
 	velocity = Vector3.ZERO      # it stays where you left it, then fades
 	_released_t = 1.2

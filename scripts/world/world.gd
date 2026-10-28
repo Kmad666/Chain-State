@@ -15,6 +15,8 @@ const Evidence := preload("res://scripts/world/evidence.gd")
 const FloatingIsland := preload("res://scripts/world/floating_island.gd")
 const BulletField := preload("res://scripts/combat/bullet_field.gd")
 const Sentry := preload("res://scripts/combat/sentry.gd")
+const OrbTree := preload("res://scripts/combat/orb_tree.gd")
+const Ward := preload("res://scripts/combat/ward.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -44,6 +46,8 @@ var env: Environment
 var sun: DirectionalLight3D
 var islands: Array = []
 var sentries: Array = []
+var tree: Node3D
+var ward: Node3D
 var bullets: Node3D
 var start_pos := START_POS
 var start_yaw := 0.0
@@ -69,6 +73,10 @@ func _ready() -> void:
 		bullets.player = player
 	for s in sentries:
 		s.player = player
+	if tree:
+		tree.player = player
+	if ward:
+		ward.player = player
 
 	# sun glare sits between the 3D view and the HUD
 	var glare_layer := CanvasLayer.new()
@@ -86,7 +94,9 @@ func _ready() -> void:
 	hud.player = player
 	ui.add_child(hud)
 	player.notice.connect(func(t): hud.toast(t, 2.5))
-	player.hurt.connect(func(_h): hud.flash())
+	player.stun_started.connect(func():
+		hud.flash(Color(0.55, 0.25, 1.0), 0.5)
+		hud.toast("Stunned! You drop for %d seconds." % int(player.STUN_TIME), 2.5))
 	player.snapped.connect(_on_chain_snapped)
 	player.downed.connect(func():
 		hud.toast("Down! Back to the start.", 3.0)
@@ -210,17 +220,22 @@ func _build_enemy_test() -> void:
 	start_yaw = 0.0
 
 
-## Enemy test (air): islands spread out, one high-flying Sentry wearing a
-## spinning constellation of red orbs, with blue orbs to grab.
+## Enemy test (air): the witch's tree. A tall, slowly turning cone of 80 red
+## orbs (touch one and you're stunned) and 10 blue ones spiralling up as the
+## route. At the top the witch hovers inside her ward; fly in through its opening.
 func _build_enemy_test_air() -> void:
 	_island(Vector3(0, 0, 0), 26.0, 5)
-	_island(Vector3(-40, 8, -38), 12.0, 7)
-	_island(Vector3(38, 4, -30), 10.0, 9)
-	var loop := PackedVector3Array()
-	for i in 10:
-		var a := TAU * i / 10.0
-		loop.append(Vector3(cos(a) * 22.0, 17.0 + sin(a * 2.0) * 3.0, sin(a) * 22.0 - 14.0))
-	_sentry("air", loop)
+	_island(Vector3(-46, 6, -40), 12.0, 7)
+	var base := Vector3(0, 12, -6)
+	tree = OrbTree.new()
+	tree.position = base
+	add_child(tree)
+	ward = Ward.new()
+	ward.position = base + Vector3(0, tree.height + 13.0, 0)
+	ward.open_dir = Vector3(0, -0.5, 1.0)
+	add_child(ward)
+	var witch := _sentry("air", PackedVector3Array([ward.position]))
+	witch.ward = ward
 	start_pos = Vector3(0, 1.0, 18)
 	start_yaw = 0.0
 

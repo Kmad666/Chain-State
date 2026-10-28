@@ -125,11 +125,9 @@ func _process(_dt: float) -> void:
 	_banner_t = maxf(_banner_t - _dt, 0.0)
 	_banner.modulate.a = clampf(_banner_t * 1.5, 0.0, 1.0)
 	_flash.color.a = _flash_a
-	var hp := ""
-	for i in player.MAX_HEALTH:
-		hp += "♥ " if i < player.health else "♡ "
-	_health.text = hp
-	_health.modulate.a = 0.5 if player.invuln > 0.0 and fmod(player.invuln, 0.2) < 0.1 else 1.0
+	# stun: a countdown in place of the old hearts
+	_health.text = "STUNNED  %.1f" % player.stunned if player.stunned > 0.0 else ""
+	_health.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
 	var target = player.hook_node if player.attached else null
 	if target and is_instance_valid(target) and target.is_in_group("enemy"):
 		var w: float = target.wraps
@@ -159,9 +157,12 @@ func _process(_dt: float) -> void:
 		var close: bool = dist <= player.aim_enemy.SUBDUE_RANGE
 		col = Color(1.0, 0.35, 0.3, 0.95) if close else Color(1.0, 0.75, 0.5, 0.7)
 		_info.text = ("%d m  ·  in range to wrap" if close else "%d m  ·  too far to wrap") % roundi(dist)
+	elif player.aim_enemy and is_instance_valid(player.aim_enemy) and player.aim_enemy.is_in_group("ward"):
+		col = Color(0.8, 0.6, 1.0, 0.95)
+		_info.text = "ward  ·  free grapple, but don't touch it"
 	elif player.aim_enemy and is_instance_valid(player.aim_enemy):
 		col = Color(0.55, 0.85, 1.0, 0.95)
-		_info.text = "hookable orb"
+		_info.text = "blue orb  ·  magic, free grapple"
 	elif player.attached:
 		col = Color(0.75, 0.85, 1.0, 0.8)
 		_info.text = "rope %d m" % roundi(player.rope_len)

@@ -6,8 +6,9 @@ extends StaticBody3D
 ##   ground - hovers low over an island. When you come within ENGAGE_RANGE it
 ##            turns to face you and fires spread-out lines of large dark red orbs
 ##            straight across, parallel to the ground (NieR-style). Few orbs, with gaps.
-##   air    - flies high and doesn't shoot. A constellation of dark red orbs spins
-##            around it, with blue hookable orbs in a wider ring to swing from.
+##   air    - the witch. She doesn't shoot. She hovers inside her ward (ward.gd) at
+##            the top of her orb tree (orb_tree.gd). You can only wrap her once you're
+##            inside the ward: fly in through its opening.
 ##
 ## Subduing (both kinds): hook it from within SUBDUE_RANGE, then swing around it.
 ## Each full lap adds a silver coil. On the third lap it releases a purple magic
@@ -28,14 +29,6 @@ const WRAPS_NEEDED := 3
 const SLIP_DELAY := 1.5
 const TELEGRAPH := 0.8
 const BREAK_SPEED := 9.0         # your speed is capped to this when the chain snaps
-
-# air constellation
-const RED_ORBS := 10
-const RED_RADIUS := 5.0
-const RED_ORB_SIZE := 0.6
-const BLUE_ORBS := 3
-const BLUE_RADIUS := 9.0
-const BLUE_RESPAWN := 4.0
 
 @export var kind := "ground"
 @export var path: PackedVector3Array = []     # world-space waypoints, looped
@@ -62,9 +55,7 @@ var _core_mat: StandardMaterial3D
 var _rig: Node3D                 # the broom and rider, tilted and bobbed for life
 var title := "witch"             # used in messages: "witch" or "wizard"
 var _coils: Array[MeshInstance3D] = []
-var _reds: Array[MeshInstance3D] = []
-var _blues: Array = []           # HookOrb or null (respawning)
-var _blue_t: Array[float] = []
+var ward: Node = null            # air kind: the ward she sits in
 
 
 func _ready() -> void:
@@ -79,8 +70,6 @@ func _ready() -> void:
 
 	_build_rider()
 
-	if kind == "air":
-		_build_constellation()
 	if path.size() > 0:
 		global_position = path[0]
 
@@ -162,32 +151,6 @@ func _part(mesh: Mesh, pos: Vector3, mat: Material, rot := Vector3.ZERO) -> Mesh
 	return mi
 
 
-func _build_constellation() -> void:
-	var s := SphereMesh.new()
-	s.radius = RED_ORB_SIZE
-	s.height = RED_ORB_SIZE * 2.0
-	s.radial_segments = 12
-	s.rings = 6
-	for i in RED_ORBS:
-		var m := MeshInstance3D.new()
-		m.mesh = s
-		m.material_override = _red_mat()
-		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		m.top_level = true       # placed in world space each frame, not spun with the body
-		add_child(m)
-		_reds.append(m)
-	for i in BLUE_ORBS:
-		_blues.append(null)
-		_blue_t.append(0.0)
-
-
-static func _red_mat() -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = Color(0.42, 0.02, 0.05)
-	return m
-
-
 func _physics_process(dt: float) -> void:
 	_t += dt
 	if is_subdued:
@@ -222,8 +185,7 @@ func _physics_process(dt: float) -> void:
 			basis = basis.slerp(Basis.looking_at(to.normalized(), Vector3.UP), 1.0 - exp(-4.0 * dt)).orthonormalized()
 
 	if kind == "air":
-		_update_constellation(dt)
-		_core_mat.albedo_color = Color(0.9, 0.15, 0.2) if engaged else Color(0.7, 0.45, 0.2)
+		_core_mat.albedo_color = Color(0.85, 0.4, 1.0) if engaged else Color(0.7, 0.45, 0.2)
 		return
 
 	# ground: telegraph (core swells, goes from ember to bright red) then fire
@@ -273,42 +235,6 @@ func _fire_line() -> void:
 	_volley += 1
 
 
-# ---------------------------------------------------------------- air: constellation
-func _update_constellation(dt: float) -> void:
-	var c := global_position
-	for i in _reds.size():
-		var a := _t * 1.1 + TAU * i / _reds.size()
-		var tilt := sin(a * 2.0 + _t * 0.5) * 1.6
-		_reds[i].global_position = c + Vector3(cos(a) * RED_RADIUS, tilt, sin(a) * RED_RADIUS)
-		if player and is_instance_valid(player) and _touches(_reds[i].global_position, player.global_position):
-			player.hit((player.global_position - _reds[i].global_position).normalized())
-	for i in _blues.size():
-		var orb = _blues[i]
-		var a := -_t * 0.6 + TAU * i / _blues.size()
-		var at := c + Vector3(cos(a) * BLUE_RADIUS, 1.5 + sin(_t + i) * 1.2, sin(a) * BLUE_RADIUS)
-		if orb == null or not is_instance_valid(orb):
-			_blues[i] = null
-			_blue_t[i] -= dt
-			if _blue_t[i] <= 0.0:
-				var o := HookOrb.new()
-				o.orbiting = true
-				o.harmless = true
-				add_child(o)
-				o.top_level = true
-				o.global_position = at
-				_blues[i] = o
-		elif orb.orbiting:
-			orb.global_position = at
-		else:
-			_blues[i] = null          # it was caught; a new one grows in after a while
-			_blue_t[i] = BLUE_RESPAWN
-
-
-func _touches(orb_pos: Vector3, p: Vector3) -> bool:
-	var y := clampf(orb_pos.y, p.y - 0.5, p.y + 0.5)
-	return orb_pos.distance_to(Vector3(p.x, y, p.z)) < RED_ORB_SIZE + 0.38
-
-
 # ---------------------------------------------------------------- the wrap
 ## Called by the player's grapple when the arrowhead bites. False = shaken off.
 func on_hooked(p: Node) -> bool:
@@ -322,7 +248,10 @@ func on_hooked(p: Node) -> bool:
 	_slip_t = -1.0
 	_last_angle = _angle_to(p.global_position)
 	if p.has_signal("notice"):
-		p.notice.emit("Hooked! Swing around it to wrap the chain.")
+		if ward and is_instance_valid(ward) and not ward.is_inside(p.global_position):
+			p.notice.emit("Hooked through the opening. Get inside the ward to wrap her.")
+		else:
+			p.notice.emit("Hooked! Swing around it to wrap the chain.")
 	return true
 
 
@@ -339,6 +268,9 @@ func _angle_to(pos: Vector3) -> float:
 ## Counts laps of the player around it (in the horizontal plane); reversing unwinds.
 func _track_wrap(player_pos: Vector3) -> void:
 	var a := _angle_to(player_pos)
+	if ward and is_instance_valid(ward) and not ward.is_inside(player_pos):
+		_last_angle = a              # laps only count inside her ward
+		return
 	var delta := wrapf(a - _last_angle, -PI, PI)
 	_last_angle = a
 	var before := floori(wraps)
@@ -380,13 +312,8 @@ func _subdue() -> void:
 	var burst := MagicBurst.new()
 	get_parent().add_child(burst)
 	burst.global_position = global_position
-	for r in _reds:
-		r.queue_free()
-	_reds.clear()
-	for o in _blues:
-		if o and is_instance_valid(o) and o.orbiting:
-			o.queue_free()
-	_blues.clear()
+	if ward and is_instance_valid(ward):
+		ward.queue_free()            # her ward dies with her
 	if _hooked_by and is_instance_valid(_hooked_by):
 		var p := _hooked_by
 		_hooked_by = null

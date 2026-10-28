@@ -19,6 +19,7 @@ signal notice(text: String)      # short messages for the HUD
 signal hurt(health: int)
 signal downed
 signal snapped                   # the chain broke on a bound enemy
+signal stun_started              # touched a magic projectile or a ward
 
 const Chain := preload("res://scripts/player/chain.gd")
 const Viewmodel := preload("res://scripts/player/viewmodel.gd")
@@ -28,6 +29,7 @@ const LAYER_NPC := 2            # solid, talk-able, NOT grapple-able
 const LAYER_HOOK := 4           # moving grapple targets (enemies, hookable orbs): not solid
 const MAX_HEALTH := 3
 const INVULN_TIME := 1.2
+const STUN_TIME := 3.0          # touching magic: no control, no chain, you drop
 const EYE_HEIGHT := 0.7         # camera height above the capsule centre
 const MIN_ROPE := 2.0
 const ATTACH_PULL := 0.03       # rope shortens by this fraction on attach (the "tug")
@@ -103,6 +105,7 @@ var hook_node: Node3D = null     # a moving target the hook is flying to / attac
 var hook_offset := Vector3.ZERO  # where on it, in its local space
 var health := MAX_HEALTH
 var invuln := 0.0
+var stunned := 0.0               # seconds of stun left
 var aim_enemy: Node = null       # enemy under the crosshair (read by the HUD)
 var dash_cd := 0.0
 
@@ -165,6 +168,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		head.rotate_x(-event.relative.y * s)
 		head.rotation.x = clampf(head.rotation.x, deg_to_rad(-88), deg_to_rad(88))
 		_look_delta += event.relative
+	elif stunned > 0.0 and (event.is_action_pressed("grapple") or event.is_action_pressed("interact")):
+		return
 	elif event.is_action_pressed("grapple"):
 		if look_npc:
 			talk_requested.emit(look_npc)
@@ -192,12 +197,13 @@ func _ray(mask: int, length: float) -> Dictionary:
 # ---------------------------------------------------------------- grapple
 ## Fire the arrowhead at whatever surface is under the crosshair.
 func try_grapple() -> void:
-	if hook_state == Chain.FLYING or attached:
+	if hook_state == Chain.FLYING or attached or stunned > 0.0:
 		return
 	var hit := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, tune.grapple_range)
 	if hit.is_empty() or (hit.collider.collision_layer & (LAYER_WORLD | LAYER_HOOK)) == 0:
 		return
-	if not is_on_floor():
+	# grapples on ordinary things are limited per jump; on magic they're free
+	if not is_on_floor() and not is_magic(hit.collider):
 		if air_left <= 0:
 			return
 		air_left -= 1
@@ -206,6 +212,8 @@ func try_grapple() -> void:
 	if hit.collider.collision_layer & LAYER_HOOK:
 		hook_node = hit.collider
 		hook_offset = Vector3.ZERO          # aim for its centre: it's moving
+		if hit.collider.is_in_group("ward"):
+			hook_offset = hit.collider.to_local(hit.position)   # a fixed shell: hook where you hit
 	hook_state = Chain.FLYING
 
 
@@ -289,24 +297,35 @@ func chain_snapped(max_speed: float) -> void:
 	snapped.emit()
 
 
-## Struck by a projectile: lose a point of health, get knocked back, and get a
-## moment of invulnerability. At zero you go down and restart at full health.
-func hit(from_dir: Vector3) -> void:
-	if invuln > 0.0 or not Game.playing():
+static func is_magic(n: Node) -> bool:
+	return n.is_in_group("magic") or n.is_in_group("hook_orb") or n.is_in_group("enemy")
+
+
+## Touched magic (a red orb, a projectile, a ward): stunned for STUN_TIME. The
+## chain drops, your sideways motion dies and you fall straight down, passing
+## through wards. Control returns when it wears off. A short grace period follows.
+func hit(_from_dir: Vector3) -> void:
+	if invuln > 0.0 or stunned > 0.0 or not Game.playing():
 		return
-	health -= 1
-	invuln = INVULN_TIME
-	velocity += from_dir * 6.0 + Vector3.UP * 2.5
-	hurt.emit(health)
-	if health <= 0:
-		downed.emit()
-		respawn()
-		health = MAX_HEALTH
-		hurt.emit(health)
+	_drop_chain()
+	stunned = STUN_TIME
+	invuln = STUN_TIME + 0.8
+	velocity = Vector3(velocity.x * 0.15, minf(velocity.y, 0.0), velocity.z * 0.15)
+	stun_started.emit()
+
+
+func _drop_chain() -> void:
+	if hook_node and is_instance_valid(hook_node) and hook_node.has_method("on_released"):
+		hook_node.on_released(self)
+	hook_node = null
+	attached = false
+	if hook_state != Chain.STOWED:
+		hook_state = Chain.RETURNING
 
 
 func respawn() -> void:
 	release()
+	stunned = 0.0
 	global_transform = spawn
 	head.rotation.x = 0.0
 	velocity = Vector3.ZERO
@@ -323,7 +342,8 @@ func halt() -> void:
 # ---------------------------------------------------------------- movement
 func _physics_process(dt: float) -> void:
 	var input := Vector2.ZERO
-	if Game.playing():
+	stunned = maxf(stunned - dt, 0.0)
+	if Game.playing() and stunned <= 0.0:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var wish := global_basis * Vector3(input.x, 0, input.y)
 	wish.y = 0
@@ -338,7 +358,7 @@ func _physics_process(dt: float) -> void:
 		_swing(look_wish, dt)
 	elif is_on_floor():
 		_walk(wish, dt)
-		if Game.playing() and Input.is_action_just_pressed("jump"):
+		if Game.playing() and stunned <= 0.0 and Input.is_action_just_pressed("jump"):
 			velocity.y = tune.jump
 	else:
 		# air strafe: steer, but can't accelerate past air_speed in the wish direction
@@ -349,7 +369,7 @@ func _physics_process(dt: float) -> void:
 	# Dash: snap your momentum toward where you look
 	dash_cd = maxf(dash_cd - dt, 0.0)
 	invuln = maxf(invuln - dt, 0.0)
-	if Game.playing() and dash_cd == 0.0 and Input.is_action_just_pressed("dash") and tune.dash_speed > 0.0:
+	if Game.playing() and stunned <= 0.0 and dash_cd == 0.0 and Input.is_action_just_pressed("dash") and tune.dash_speed > 0.0:
 		velocity = -cam.global_basis.z * maxf(velocity.length(), tune.dash_speed) * (1.0 + tune.release_boost)
 		dash_cd = 1.2
 
@@ -439,7 +459,7 @@ func _process(dt: float) -> void:
 				if d <= TALK_RANGE:
 					look_npc = hit.collider
 			else:
-				if hit.collider.is_in_group("enemy") or hit.collider.is_in_group("hook_orb"):
+				if hit.collider.is_in_group("enemy") or hit.collider.is_in_group("hook_orb") or hit.collider.is_in_group("ward"):
 					aim_enemy = hit.collider
 				aim_valid = true
 				aim_point = hit.position
