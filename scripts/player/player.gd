@@ -61,6 +61,7 @@ var tune := {
 	"dash_speed": 10.0,
 	"mouse_sensitivity": 0.25,
 	"aim_assist": 70.0,
+	"lock_cone": 30.0,
 }
 const TUNING := [
 	{"key": "gravity", "label": "Gravity", "min": 4.0, "max": 30.0, "step": 0.5},
@@ -79,6 +80,7 @@ const TUNING := [
 	{"key": "dash_speed", "label": "Dash speed", "min": 0.0, "max": 30.0, "step": 0.5},
 	{"key": "mouse_sensitivity", "label": "Mouse sensitivity", "min": 0.05, "max": 1.0, "step": 0.01},
 	{"key": "aim_assist", "label": "Reticle size (aim assist)", "min": 0.0, "max": 160.0, "step": 5.0},
+	{"key": "lock_cone", "label": "Auto-aim lock cone (deg)", "min": 0.0, "max": 60.0, "step": 1.0},
 ]
 const PRESETS := [
 	{"name": "Float", "desc": "No gravity on the rope. Drift on your momentum.",
@@ -115,6 +117,9 @@ var dash_cd := 0.0
 var aim_valid := false
 var aim_point := Vector3.ZERO
 var aim_distance := 0.0
+var lock_target: Node3D = null   # the grapple target auto-aim has locked onto
+var highlight_target: Node3D = null   # what the chain would bite right now, lit up (read by the HUD)
+var _lock_lost := 0.0
 var look_npc: Node = null        # NPC or evidence under the crosshair within reach
 
 var _look_delta := Vector2.ZERO
@@ -218,13 +223,13 @@ func find_target() -> Dictionary:
 	var r_px := reticle_px()
 	var centre := get_viewport().get_visible_rect().size * 0.5
 	var reach: float = tune.grapple_range
-	var space := get_world_3d().direct_space_state
 	var eye := cam.global_position
 
+	# 1. a caster inside the reticle and in sight: the nearest one
 	if r_px > 0.0:
 		var best: Dictionary = {}
 		var best_d := INF
-		for n in get_tree().get_nodes_in_group("hook_orb") + get_tree().get_nodes_in_group("enemy"):
+		for n in get_tree().get_nodes_in_group("enemy"):
 			if not is_instance_valid(n) or not (n is Node3D):
 				continue
 			var p: Vector3 = n.global_position
@@ -233,39 +238,128 @@ func find_target() -> Dictionary:
 				continue
 			if cam.unproject_position(p).distance_to(centre) > r_px:
 				continue
-			var q := PhysicsRayQueryParameters3D.create(eye, p, MASK)
-			q.exclude = [get_rid()]
-			var h := space.intersect_ray(q)
-			if h.is_empty() or h.collider == n:
-				best = {"collider": n, "position": h.position if not h.is_empty() else p}
+			if _in_sight(n):
+				best = {"collider": n, "position": p}
 				best_d = d
 		if not best.is_empty():
 			return best
 
+	# 2. the locked grapple target, if it's inside the reticle
+	var lock_ok := lock_target != null and is_instance_valid(lock_target)
+	var lock_hit := {}
+	if lock_ok:
+		lock_hit = {"collider": lock_target, "position": lock_target.global_position}
+		if _in_reticle(lock_target.global_position):
+			return lock_hit
+
+	# 3. the surface dead centre
 	var hit := _ray(MASK, reach)
-	if not hit.is_empty() or r_px <= 0.0:
+	if not hit.is_empty():
 		return hit
 
-	# nothing dead centre: sweep rings outward and take the first ring that finds a surface
-	const RINGS := 4
-	const SPOKES := 16
-	for ring in range(1, RINGS + 1):
-		var rr := r_px * ring / RINGS
-		var found: Dictionary = {}
-		var found_off := INF
-		for k in SPOKES:
-			var a := TAU * (k + 0.5 * (ring % 2)) / SPOKES
-			var sp := centre + Vector2(cos(a), sin(a)) * rr
-			var h := _ray_dir(cam.project_ray_normal(sp), MASK, reach)
-			if h.is_empty():
-				continue
-			var off := cam.unproject_position(h.position).distance_to(centre)
-			if off < found_off:
-				found = h
-				found_off = off
-		if not found.is_empty():
-			return found
-	return {}
+	# 4. a surface elsewhere in the reticle, closest to the centre
+	if r_px > 0.0:
+		const RINGS := 4
+		const SPOKES := 16
+		for ring in range(1, RINGS + 1):
+			var rr := r_px * ring / RINGS
+			var found: Dictionary = {}
+			var found_off := INF
+			for k in SPOKES:
+				var a := TAU * (k + 0.5 * (ring % 2)) / SPOKES
+				var sp := centre + Vector2(cos(a), sin(a)) * rr
+				var h := _ray_dir(cam.project_ray_normal(sp), MASK, reach)
+				if h.is_empty():
+					continue
+				var off := cam.unproject_position(h.position).distance_to(centre)
+				if off < found_off:
+					found = h
+					found_off = off
+			if not found.is_empty():
+				return found
+
+	# 5. nothing under the reticle at all: the lock, even if it's off to the side or off-screen
+	return lock_hit
+
+
+func _in_reticle(p: Vector3) -> bool:
+	if cam.is_position_behind(p):
+		return false
+	var centre := get_viewport().get_visible_rect().size * 0.5
+	return cam.unproject_position(p).distance_to(centre) <= maxf(reticle_px(), 10.0)
+
+
+## Clear line from the eye to this node (nothing solid or hookable in between).
+func _in_sight(n: Node3D) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(cam.global_position, n.global_position, LAYER_WORLD | LAYER_HOOK)
+	q.exclude = [get_rid()]
+	var h := get_world_3d().direct_space_state.intersect_ray(q)
+	return h.is_empty() or h.collider == n
+
+
+func _view_angle(p: Vector3) -> float:
+	return rad_to_deg((-cam.global_basis.z).angle_to(p - cam.global_position))
+
+
+## Auto-aim lock-on for explicitly grapple-able things (group "grapple_target").
+## It picks the one nearest the crosshair within tune.lock_cone degrees, then holds
+## on to it while it stays in reach and in sight, even once it's left the screen.
+## It switches when you aim clearly closer to another one, and moves on from the
+## one you're hanging from.
+func _update_lock(dt: float) -> void:
+	var cone: float = tune.lock_cone
+	if cone <= 0.0 or stunned > 0.0:
+		lock_target = null
+		return
+	var reach: float = tune.grapple_range
+	var eye := cam.global_position
+	var best: Node3D = null
+	var best_ang := INF
+	for n in get_tree().get_nodes_in_group("grapple_target"):
+		if not is_instance_valid(n) or n == hook_node or not (n is Node3D):
+			continue
+		var p: Vector3 = n.global_position
+		if eye.distance_to(p) > reach:
+			continue
+		var ang := _view_angle(p)
+		if ang > cone or ang >= best_ang:
+			continue
+		if _in_sight(n):
+			best = n
+			best_ang = ang
+
+	# keep the current lock while it's valid; a brief loss of sight is forgiven
+	if lock_target != null:
+		if not is_instance_valid(lock_target) or lock_target == hook_node \
+				or eye.distance_to(lock_target.global_position) > reach:
+			lock_target = null
+		elif not _in_sight(lock_target):
+			_lock_lost += dt
+			if _lock_lost > 0.25:
+				lock_target = null
+		else:
+			_lock_lost = 0.0
+
+	if best == null:
+		return
+	if lock_target == null:
+		lock_target = best
+		_lock_lost = 0.0
+	elif best != lock_target:
+		var la := _view_angle(lock_target.global_position)
+		if (_in_reticle(best.global_position) and not _in_reticle(lock_target.global_position)) or best_ang < la - 10.0:
+			lock_target = best
+			_lock_lost = 0.0
+
+
+func _set_highlight(n: Node3D) -> void:
+	if n == highlight_target:
+		return
+	if highlight_target and is_instance_valid(highlight_target) and highlight_target.has_method("set_highlight"):
+		highlight_target.set_highlight(false)
+	highlight_target = n
+	if n and n.has_method("set_highlight"):
+		n.set_highlight(true)
 
 
 # ---------------------------------------------------------------- grapple
@@ -525,18 +619,23 @@ func _process(dt: float) -> void:
 	look_npc = null
 	aim_valid = false
 	aim_enemy = null
+	var lit: Node3D = null
 	if Game.playing():
+		_update_lock(dt)
 		var near := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, TALK_RANGE)
 		if not near.is_empty() and (near.collider.is_in_group("npc") or near.collider.is_in_group("evidence")):
 			look_npc = near.collider
 		else:
 			var hit := find_target()
+			if not hit.is_empty() and hit.collider.is_in_group("grapple_target") and hit.collider != hook_node:
+				lit = hit.collider
 			if not hit.is_empty():
 				if hit.collider.is_in_group("enemy") or hit.collider.is_in_group("hook_orb") or hit.collider.is_in_group("ward"):
 					aim_enemy = hit.collider
 				aim_valid = true
 				aim_point = hit.position
 				aim_distance = cam.global_position.distance_to(hit.position)
+	_set_highlight(lit)
 
 	var spd := velocity.length()
 	cam.fov = lerpf(cam.fov, 80.0 + clampf((spd - 6.0) * 0.8, 0.0, 18.0), 0.08)

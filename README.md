@@ -61,6 +61,16 @@ Grapples on **ordinary** things (islands, rock, the test cube) are limited: 3 pe
 
 The diamond marker shows the pick before you fire. You can resize the circle (or turn it off at 0) with the "Reticle size" slider.
 
+**Auto-aim lock-on.** Things built to be grappled carry a **grapple-target** label (the `grapple_target` group plus a `grapple_name`). For now that's the blue orbs: the tree's orbs and the hookable orbs in a wizard's volley.
+- **Locking on:** auto-aim locks onto the one nearest your crosshair within a 30° cone, even well outside the reticle.
+- **Highlight:** the locked orb turns **gold and pulses**, with gold brackets and a "blue orb 23 m" tag beside it.
+- **Out of sight:** the lock **holds once the orb leaves your view**, while it stays in reach and in line of sight. A gold arrow at the screen edge points to it, and firing still sends the chain there.
+- **Switching:** aim clearly closer to another orb, or put one inside the reticle, and the lock switches to it. Once you're hanging from an orb, the lock moves on to the next.
+- **What wins:** anything inside the reticle (a surface or a caster) beats a lock that's off to the side, so you can still pick a wall on purpose. The highlight always shows what the chain will actually hit.
+- **Tuning:** the "Auto-aim lock cone" slider sets the cone; 0 turns lock-on off.
+
+To make anything else lock-on-able, add it to `grapple_target`, put it on the HOOK layer (4), and optionally give it `grapple_name` and `set_highlight(on)`.
+
 ## Stun
 Touching **magic that isn't safe**, meaning any red orb, any projectile or the outside of a ward, **stuns you for 3 seconds**: the chain drops, you can't move or grapple, your sideways motion dies and you fall straight down, passing through wards. A purple flash and a **STUNNED** countdown (top left) make it clear. Control returns when it wears off, followed by a short grace period. Stuns replace the old hearts: falling is the punishment.
 

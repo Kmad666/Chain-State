@@ -11,7 +11,13 @@ var hooked := false
 var orbiting := false            # placed by a Sentry's constellation each frame
 var harmless := false            # tree / constellation blue orbs don't hurt
 var persistent := false          # stays in its tree when hooked or released
+var highlighted := false        # lit gold while it's the grapple's current target
+var grapple_name := "blue orb"   # the label the HUD shows for this grapple target
 var _released_t := -1.0
+var _t := 0.0
+var _core_mat: StandardMaterial3D
+const BLUE := Color(0.2, 0.75, 1.0)
+const LIT := Color(1.0, 0.86, 0.3)
 var _core: MeshInstance3D
 var _ring: MeshInstance3D
 
@@ -19,6 +25,7 @@ var _ring: MeshInstance3D
 func _ready() -> void:
 	add_to_group("hook_orb")
 	add_to_group("magic")
+	add_to_group("grapple_target")   # explicitly grapple-able: auto-aim can lock on to it
 	collision_layer = 4
 	collision_mask = 0
 	var shape := SphereShape3D.new()
@@ -34,10 +41,10 @@ func _ready() -> void:
 	s.rings = 6
 	_core = MeshInstance3D.new()
 	_core.mesh = s
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = Color(0.2, 0.75, 1.0)
-	_core.material_override = m
+	_core_mat = StandardMaterial3D.new()
+	_core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_core_mat.albedo_color = BLUE
+	_core.material_override = _core_mat
 	_core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_core)
 
@@ -56,6 +63,9 @@ func _ready() -> void:
 func _physics_process(dt: float) -> void:
 	_ring.rotate_object_local(Vector3.RIGHT, dt * 2.5)
 	_ring.rotate_y(dt * 1.7)
+	if highlighted:
+		_t += dt
+		_core.scale = Vector3.ONE * (1.15 + sin(_t * 9.0) * 0.08)
 	if hooked or orbiting:
 		return
 	global_position += velocity * dt
@@ -73,6 +83,16 @@ func _physics_process(dt: float) -> void:
 	if not harmless and field and p and is_instance_valid(p) and field._hits_player(global_position, p.global_position):
 		p.hit(velocity.normalized())
 		queue_free()
+
+
+## Auto-aim's highlight: gold and pulsing while this is what the chain will bite.
+func set_highlight(on: bool) -> void:
+	highlighted = on
+	_t = 0.0
+	if _core_mat:
+		_core_mat.albedo_color = LIT if on else BLUE
+	if _core:
+		_core.scale = Vector3.ONE
 
 
 ## Called by the player's grapple when the arrowhead bites.

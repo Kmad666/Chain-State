@@ -2,6 +2,8 @@ extends Node
 ## Smoke tests. Run:  godot --headless res://tests/test_runner.tscn
 ## With a display (no --headless) it also saves screenshots to user://shots/.
 
+const HookOrb := preload("res://scripts/combat/hook_orb.gd")
+
 var fails := 0
 var range_scene: Node
 
@@ -327,8 +329,11 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	var keep: float = ap.tune.aim_assist
 	ap.tune.aim_assist = 0.0
-	check(ap.find_target().is_empty() or ap.find_target().collider != blue2, "with the reticle at 0, the same near miss misses")
+	ap.tune.lock_cone = 0.0
+	ap.lock_target = null
+	check(ap.find_target().is_empty() or ap.find_target().collider != blue2, "with the reticle and lock-on at 0, the same near miss misses")
 	ap.tune.aim_assist = keep
+	ap.tune.lock_cone = 30.0
 
 	# aim assist on surfaces: dead centre on open sky, but the ward's edge is inside the circle
 	ap.global_position = wd.global_position + Vector3(-30, 0, -30)
@@ -340,6 +345,70 @@ func _ready() -> void:
 	var centre_hit: Dictionary = ap._ray(1 | 4, ap.tune.grapple_range)
 	ft = ap.find_target()
 	check(centre_hit.is_empty() and not ft.is_empty() and ft.collider == wd, "aim assist: just past the ward's edge still finds the ward")
+
+	# auto-aim lock-on: away from the tree, one test orb up and off to the side
+	var lo := HookOrb.new()
+	lo.orbiting = true
+	lo.harmless = true
+	aw.add_child(lo)
+	var spot := Vector3(-60, 20, -60)
+	lo.global_position = spot + Vector3(9, 7.6, -20)
+	ap.global_position = spot
+	ap.velocity = Vector3.ZERO
+	ap.rotation = Vector3.ZERO
+	ap.head.rotation.x = deg_to_rad(4.0)
+	ap.lock_target = null
+	await get_tree().process_frame
+	await get_tree().process_frame
+	ft = ap.find_target()
+	var lo_px: float = ap.cam.unproject_position(lo.global_position).distance_to(ap.get_viewport().get_visible_rect().size * 0.5)
+	check(lo.is_in_group("grapple_target"), "blue orbs carry the grapple-target label")
+	check(ap.lock_target == lo and not ft.is_empty() and ft.collider == lo and lo_px > ap.reticle_px(),
+		"auto-aim locks onto a blue orb %d px off-centre, well outside the reticle" % roundi(lo_px))
+	check(lo.highlighted and ap.highlight_target == lo, "the locked orb lights up")
+	await shot("18_lock_on")
+	ap.global_position = spot
+	ap.rotation.y = deg_to_rad(110.0)          # turn away: the orb is now off-screen
+	await get_tree().process_frame
+	await get_tree().process_frame
+	ft = ap.find_target()
+	check(ap.cam.is_position_behind(lo.global_position) or not Rect2(Vector2.ZERO, ap.get_viewport().get_visible_rect().size).has_point(ap.cam.unproject_position(lo.global_position)),
+		"(the orb is off-screen)")
+	check(ap.lock_target == lo and not ft.is_empty() and ft.collider == lo and lo.highlighted, "the lock holds with the orb out of sight")
+	await shot("19_lock_offscreen")
+	ap.try_grapple()
+	for i in 40:
+		await get_tree().physics_frame
+	check(ap.attached and ap.hook_node == lo, "...and the chain still catches it")
+	check(not lo.highlighted, "the orb you hang from stops glowing (auto-aim moves on)")
+	ap.release()
+	for i in 20:
+		await get_tree().physics_frame
+	ap.global_position = spot
+	ap.velocity = Vector3.ZERO
+	ap.rotation = Vector3.ZERO
+	ap.head.rotation.x = deg_to_rad(4.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(ap.lock_target == lo, "(re-locked)")
+	ap.global_position = Vector3(-46, 9, -30)   # stand by the small island, look down at it
+	ap.rotation = Vector3(0, PI, 0)
+	ap.head.rotation.x = deg_to_rad(-60.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	ft = ap.find_target()
+	check(not ft.is_empty() and ft.collider != lo and not lo.highlighted,
+		"aiming dead at a surface beats a lock outside the reticle")
+	ap.global_position = spot
+	ap.rotation = Vector3.ZERO
+	ap.head.rotation.x = deg_to_rad(4.0)
+	var keep_cone: float = ap.tune.lock_cone
+	ap.tune.lock_cone = 0.0
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(ap.lock_target == null and not lo.highlighted, "lock cone 0 turns auto-aim off")
+	ap.tune.lock_cone = keep_cone
+	lo.queue_free()
 
 	ap.air_left = 0
 	ap.global_position = Vector3(0, 6, 20)

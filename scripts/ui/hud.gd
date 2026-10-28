@@ -161,8 +161,8 @@ func _process(_dt: float) -> void:
 		col = Color(0.8, 0.6, 1.0, 0.95)
 		_info.text = "ward  ·  free grapple, but don't touch it"
 	elif player.aim_enemy and is_instance_valid(player.aim_enemy):
-		col = Color(0.55, 0.85, 1.0, 0.95)
-		_info.text = "blue orb  ·  magic, free grapple"
+		col = GOLD if player.aim_enemy == player.highlight_target else Color(0.55, 0.85, 1.0, 0.95)
+		_info.text = "%s  ·  magic, free grapple" % player.aim_enemy.get("grapple_name") if player.aim_enemy.get("grapple_name") else "magic, free grapple"
 	elif player.attached:
 		col = Color(0.75, 0.85, 1.0, 0.8)
 		_info.text = "rope %d m" % roundi(player.rope_len)
@@ -197,3 +197,64 @@ func _draw() -> void:
 		draw_polyline(pts, Color(_cross_col, 1.0), 2.0, true)
 		if m.distance_to(c) > 14.0:
 			draw_line(c + (m - c).normalized() * 5.0, m - (m - c).normalized() * 10.0, faint, 1.5, true)
+
+	if player:
+		_draw_lock()
+
+
+const GOLD := Color(1.0, 0.86, 0.3)
+
+
+## Lock-on brackets and label around the highlighted grapple target; an arrow at
+## the screen edge when it's off-screen.
+func _draw_lock() -> void:
+	var t: Node3D = player.highlight_target
+	if t == null or not is_instance_valid(t):
+		return
+	var cam: Camera3D = player.cam
+	var p := t.global_position
+	var d: float = cam.global_position.distance_to(p)
+	var label := "%s  %d m" % [str(t.get("grapple_name")) if t.get("grapple_name") else "grapple", roundi(d)]
+	var font := get_theme_default_font()
+	var shade := Color(0, 0, 0, 0.45)
+	var margin := 48.0
+	var on_screen := not cam.is_position_behind(p)
+	var m := Vector2.ZERO
+	if on_screen:
+		m = cam.unproject_position(p)
+		on_screen = Rect2(Vector2.ZERO, size).grow(-margin * 0.5).has_point(m)
+	if on_screen:
+		# corner brackets sized to the orb on screen
+		var px_per_m := size.y / (2.0 * tan(deg_to_rad(cam.fov) * 0.5) * maxf(d, 0.1))
+		var r := clampf(1.1 * px_per_m, 14.0, 90.0)
+		var k := r * 0.45
+		for sx in [-1.0, 1.0]:
+			for sy in [-1.0, 1.0]:
+				var corner: Vector2 = m + Vector2(sx * r, sy * r)
+				var pts := PackedVector2Array([corner - Vector2(0, sy * k), corner, corner - Vector2(sx * k, 0)])
+				draw_polyline(pts, shade, 5.0, true)
+				draw_polyline(pts, GOLD, 2.5, true)
+		var at := m + Vector2(r + 8.0, -r + 12.0)
+		draw_string_outline(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, shade)
+		draw_string(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, GOLD)
+		return
+	# off-screen: an arrow on the edge pointing the way, with the label
+	var local: Vector3 = cam.global_transform.affine_inverse() * p
+	var dir := Vector2(local.x, -local.y)
+	if dir.length() < 0.001:
+		dir = Vector2(0, 1)
+	dir = dir.normalized()
+	var c := size * 0.5
+	var half := c - Vector2(margin, margin)
+	var s := minf(half.x / maxf(absf(dir.x), 0.001), half.y / maxf(absf(dir.y), 0.001))
+	var tip := c + dir * s
+	var side := Vector2(-dir.y, dir.x)
+	var tri := PackedVector2Array([tip, tip - dir * 34.0 + side * 10.0, tip - dir * 26.0, tip - dir * 34.0 - side * 10.0])
+	draw_colored_polygon(tri, GOLD)
+	draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2], tri[3], tri[0]]), shade, 2.0, true)
+	var lsize := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
+	var at2 := (tip - dir * (54.0 + absf(dir.x) * lsize.x * 0.5)) + Vector2(-lsize.x * 0.5, 5.0)
+	at2.x = clampf(at2.x, 8.0, size.x - lsize.x - 8.0)
+	at2.y = clampf(at2.y, 20.0, size.y - 8.0)
+	draw_string_outline(font, at2, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, shade)
+	draw_string(font, at2, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, GOLD)
