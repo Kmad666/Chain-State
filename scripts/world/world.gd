@@ -87,6 +87,7 @@ func _ready() -> void:
 	ui.add_child(hud)
 	player.notice.connect(func(t): hud.toast(t, 2.5))
 	player.hurt.connect(func(_h): hud.flash())
+	player.snapped.connect(_on_chain_snapped)
 	player.downed.connect(func():
 		hud.toast("Down! Back to the start.", 3.0)
 		if bullets:
@@ -175,6 +176,8 @@ func _build_world() -> void:
 			_build_level_2()
 		"enemy_test":
 			_build_enemy_test()
+		"enemy_test_air":
+			_build_enemy_test_air()
 		_:
 			_build_range()
 
@@ -193,38 +196,60 @@ func _build_level_2() -> void:
 	_start_on(a, b)
 
 
-## Enemy test: one wide island with two small ones nearby, and two Sentries
-## patrolling loops around it.
+## Enemy test (ground): one wide island, one low-flying Sentry that fires
+## spread-out lines of orbs across the ground once you come within range.
 func _build_enemy_test() -> void:
-	var main := _island(Vector3(0, 0, 0), 34.0, 5)
+	_island(Vector3(0, 0, 0), 34.0, 5)
 	_island(Vector3(-52, 10, -30), 12.0, 7)
-	_island(Vector3(48, 6, 36), 10.0, 9)
-	bullets = BulletField.new()
-	add_child(bullets)
-	var loop_a := PackedVector3Array()
+	var loop := PackedVector3Array()
+	for i in 8:
+		var a := TAU * i / 8.0
+		loop.append(Vector3(cos(a) * 16.0, 2.4, sin(a) * 16.0 - 6.0))
+	_sentry("ground", loop)
+	start_pos = Vector3(0, 1.0, 30)
+	start_yaw = 0.0
+
+
+## Enemy test (air): islands spread out, one high-flying Sentry wearing a
+## spinning constellation of red orbs, with blue orbs to grab.
+func _build_enemy_test_air() -> void:
+	_island(Vector3(0, 0, 0), 26.0, 5)
+	_island(Vector3(-40, 8, -38), 12.0, 7)
+	_island(Vector3(38, 4, -30), 10.0, 9)
+	var loop := PackedVector3Array()
 	for i in 10:
 		var a := TAU * i / 10.0
-		loop_a.append(Vector3(cos(a) * 26.0, 13.0 + sin(a * 2.0) * 3.0, sin(a) * 26.0))
-	var loop_b := PackedVector3Array()
-	for i in 12:
-		var a := TAU * i / 12.0
-		loop_b.append(Vector3(sin(a) * 34.0, 22.0, sin(a) * cos(a) * 30.0))   # a figure eight, higher up
-	for loop in [loop_a, loop_b]:
-		var s := Sentry.new()
-		s.path = loop
-		s.field = bullets
-		add_child(s)
-		s.subdued.connect(_on_sentry_subdued)
-		sentries.append(s)
-	start_pos = Vector3(0, 1.0, 22)
+		loop.append(Vector3(cos(a) * 22.0, 17.0 + sin(a * 2.0) * 3.0, sin(a) * 22.0 - 14.0))
+	_sentry("air", loop)
+	start_pos = Vector3(0, 1.0, 18)
 	start_yaw = 0.0
-	main.name = "MainIsland"
+
+
+func _sentry(kind: String, loop: PackedVector3Array) -> Node:
+	if bullets == null:
+		bullets = BulletField.new()
+		add_child(bullets)
+	var s := Sentry.new()
+	s.kind = kind
+	s.path = loop
+	s.field = bullets
+	add_child(s)
+	s.subdued.connect(_on_sentry_subdued)
+	sentries.append(s)
+	return s
+
+
+## The chain snapped on a bound Sentry: make it impossible to miss.
+func _on_chain_snapped() -> void:
+	hud.flash(Color(0.6, 0.25, 1.0), 0.5)
+	hud.banner("SUBDUED", Color(0.85, 0.7, 1.0))
+	hud.toast("The chain snapped. You keep your swing, slowed.", 3.0)
+	Engine.time_scale = 0.3
+	get_tree().create_timer(0.45, true, false, true).timeout.connect(func(): Engine.time_scale = 1.0)
 
 
 func _on_sentry_subdued(_s: Node) -> void:
-	var left := sentries.filter(func(x): return is_instance_valid(x) and not x.is_subdued).size()
-	if hud:
-		hud.toast("Sentry subdued.  %d left." % left if left > 0 else "All Sentries subdued!", 4.0)
+	pass   # the snap itself is the feedback (see _on_chain_snapped)
 
 
 func _island(pos: Vector3, r: float, seed_: int) -> Node3D:

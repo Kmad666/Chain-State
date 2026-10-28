@@ -8,6 +8,8 @@ var velocity := Vector3.ZERO
 var life := 8.0
 var field: Node                 # the BulletField, for the player reference
 var hooked := false
+var orbiting := false            # placed by a Sentry's constellation each frame
+var harmless := false            # constellation blue orbs don't hurt
 var _released_t := -1.0
 var _core: MeshInstance3D
 var _ring: MeshInstance3D
@@ -52,7 +54,7 @@ func _ready() -> void:
 func _physics_process(dt: float) -> void:
 	_ring.rotate_object_local(Vector3.RIGHT, dt * 2.5)
 	_ring.rotate_y(dt * 1.7)
-	if hooked:
+	if hooked or orbiting:
 		return
 	global_position += velocity * dt
 	life -= dt
@@ -66,7 +68,7 @@ func _physics_process(dt: float) -> void:
 		queue_free()
 		return
 	var p = field.player if field else null
-	if p and is_instance_valid(p) and field._hits_player(global_position, p.global_position):
+	if not harmless and field and p and is_instance_valid(p) and field._hits_player(global_position, p.global_position):
 		p.hit(velocity.normalized())
 		queue_free()
 
@@ -74,6 +76,7 @@ func _physics_process(dt: float) -> void:
 ## Called by the player's grapple when the arrowhead bites.
 func on_hooked(_player: Node) -> bool:
 	hooked = true
+	orbiting = false             # caught: it leaves the constellation and holds still
 	return true
 
 

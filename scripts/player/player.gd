@@ -18,6 +18,7 @@ signal talk_requested(npc: Node)
 signal notice(text: String)      # short messages for the HUD
 signal hurt(health: int)
 signal downed
+signal snapped                   # the chain broke on a bound enemy
 
 const Chain := preload("res://scripts/player/chain.gd")
 const Viewmodel := preload("res://scripts/player/viewmodel.gd")
@@ -274,6 +275,18 @@ func _update_hook(dt: float) -> void:
 				hook_tip += to / to.length() * step
 		_:
 			hook_tip = chain.stowed_tip()
+
+
+## The chain snaps after binding an enemy. No release boost, and your speed is
+## capped so you don't get flung somewhere unexpected; you keep your direction.
+func chain_snapped(max_speed: float) -> void:
+	if hook_node and is_instance_valid(hook_node) and hook_node.has_method("on_released"):
+		hook_node.on_released(self)
+	hook_node = null
+	attached = false
+	hook_state = Chain.RETURNING
+	velocity = velocity.limit_length(max_speed)
+	snapped.emit()
 
 
 ## Struck by a projectile: lose a point of health, get knocked back, and get a

@@ -197,20 +197,31 @@ func _ready() -> void:
 		await shot("12_" + lv + "_down")
 		w.queue_free()
 		await get_tree().process_frame
-	print("== Enemy test")
+	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
 	var ew = load("res://scenes/world.tscn").instantiate()
 	get_tree().root.add_child(ew)
-	for i in 60:
+	for i in 30:
 		await get_tree().physics_frame
 	var ep = ew.player
-	check(ew.sentries.size() == 2, "two Sentries patrol")
-	ep.invuln = 999.0                        # keep the player safe while volleys fill the air
-	for i in 400:
+	ep.invuln = 999.0
+	var s = ew.sentries[0]
+	check(ew.sentries.size() == 1 and s.kind == "ground", "one ground Sentry in the test area")
+	ep.global_position = s.global_position + Vector3(0, 0, 60)
+	for i in 240:
 		await get_tree().physics_frame
-	check(ew.bullets.count() > 20, "Sentries fire volleys (%d projectiles in the air)" % ew.bullets.count())
-	check(get_tree().get_nodes_in_group("hook_orb").size() > 0, "volleys include hookable orbs")
-	await shot("13_enemy_volley")
+	check(ew.bullets.count() == 0 and not s.engaged, "out of range: it holds fire")
+	ep.global_position = s.global_position + Vector3(0, -1, 25)
+	for i in 420:
+		await get_tree().physics_frame
+	var n: int = ew.bullets.count()
+	check(s.engaged and n > 0 and n <= 15, "in range: it fires a few large orbs (%d in the air)" % n)
+	var flat := true
+	for v in ew.bullets._vel:
+		flat = flat and absf(v.y) < 0.001
+	check(flat, "its orbs fly level, parallel to the ground")
+	_aim(ep, s.global_position)
+	await shot("13_enemy_ground")
 	ep.invuln = 0.0
 	var hp: int = ep.health
 	ep.hit(Vector3.FORWARD)
@@ -219,37 +230,77 @@ func _ready() -> void:
 	check(ep.health == hp - 1, "no double hits during the safety window")
 	ep.invuln = 999.0
 
-	var s = ew.sentries[0]
 	ep.global_position = s.global_position + Vector3(30, 0, 0)
 	check(not s.on_hooked(ep), "hooking from too far: it shakes the chain off")
-	ep.global_position = s.global_position + Vector3(8, -2, 0)
+	ep.global_position = s.global_position + Vector3(8, -1, 0)
 	check(s.on_hooked(ep), "hooking from close range holds")
 	ep.attached = true
 	ep.hook_node = s
 	ep.rope_len = 8.0
+	ep.velocity = Vector3(0, 0, 25)
 	var c: Vector3 = s.global_position
-	for k in 3 * 24 + 6:                      # three-and-a-bit laps around it
+	var rope_before: float = ep.rope_len
+	for k in 3 * 24 + 6:
 		var a2 := TAU * k / 24.0
-		s._track_wrap(c + Vector3(cos(a2) * 8.0, -2.0, sin(a2) * 8.0))
+		s._track_wrap(c + Vector3(cos(a2) * 8.0, -1.0, sin(a2) * 8.0))
+		if k == 30:
+			check(is_equal_approx(ep.rope_len, rope_before), "wrapping no longer reels you in")
 		if s.is_subdued:
 			break
 	check(s.is_subdued, "three laps around it subdue the Sentry")
-	check(not ep.attached, "the hook is released once it's bound")
-	await get_tree().physics_frame
-	await shot("14_subdued")
+	check(not ep.attached, "the chain snaps once it's bound")
+	check(ep.velocity.length() <= 9.01, "your speed is capped when the chain snaps (%.1f m/s)" % ep.velocity.length())
+	check(Engine.time_scale < 1.0, "a moment of slow motion marks the snap")
+	check(get_tree().get_nodes_in_group("enemy").size() >= 1 and ew.get_children().any(func(x): return x.get_script() == preload("res://scripts/combat/magic_burst.gd")), "a purple magic burst goes off")
+	ep.global_position = s.global_position + Vector3(0, 0.5, 9)
+	_aim(ep, s.global_position)
+	await shot("14_snap")
+	for i in 90:
+		await get_tree().process_frame
+	check(is_equal_approx(Engine.time_scale, 1.0), "time returns to normal")
+	ew.queue_free()
+	await get_tree().process_frame
 
-	var orb = get_tree().get_nodes_in_group("hook_orb")[0]
-	var before_pos: Vector3 = orb.global_position
-	check(orb.on_hooked(ep), "a hookable orb accepts the hook")
+	print("== Enemy test (air)")
+	Game.level = "enemy_test_air"
+	var aw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(aw)
 	for i in 30:
 		await get_tree().physics_frame
-	check(orb.global_position.distance_to(before_pos) < 0.01, "a hooked orb freezes in mid-air")
-	ew.queue_free()
+	var ap = aw.player
+	var air = aw.sentries[0]
+	check(aw.sentries.size() == 1 and air.kind == "air", "one flying Sentry in the air test")
+	check(air._reds.size() == 10, "a constellation of red orbs spins around it")
+	for i in 10:
+		await get_tree().physics_frame
+	var blues: Array = air._blues.filter(func(o): return o != null and is_instance_valid(o))
+	check(blues.size() == 3, "blue orbs ride the constellation to grab onto")
+	var r0: Vector3 = air._reds[0].global_position
+	await get_tree().physics_frame
+	check(air._reds[0].global_position.distance_to(r0) > 0.01, "the constellation turns")
+	ap.invuln = 0.0
+	var hp2: int = ap.health
+	ap.global_position = air._reds[0].global_position
+	air._update_constellation(0.0)
+	check(ap.health < hp2, "touching a red orb hurts")
+	ap.invuln = 999.0
+	var b = blues[0]
+	check(b.on_hooked(ap) and not b.orbiting, "a hooked blue orb leaves the constellation and holds still")
+	ap.global_position = air.global_position + Vector3(0, -6, 16)
+	_aim(ap, air.global_position)
+	await shot("15_enemy_air")
+	aw.queue_free()
 	await get_tree().process_frame
 	Game.level = "range"
 
 	print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))
 	get_tree().quit(1 if fails else 0)
+
+
+func _aim(pl: Node, target: Vector3) -> void:
+	var d: Vector3 = target - pl.cam.global_position
+	pl.rotation = Vector3(0, atan2(-d.x, -d.z), 0)
+	pl.head.rotation.x = atan2(d.y, Vector2(d.x, d.z).length())
 
 
 func shot(name: String) -> void:

@@ -6,7 +6,8 @@ const LIST := [
 	{"id": "range", "name": "Test Range", "blurb": "Flat plane, one floating cube, an NPC and four practice clues."},
 	{"id": "level_1", "name": "Level 1", "blurb": "Two floating islands, level with each other. Learn to cross the gap."},
 	{"id": "level_2", "name": "Level 2", "blurb": "Two floating islands, the far one wider apart and higher up."},
-	{"id": "enemy_test", "name": "Enemy Test", "blurb": "Two Sentries patrol around an island. Dodge the volleys, hook one up close and swing around it."},
+	{"id": "enemy_test", "name": "Enemy Test (Ground)", "blurb": "One low Sentry. Get close and it fires lines of orbs across the ground. Hook it and swing around it."},
+	{"id": "enemy_test_air", "name": "Enemy Test (Air)", "blurb": "One high Sentry inside a spinning ring of red orbs. Grab the blue orbs to get close."},
 ]
 
 

@@ -1,47 +1,68 @@
 extends StaticBody3D
-## Sentry: a flying enemy (placeholder name and look). It loops a set path and
-## stops to fire bullet-hell volleys of slow projectiles with gaps to slip
-## through. Some projectiles in each volley are hookable orbs.
+## Sentry: an enemy (placeholder name and look) that loops a set path.
 ##
-## Subduing: hook it from close range (within SUBDUE_RANGE), then swing around it.
-## Each full lap wraps the chain once more and shortens the rope; WRAPS_NEEDED
-## laps bind it. While hooked it stops patrolling and fires at half rate. Hooking
-## from too far away fails: it shakes the hook off. Let go mid-wrap and the coils
-## slip loose after a moment.
+## Two kinds:
+##   ground - hovers low over an island. When you come within ENGAGE_RANGE it
+##            turns to face you and fires spread-out lines of large dark red orbs
+##            straight across, parallel to the ground (NieR-style). Few orbs, with gaps.
+##   air    - flies high and doesn't shoot. A constellation of dark red orbs spins
+##            around it, with blue hookable orbs in a wider ring to swing from.
+##
+## Subduing (both kinds): hook it from within SUBDUE_RANGE, then swing around it.
+## Each full lap adds a silver coil. On the third lap it releases a purple magic
+## burst and the chain snaps: you keep your swing but at a capped speed, with a
+## moment of slow motion so you can see where you're going. Hooking from too far
+## away fails. Let go mid-wrap and the coils slip loose after a moment.
 ##
 ## Collision layer 4 (HOOK): grapple-able, but the player passes through it.
 
 signal subdued(sentry: Node)
 
+const MagicBurst := preload("res://scripts/combat/magic_burst.gd")
+const HookOrb := preload("res://scripts/combat/hook_orb.gd")
+
 const SUBDUE_RANGE := 20.0
+const ENGAGE_RANGE := 38.0
 const WRAPS_NEEDED := 3
-const ROPE_PER_WRAP := 2.5       # each coil takes up this much chain
-const SLIP_DELAY := 1.5          # seconds after letting go before coils loosen
-const TELEGRAPH := 0.7           # wind-up before each volley
+const SLIP_DELAY := 1.5
+const TELEGRAPH := 0.8
+const BREAK_SPEED := 9.0         # your speed is capped to this when the chain snaps
 
+# air constellation
+const RED_ORBS := 10
+const RED_RADIUS := 5.0
+const RED_ORB_SIZE := 0.6
+const BLUE_ORBS := 3
+const BLUE_RADIUS := 9.0
+const BLUE_RESPAWN := 4.0
+
+@export var kind := "ground"
 @export var path: PackedVector3Array = []     # world-space waypoints, looped
-@export var speed := 6.0
-@export var volley_every := 2.6               # seconds between volleys
-@export var bullet_speed := 7.0
+@export var speed := 5.0
+@export var volley_every := 2.4
+@export var bullet_speed := 9.0
 
-var field: Node                  # BulletField
+var field: Node                  # BulletField (ground kind)
 var player: Node
 var is_subdued := false
-var wraps := 0.0                 # laps so far (fractional while swinging)
-var _turn := 0.0                 # signed total angle swung around it; reversing unwinds
+var engaged := false
+var wraps := 0.0
+var _turn := 0.0
 var _wp := 0
 var _t := 0.0
-var _fire_t := 1.5
-var _pattern := 0
+var _fire_t := 1.0
+var _volley := 0
 var _hooked_by: Node = null
 var _last_angle := 0.0
 var _slip_t := -1.0
 var _fall_v := 0.0
-var _body: MeshInstance3D
 var _core: MeshInstance3D
 var _core_mat: StandardMaterial3D
 var _halo: MeshInstance3D
 var _coils: Array[MeshInstance3D] = []
+var _reds: Array[MeshInstance3D] = []
+var _blues: Array = []           # HookOrb or null (respawning)
+var _blue_t: Array[float] = []
 
 
 func _ready() -> void:
@@ -54,16 +75,15 @@ func _ready() -> void:
 	col.shape = shape
 	add_child(col)
 
-	# body: a dark iron diamond with a glowing core and a turning brass ring
 	var body_mesh := SphereMesh.new()
 	body_mesh.radius = 1.1
 	body_mesh.height = 2.6
 	body_mesh.radial_segments = 4
 	body_mesh.rings = 2
-	_body = MeshInstance3D.new()
-	_body.mesh = body_mesh
-	_body.material_override = Mats.lit(Color(0.16, 0.15, 0.18), 0.5)
-	add_child(_body)
+	var body := MeshInstance3D.new()
+	body.mesh = body_mesh
+	body.material_override = Mats.lit(Color(0.16, 0.15, 0.18), 0.5)
+	add_child(body)
 
 	var core_mesh := SphereMesh.new()
 	core_mesh.radius = 0.42
@@ -72,7 +92,6 @@ func _ready() -> void:
 	_core.mesh = core_mesh
 	_core_mat = StandardMaterial3D.new()
 	_core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_core_mat.albedo_color = Color(1.0, 0.45, 0.2)
 	_core.material_override = _core_mat
 	_core.position = Vector3(0, 0, -0.95)
 	add_child(_core)
@@ -87,8 +106,36 @@ func _ready() -> void:
 	_halo.material_override = Mats.lit(Color(0.72, 0.55, 0.28), 0.4)
 	add_child(_halo)
 
+	if kind == "air":
+		_build_constellation()
 	if path.size() > 0:
 		global_position = path[0]
+
+
+func _build_constellation() -> void:
+	var s := SphereMesh.new()
+	s.radius = RED_ORB_SIZE
+	s.height = RED_ORB_SIZE * 2.0
+	s.radial_segments = 12
+	s.rings = 6
+	for i in RED_ORBS:
+		var m := MeshInstance3D.new()
+		m.mesh = s
+		m.material_override = _red_mat()
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		m.top_level = true       # placed in world space each frame, not spun with the body
+		add_child(m)
+		_reds.append(m)
+	for i in BLUE_ORBS:
+		_blues.append(null)
+		_blue_t.append(0.0)
+
+
+static func _red_mat() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(0.42, 0.02, 0.05)
+	return m
 
 
 func _physics_process(dt: float) -> void:
@@ -99,13 +146,14 @@ func _physics_process(dt: float) -> void:
 	_halo.rotate_object_local(Vector3.FORWARD, dt * 1.2)
 	_halo.rotation.x = 0.6 + sin(_t * 0.8) * 0.2
 
+	var p_ok := player != null and is_instance_valid(player)
+	engaged = p_ok and global_position.distance_to(player.global_position) <= ENGAGE_RANGE
 	var hooked: bool = _hooked_by != null and is_instance_valid(_hooked_by) and _hooked_by.attached
 	if hooked:
 		_track_wrap(_hooked_by.global_position)
 	else:
 		_hooked_by = null
 		_patrol(dt)
-		# coils slip loose if you let go
 		if wraps > 0.0:
 			if _slip_t < 0.0:
 				_slip_t = SLIP_DELAY
@@ -115,21 +163,29 @@ func _physics_process(dt: float) -> void:
 				wraps = absf(_turn) / TAU
 				_update_coils()
 
-	# face the player
-	if player and is_instance_valid(player):
+	# face the player once engaged (ground kind keeps level so its shots stay level)
+	if engaged:
 		var to: Vector3 = player.global_position - global_position
-		to.y *= 0.5
+		if kind == "ground":
+			to.y = 0.0
 		if to.length_squared() > 0.01:
-			var target := Basis.looking_at(to.normalized(), Vector3.UP)
-			basis = basis.slerp(target, 1.0 - exp(-4.0 * dt)).orthonormalized()
+			basis = basis.slerp(Basis.looking_at(to.normalized(), Vector3.UP), 1.0 - exp(-4.0 * dt)).orthonormalized()
 
-	# fire: telegraph (core swells and brightens), then the volley
-	_fire_t -= dt * (0.5 if hooked else 1.0)
-	var wind := clampf(1.0 - _fire_t / TELEGRAPH, 0.0, 1.0)
-	_core.scale = Vector3.ONE * (1.0 + wind * 0.8)
-	_core_mat.albedo_color = Color(1.0, 0.45, 0.2).lerp(Color(1.0, 0.95, 0.75), wind)
+	if kind == "air":
+		_update_constellation(dt)
+		_core_mat.albedo_color = Color(0.9, 0.15, 0.2) if engaged else Color(0.7, 0.45, 0.2)
+		return
+
+	# ground: telegraph (core swells, goes from ember to bright red) then fire
+	if engaged and not hooked:
+		_fire_t -= dt
+	else:
+		_fire_t = maxf(_fire_t, TELEGRAPH + 0.3)
+	var wind := clampf(1.0 - _fire_t / TELEGRAPH, 0.0, 1.0) if engaged and not hooked else 0.0
+	_core.scale = Vector3.ONE * (1.0 + wind * 0.9)
+	_core_mat.albedo_color = (Color(0.9, 0.15, 0.2) if engaged else Color(0.7, 0.45, 0.2)).lerp(Color(1.0, 0.85, 0.8), wind)
 	if _fire_t <= 0.0:
-		_fire()
+		_fire_line()
 		_fire_t = volley_every
 
 
@@ -138,60 +194,69 @@ func _patrol(dt: float) -> void:
 		return
 	var goal: Vector3 = path[_wp]
 	var to := goal - global_position
-	var step := speed * dt
+	var step := speed * dt * (0.4 if engaged else 1.0)     # slows down while it fights
 	if to.length() <= step:
 		global_position = goal
 		_wp = (_wp + 1) % path.size()
 	else:
 		global_position += to / to.length() * step
-	global_position.y += sin(_t * 1.3) * 0.01      # a gentle bob
 
 
-# ---------------------------------------------------------------- volleys
-func _fire() -> void:
-	if field == null:
+# ---------------------------------------------------------------- ground: lines of orbs
+## A spread-out line of large orbs, aimed at the player, flying parallel to the
+## ground. Alternate volleys shift by half a gap so standing still doesn't work.
+func _fire_line() -> void:
+	if field == null or player == null:
 		return
-	match _pattern % 3:
-		0: _ring_burst()
-		1: _aimed_fan()
-		2: _double_ring()
-	_pattern += 1
-
-
-## A ring of bullets with a few wide gaps to slip through; every fifth is hookable.
-func _ring_burst() -> void:
-	var n := 22
-	var gap_at := randi() % n
-	var off := randf() * TAU
-	for i in n:
-		if abs(i - gap_at) <= 1:
-			continue                       # the gap
-		var a := off + TAU * i / n
-		var dir := Vector3(cos(a), randf_range(-0.12, 0.12), sin(a)).normalized()
-		field.spawn(global_position + dir * 1.8, dir * bullet_speed, 8.0, i % 5 == 0)
-
-
-## A fan aimed at the player: dodge sideways, or catch the hookable middle orb.
-func _aimed_fan() -> void:
-	if player == null or not is_instance_valid(player):
-		_ring_burst()
+	var to: Vector3 = player.global_position - global_position
+	to.y = 0.0
+	if to.length_squared() < 0.01:
 		return
-	var to: Vector3 = (player.global_position - global_position).normalized()
-	var side := to.cross(Vector3.UP).normalized()
-	for i in range(-3, 4):
-		var dir := (to + side * i * 0.16).normalized()
-		field.spawn(global_position + dir * 1.8, dir * bullet_speed * 1.25, 7.0, i == 0)
+	to = to.normalized()
+	var count := 5
+	var spread := deg_to_rad(64.0)
+	var shift := 0.5 if _volley % 2 else 0.0
+	for i in count:
+		var f := (float(i) + shift) / float(count - 1) - 0.5
+		var dir := to.rotated(Vector3.UP, f * spread)
+		field.spawn(global_position + dir * 1.8 + Vector3(0, -0.4, 0), dir * bullet_speed, 7.0)
+	_volley += 1
 
 
-## Two tilted rings, offset so the holes line up into lanes.
-func _double_ring() -> void:
-	var n := 16
-	for tilt in [-0.35, 0.35]:
-		var off := randf() * TAU
-		for i in n:
-			var a := off + TAU * i / n
-			var dir := Vector3(cos(a), tilt * sin(a * 2.0), sin(a)).normalized()
-			field.spawn(global_position + dir * 1.8, dir * bullet_speed * 0.85, 9.0, i % 8 == 0)
+# ---------------------------------------------------------------- air: constellation
+func _update_constellation(dt: float) -> void:
+	var c := global_position
+	for i in _reds.size():
+		var a := _t * 1.1 + TAU * i / _reds.size()
+		var tilt := sin(a * 2.0 + _t * 0.5) * 1.6
+		_reds[i].global_position = c + Vector3(cos(a) * RED_RADIUS, tilt, sin(a) * RED_RADIUS)
+		if player and is_instance_valid(player) and _touches(_reds[i].global_position, player.global_position):
+			player.hit((player.global_position - _reds[i].global_position).normalized())
+	for i in _blues.size():
+		var orb = _blues[i]
+		var a := -_t * 0.6 + TAU * i / _blues.size()
+		var at := c + Vector3(cos(a) * BLUE_RADIUS, 1.5 + sin(_t + i) * 1.2, sin(a) * BLUE_RADIUS)
+		if orb == null or not is_instance_valid(orb):
+			_blues[i] = null
+			_blue_t[i] -= dt
+			if _blue_t[i] <= 0.0:
+				var o := HookOrb.new()
+				o.orbiting = true
+				o.harmless = true
+				add_child(o)
+				o.top_level = true
+				o.global_position = at
+				_blues[i] = o
+		elif orb.orbiting:
+			orb.global_position = at
+		else:
+			_blues[i] = null          # it was caught; a new one grows in after a while
+			_blue_t[i] = BLUE_RESPAWN
+
+
+func _touches(orb_pos: Vector3, p: Vector3) -> bool:
+	var y := clampf(orb_pos.y, p.y - 0.5, p.y + 0.5)
+	return orb_pos.distance_to(Vector3(p.x, y, p.z)) < RED_ORB_SIZE + 0.38
 
 
 # ---------------------------------------------------------------- the wrap
@@ -201,7 +266,7 @@ func on_hooked(p: Node) -> bool:
 		return false
 	if p.global_position.distance_to(global_position) > SUBDUE_RANGE:
 		if p.has_signal("notice"):
-			p.notice.emit("Too far: the Sentry shakes the chain off. Get within %d m." % int(SUBDUE_RANGE))
+			p.notice.emit("Too far: it shakes the chain off. Get within %d m." % int(SUBDUE_RANGE))
 		return false
 	_hooked_by = p
 	_slip_t = -1.0
@@ -221,7 +286,7 @@ func _angle_to(pos: Vector3) -> float:
 	return atan2(d.z, d.x)
 
 
-## Counts laps of the player around the Sentry (in the horizontal plane).
+## Counts laps of the player around it (in the horizontal plane); reversing unwinds.
 func _track_wrap(player_pos: Vector3) -> void:
 	var a := _angle_to(player_pos)
 	var delta := wrapf(a - _last_angle, -PI, PI)
@@ -230,10 +295,8 @@ func _track_wrap(player_pos: Vector3) -> void:
 	_turn += delta
 	wraps = absf(_turn) / TAU
 	var after := floori(wraps)
-	if after > before and _hooked_by:
-		_hooked_by.rope_len = maxf(_hooked_by.rope_len - ROPE_PER_WRAP, 2.5)
-		if _hooked_by.has_signal("notice") and after < WRAPS_NEEDED:
-			_hooked_by.notice.emit("Wrap %d of %d" % [after, WRAPS_NEEDED])
+	if after > before and _hooked_by and _hooked_by.has_signal("notice") and after < WRAPS_NEEDED:
+		_hooked_by.notice.emit("Wrap %d of %d" % [after, WRAPS_NEEDED])
 	_update_coils()
 	if wraps >= WRAPS_NEEDED:
 		_subdue()
@@ -259,16 +322,28 @@ func _update_coils() -> void:
 		_coils.pop_back().queue_free()
 
 
+## Third lap: a purple magic burst, and the chain snaps.
 func _subdue() -> void:
 	is_subdued = true
 	_core_mat.albedo_color = Color(0.35, 0.35, 0.4)
 	_core.scale = Vector3.ONE
+	var burst := MagicBurst.new()
+	get_parent().add_child(burst)
+	burst.global_position = global_position
+	for r in _reds:
+		r.queue_free()
+	_reds.clear()
+	for o in _blues:
+		if o and is_instance_valid(o) and o.orbiting:
+			o.queue_free()
+	_blues.clear()
 	if _hooked_by and is_instance_valid(_hooked_by):
 		var p := _hooked_by
 		_hooked_by = null
-		p.release()
-		if p.has_signal("notice"):
-			p.notice.emit("Sentry subdued.")
+		if p.has_method("chain_snapped"):
+			p.chain_snapped(BREAK_SPEED)
+		else:
+			p.release()
 	subdued.emit(self)
 
 

@@ -14,6 +14,8 @@ var _health: Label
 var _wraps: Label
 var _flash: ColorRect
 var _flash_a := 0.0
+var _banner: Label
+var _banner_t := 0.0
 
 
 func _ready() -> void:
@@ -50,6 +52,14 @@ func _ready() -> void:
 	add_child(_flash)
 	move_child(_flash, 0)
 
+	_banner = _label(64, HORIZONTAL_ALIGNMENT_CENTER)
+	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_banner.offset_left = -500
+	_banner.offset_right = 500
+	_banner.offset_top = -170
+	_banner.offset_bottom = -90
+	_banner.add_theme_constant_override("outline_size", 12)
+
 	_health = _label(30, HORIZONTAL_ALIGNMENT_LEFT)
 	_health.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	_health.offset_left = 22
@@ -85,9 +95,17 @@ func _label(sz: int, align: HorizontalAlignment) -> Label:
 	return l
 
 
-## Red flash when the player is hit.
-func flash() -> void:
-	_flash_a = 0.45
+## Red flash when the player is hit (or another colour for other events).
+func flash(c := Color(0.9, 0.1, 0.05), strength := 0.45) -> void:
+	_flash.color = Color(c, 0.0)
+	_flash_a = strength
+
+
+## A big centred word that fades out (e.g. SUBDUED).
+func banner(t: String, c: Color, secs := 1.6) -> void:
+	_banner.text = t
+	_banner.add_theme_color_override("font_color", c)
+	_banner_t = secs
 
 
 ## A short message near the top of the screen.
@@ -104,6 +122,8 @@ func _process(_dt: float) -> void:
 	var playing := Game.playing()
 	visible = playing
 	_flash_a = maxf(_flash_a - _dt * 1.6, 0.0)
+	_banner_t = maxf(_banner_t - _dt, 0.0)
+	_banner.modulate.a = clampf(_banner_t * 1.5, 0.0, 1.0)
 	_flash.color.a = _flash_a
 	var hp := ""
 	for i in player.MAX_HEALTH:

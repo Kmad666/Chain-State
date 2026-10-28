@@ -6,9 +6,9 @@ extends Node3D
 
 const HookOrb := preload("res://scripts/combat/hook_orb.gd")
 const MAX_BULLETS := 600
-const RADIUS := 0.32             # bullet radius, metres
+const RADIUS := 0.6              # large, slow, readable orbs
 const PLAYER_RADIUS := 0.38      # a little under the capsule, so grazes feel fair
-const COLOR := Color(1.0, 0.36, 0.22)
+const COLOR := Color(0.42, 0.02, 0.05)   # dark red
 
 var player: Node                 # set by the world
 var _pos := PackedVector3Array()
@@ -23,8 +23,8 @@ func _ready() -> void:
 	var sphere := SphereMesh.new()
 	sphere.radius = RADIUS
 	sphere.height = RADIUS * 2.0
-	sphere.radial_segments = 10
-	sphere.rings = 5
+	sphere.radial_segments = 14
+	sphere.rings = 7
 	_mm.mesh = sphere
 	_mm.instance_count = MAX_BULLETS
 	_mm.visible_instance_count = 0

@@ -15,11 +15,13 @@ const MENU_SCENE := "res://scenes/level_select.tscn"
 
 func play_level(id: String) -> void:
 	level = id
+	Engine.time_scale = 1.0
 	get_tree().paused = false
 	get_tree().change_scene_to_file(WORLD_SCENE)
 
 
 func to_level_select() -> void:
+	Engine.time_scale = 1.0
 	get_tree().paused = false
 	set_ui_mode("menu")
 	get_tree().change_scene_to_file(MENU_SCENE)
