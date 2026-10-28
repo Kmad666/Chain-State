@@ -1,6 +1,7 @@
 extends Node3D
-## Test range: a big flat plane, one floating cube to swing from, and one NPC to
-## talk to. Wires the player, HUD, pause menu, dialogue panel and editor together.
+## The playable world. Builds the level picked in the level select (Game.level):
+## the test range, or one of the island levels. Wires the player, HUD, pause
+## menu, dialogue panel, editor and logbook together.
 
 const Player := preload("res://scripts/player/player.gd")
 const Npc := preload("res://scripts/world/npc.gd")
@@ -11,6 +12,7 @@ const PauseMenu := preload("res://scripts/ui/pause_menu.gd")
 const LogbookPanel := preload("res://scripts/ui/logbook_panel.gd")
 const SunGlare := preload("res://scripts/ui/sun_glare.gd")
 const Evidence := preload("res://scripts/world/evidence.gd")
+const FloatingIsland := preload("res://scripts/world/floating_island.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -38,6 +40,9 @@ var pause_menu: Control
 var logbook: Control
 var env: Environment
 var sun: DirectionalLight3D
+var islands: Array = []
+var start_pos := START_POS
+var start_yaw := 0.0
 var glare: Control
 var sky_id := "day"
 var _talking_to: Node = null
@@ -52,7 +57,8 @@ func _ready() -> void:
 	player = Player.new()
 	player.process_mode = Node.PROCESS_MODE_PAUSABLE   # ...but the player freezes
 	add_child(player)
-	player.global_position = START_POS
+	player.global_position = start_pos
+	player.rotation.y = start_yaw
 	player.spawn = player.global_transform
 	player.talk_requested.connect(_talk)
 
@@ -148,6 +154,50 @@ func set_sky(id: String) -> void:
 
 
 func _build_world() -> void:
+	match Game.level:
+		"level_1":
+			_build_level_1()
+		"level_2":
+			_build_level_2()
+		_:
+			_build_range()
+
+
+## Level 1: two islands at the same height, a short gap between them.
+func _build_level_1() -> void:
+	var a := _island(Vector3(0, 0, 0), 22.0, 11)
+	var b := _island(Vector3(6, 2, -72), 26.0, 23)
+	_start_on(a, b)
+
+
+## Level 2: the far island is further away and higher, so you'll need height and momentum.
+func _build_level_2() -> void:
+	var a := _island(Vector3(0, 0, 0), 20.0, 37)
+	var b := _island(Vector3(38, 16, -70), 28.0, 41)
+	_start_on(a, b)
+
+
+func _island(pos: Vector3, r: float, seed_: int) -> Node3D:
+	var isl := FloatingIsland.new()
+	isl.radius = r
+	isl.island_seed = seed_
+	isl.position = pos
+	add_child(isl)
+	islands.append(isl)
+	return isl
+
+
+## Start near the edge of `from`, facing `to`.
+func _start_on(from: Node3D, to: Node3D) -> void:
+	var d := (to.position - from.position)
+	d.y = 0
+	d = d.normalized()
+	start_pos = from.position + d * (from.radius * 0.55) + Vector3(0, 1.0, 0)
+	start_yaw = atan2(-d.x, -d.z)
+
+
+## The test range: flat plane, one floating cube, an NPC and four clues.
+func _build_range() -> void:
 	# the plane: 400 x 400 m, top surface at y = 0
 	_box(Vector3(400, 1, 400), Vector3(0, -0.5, 0), Mats.grid(Color(0.46, 0.56, 0.36), Color(0.42, 0.52, 0.33)))
 
@@ -161,7 +211,7 @@ func _build_world() -> void:
 	npc.display_name = "NPC"
 	npc.position = Vector3(4, 0, 7)
 	add_child(npc)
-	npc.look_at(Vector3(START_POS.x, 0, START_POS.z), Vector3.UP, true)
+	npc.look_at(Vector3(start_pos.x, 0, start_pos.z), Vector3.UP, true)
 
 	_build_evidence()
 

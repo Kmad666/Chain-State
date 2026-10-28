@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Chain State"
 config/description="First-person Verlet grapple, NPC dialogue and a dialogue tree editor. Test range."
-run/main_scene="res://scenes/test_range.tscn"
+run/main_scene="res://scenes/level_select.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 

@@ -89,6 +89,10 @@ func _ready() -> void:
 	resume.text = "Resume"
 	resume.pressed.connect(func(): Game.set_ui_mode("play"))
 	br.add_child(resume)
+	var levels := Button.new()
+	levels.text = "Level select"
+	levels.pressed.connect(Game.to_level_select)
+	br.add_child(levels)
 	var reset := Button.new()
 	reset.text = "Reset tuning"
 	reset.pressed.connect(_reset_tuning)

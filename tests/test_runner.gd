@@ -24,7 +24,7 @@ func _ready() -> void:
 	check(t.nodes.a.choices[0].next == "b" and t.nodes.b.choices[0].next == "a", "A and B loop to each other")
 
 	print("== Test range")
-	range_scene = load("res://scenes/test_range.tscn").instantiate()
+	range_scene = load("res://scenes/world.tscn").instantiate()
 	get_tree().root.add_child(range_scene)
 	for i in 60:
 		await get_tree().physics_frame
@@ -165,6 +165,39 @@ func _ready() -> void:
 	ed._revert()
 	check(ed.data.nodes.size() == before, "revert discards unsaved edits")
 	range_scene.close_editor()
+
+	print("== Level select")
+	range_scene.queue_free()
+	await get_tree().process_frame
+	var menu = load("res://scenes/level_select.tscn").instantiate()
+	get_tree().root.add_child(menu)
+	await get_tree().process_frame
+	check(menu._buttons.size() == Levels.LIST.size(), "menu lists every level")
+	await shot("10_level_select")
+	menu.queue_free()
+	await get_tree().process_frame
+
+	for lv in ["level_1", "level_2"]:
+		print("== " + lv)
+		Game.level = lv
+		var w = load("res://scenes/world.tscn").instantiate()
+		get_tree().root.add_child(w)
+		for i in 60:
+			await get_tree().physics_frame
+		check(w.islands.size() == 2, "%s has two islands" % lv)
+		check(w.player.is_on_floor(), "%s: player starts standing on an island" % lv)
+		var far = w.islands[1]
+		var space = w.get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(w.player.cam.global_position, far.global_position + Vector3(0, -2, 0))
+		q.exclude = [w.player.get_rid()]
+		var hit = space.intersect_ray(q)
+		check(not hit.is_empty() and hit.collider == far, "%s: the far island is solid and grapple-able" % lv)
+		await shot("11_" + lv)
+		w.player.head.rotation.x = deg_to_rad(-35)
+		await shot("12_" + lv + "_down")
+		w.queue_free()
+		await get_tree().process_frame
+	Game.level = "range"
 
 	print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))
 	get_tree().quit(1 if fails else 0)

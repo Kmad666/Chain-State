@@ -3,7 +3,7 @@
 // direction, so plain metal looks milky. This fakes a full environment instead:
 // bright sky above, a sharp horizon line, darker ground below, so the facets of
 // each link flash between light and dark the way polished silver does.
-// test_range.gd sets the env colours to match the current sky.
+// world.gd sets the env colours to match the current sky.
 shader_type spatial;
 render_mode specular_schlick_ggx;
 

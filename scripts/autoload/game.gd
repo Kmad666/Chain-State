@@ -4,8 +4,25 @@ extends Node
 
 signal ui_mode_changed(mode: String)
 
-## "play", "pause", "dialogue", "editor" or "log"
+## "play", "pause", "dialogue", "editor", "log" or "menu"
 var ui_mode := "play"
+## Which level the world scene builds (see scripts/world/levels.gd)
+var level := "range"
+
+const WORLD_SCENE := "res://scenes/world.tscn"
+const MENU_SCENE := "res://scenes/level_select.tscn"
+
+
+func play_level(id: String) -> void:
+	level = id
+	get_tree().paused = false
+	get_tree().change_scene_to_file(WORLD_SCENE)
+
+
+func to_level_select() -> void:
+	get_tree().paused = false
+	set_ui_mode("menu")
+	get_tree().change_scene_to_file(MENU_SCENE)
 
 
 func _enter_tree() -> void:

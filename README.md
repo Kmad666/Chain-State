@@ -41,6 +41,15 @@ Pause with **Esc**. On the right there's a slider for every movement number: gra
 ### How the rope works
 `scripts/player/player.gd` treats the rope as a Verlet distance constraint. Each physics tick (120 per second) it predicts where gravity and momentum would carry you. If that's past the rope length, it projects the point back onto the rope's sphere and derives your velocity from the correction. You get real pendulum swings, and reeling in pumps speed.
 
+## Levels
+The game opens on a **level select**. Click a level or press its number. In a level, Esc → **Level select** takes you back.
+
+- **Test Range:** the flat plane with the floating cube, the NPC and four practice clues.
+- **Level 1:** two floating islands level with each other, with a short gap. Start near the edge facing the far island.
+- **Level 2:** two floating islands, the far one further away and 16 m higher, so you need height and momentum.
+
+The islands have flat, grassy tops to walk on and jagged rock cones underneath. Every surface can be grappled, including the cliffs and the undersides. There are no obstacles or details yet: this is a blank countryside for practising level design. Falling off sends you back to the start.
+
 ## Skies
 The range uses Kenney's free CC0 skybox pack: **Day** (default), **Morning**, **Night**, **Space** and **Alien**. Switch between them in the pause menu (Esc → Sky); your choice is remembered. Each sky moves the sun light to where the painted sun sits, and matches the light colour, ambient light and fog to that sky.
 
@@ -56,7 +65,7 @@ Press **L** to open the Agent's logbook. The game pauses while it's open.
 
 The test range has four practice clues in a row near the start, one per school: a ring burnt into stone, a crate that has sprouted, frost on a summer post, and a tide line on a dry crate. Look at one and press **E** to examine it.
 
-To place a clue in a scene, add `scripts/world/evidence.gd` with an `evidence_id`, `school`, `title` and `note`, and build its shape with `part()` (see `_build_evidence()` in `test_range.gd`).
+To place a clue in a scene, add `scripts/world/evidence.gd` with an `evidence_id`, `school`, `title` and `note`, and build its shape with `part()` (see `_build_evidence()` in `world.gd`).
 
 ## Dialogue
 Walk up to an NPC, look at it and press **E**. A tall Disco Elysium-style column opens on the right. The conversation builds up as a log (**SPEAKER** — line), with numbered choices underneath. Choices you've already picked in this conversation turn grey.
@@ -78,10 +87,13 @@ Each NPC has its own tree, saved as `dialogue/<npc_id>.json`.
 - **Running inside the Godot editor:** straight into the project's `dialogue/` folder. Commit it and it ships with the game.
 - **An exported build (Windows or browser):** to your user data folder, overriding the shipped file on that computer. Use **Copy JSON**, **Download** (browser) or **Open folder** (Windows) to get the file, then put it in `dialogue/` in the repo.
 
-To add a new NPC, place `scripts/world/npc.gd` in a scene (or add one in `test_range.gd`) with a unique `npc_id` and `display_name`. It shows up in the editor's drop-down automatically.
+To add a new NPC, place `scripts/world/npc.gd` in a scene (or add one in `world.gd`) with a unique `npc_id` and `display_name`. It shows up in the editor's drop-down automatically.
 
 ## Project layout
-- `scenes/test_range.tscn` + `scripts/world/test_range.gd`: the test range, which also wires the UI together
+- `scenes/level_select.tscn` + `scripts/ui/level_select.gd`: the level select, the first screen
+- `scenes/world.tscn` + `scripts/world/world.gd`: the playable world. Builds the chosen level and wires the UI together
+- `scripts/world/levels.gd`: the list of levels
+- `scripts/world/floating_island.gd`: a procedurally shaped floating island (grass top, rock cone below)
 - `scripts/player/player.gd`: first-person controller, grapple, rope physics, feel tuning, talk targeting
 - `scripts/player/viewmodel.gd`: your right arm (sleeve, glove, silver cuff); punches out on fire, reaches up while hooked
 - `scripts/player/chain.gd`: the silver chain, coiled around the forearm and paying out to the arrowhead
