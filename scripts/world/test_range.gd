@@ -9,6 +9,7 @@ const DialoguePanel := preload("res://scripts/ui/dialogue_panel.gd")
 const DialogueEditor := preload("res://scripts/ui/dialogue_editor.gd")
 const PauseMenu := preload("res://scripts/ui/pause_menu.gd")
 const LogbookPanel := preload("res://scripts/ui/logbook_panel.gd")
+const SunGlare := preload("res://scripts/ui/sun_glare.gd")
 const Evidence := preload("res://scripts/world/evidence.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
@@ -17,15 +18,15 @@ const SKY_SAVE := "user://sky.txt"
 ## Kenney "Skyboxes" (CC0): 360-degree panoramas. `u` and `elev` locate the painted
 ## sun in the image so the real light comes from the same place.
 const SKIES := {
-	"day": {"name": "Day", "u": 0.916, "elev": 49.9, "light": Color(1.0, 0.97, 0.90), "energy": 0.8,
+	"day": {"name": "Day", "top": Color(0.548, 0.718, 0.942), "glare": 1.0, "u": 0.916, "elev": 49.9, "light": Color(1.0, 0.97, 0.90), "energy": 0.8,
 		"ambient": 0.45, "fog": Color(0.685, 0.766, 0.949)},
-	"morning": {"name": "Morning", "u": 0.912, "elev": 51.3, "light": Color(1.0, 0.84, 0.66), "energy": 0.75,
+	"morning": {"name": "Morning", "top": Color(0.992, 0.929, 0.84), "glare": 1.0, "u": 0.912, "elev": 51.3, "light": Color(1.0, 0.84, 0.66), "energy": 0.75,
 		"ambient": 0.45, "fog": Color(0.977, 0.874, 0.765)},
-	"night": {"name": "Night", "u": 0.916, "elev": 51.3, "light": Color(0.62, 0.72, 1.0), "energy": 0.35,
+	"night": {"name": "Night", "top": Color(0.194, 0.248, 0.451), "glare": 0.35, "u": 0.916, "elev": 51.3, "light": Color(0.62, 0.72, 1.0), "energy": 0.35,
 		"ambient": 1.7, "fog": Color(0.179, 0.229, 0.407)},
-	"space": {"name": "Space", "u": 0.623, "elev": 9.1, "light": Color(0.72, 0.76, 1.0), "energy": 0.35,
+	"space": {"name": "Space", "top": Color(0.099, 0.157, 0.322), "glare": 0.15, "u": 0.623, "elev": 9.1, "light": Color(0.72, 0.76, 1.0), "energy": 0.35,
 		"ambient": 1.9, "fog": Color(0.143, 0.181, 0.381)},
-	"alien": {"name": "Alien", "u": 0.889, "elev": 62.6, "light": Color(1.0, 0.86, 1.0), "energy": 0.8,
+	"alien": {"name": "Alien", "top": Color(0.853, 0.714, 0.951), "glare": 1.0, "u": 0.889, "elev": 62.6, "light": Color(1.0, 0.86, 1.0), "energy": 0.8,
 		"ambient": 0.45, "fog": Color(0.843, 0.777, 0.914)},
 }
 
@@ -37,6 +38,7 @@ var pause_menu: Control
 var logbook: Control
 var env: Environment
 var sun: DirectionalLight3D
+var glare: Control
 var sky_id := "day"
 var _talking_to: Node = null
 var _had_capture := false
@@ -53,6 +55,15 @@ func _ready() -> void:
 	player.global_position = START_POS
 	player.spawn = player.global_transform
 	player.talk_requested.connect(_talk)
+
+	# sun glare sits between the 3D view and the HUD
+	var glare_layer := CanvasLayer.new()
+	glare_layer.layer = 5
+	add_child(glare_layer)
+	glare = SunGlare.new()
+	glare.camera = player.cam
+	glare_layer.add_child(glare)
+	set_sky(sky_id)
 
 	var ui := CanvasLayer.new()
 	ui.layer = 10
@@ -123,6 +134,12 @@ func set_sky(id: String) -> void:
 	# Godot's panorama yaw is the negative of the image's horizontal position
 	var sun_dir := Basis.from_euler(Vector3(deg_to_rad(s.elev), -s.u * TAU, 0)) * Vector3.FORWARD
 	sun.basis = Basis.looking_at(-sun_dir, Vector3.UP if absf(sun_dir.y) < 0.99 else Vector3.BACK)
+	Mats.set_chrome_env(s.top, s.fog, Color(0.26, 0.29, 0.24) * (1.0 if s.energy > 0.5 else 0.6),
+		1.0 if s.energy > 0.5 else 1.2)
+	if glare:
+		glare.sun_dir = sun_dir
+		glare.tint = s.light
+		glare.strength = s.glare
 	sun.light_color = s.light
 	sun.light_energy = s.energy
 	var f := FileAccess.open(SKY_SAVE, FileAccess.WRITE)

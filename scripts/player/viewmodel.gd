@@ -32,7 +32,7 @@ func _ready() -> void:
 	add_child(pivot)
 	var sleeve := Mats.lit(CLOAK)
 	var glove := Mats.lit(GLOVE)
-	var silver := Mats.metal(SILVER)
+	var silver := Mats.polished(SILVER)
 
 	# sleeve: wide cloak cuff that tapers toward the wrist
 	_zcyl(0.075, 0.062, 0.18, -0.04, sleeve, 7)

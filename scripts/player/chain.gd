@@ -38,7 +38,7 @@ func _ready() -> void:
 	_mm.visible_instance_count = 0
 	_links = MultiMeshInstance3D.new()
 	_links.multimesh = _mm
-	_links.material_override = Mats.metal(SILVER)
+	_links.material_override = Mats.polished(SILVER)
 	_links.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_links.custom_aabb = AABB(Vector3(-5000, -5000, -5000), Vector3(10000, 10000, 10000))
 	add_child(_links)
@@ -47,7 +47,7 @@ func _ready() -> void:
 	add_child(arrow)
 	var am := MeshInstance3D.new()
 	am.mesh = _arrow_mesh()
-	am.material_override = Mats.metal(SILVER_BRIGHT, 0.25)
+	am.material_override = Mats.polished(SILVER_BRIGHT)
 	am.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	arrow.add_child(am)
 

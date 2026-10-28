@@ -37,6 +37,21 @@ func _ready() -> void:
 		check(range_scene.env.sky.sky_material is PanoramaSkyMaterial and range_scene.env.sky.sky_material.panorama != null, "%s sky loads" % id)
 		await shot("sky_" + id)
 	range_scene.set_sky("day")
+	print("== Sun glare")
+	var g = range_scene.glare
+	p.global_position = Vector3(0, 1, 30)
+	p.look_at(p.global_position + Vector3(g.sun_dir.x, 0, g.sun_dir.z), Vector3.UP)
+	p.rotation = Vector3(0, p.rotation.y, 0)
+	p.head.rotation.x = asin(clampf(g.sun_dir.y, -1, 1))
+	for i in 40:
+		await get_tree().process_frame
+	check(g._vis > 0.6, "glare shows when looking at the sun (%.2f)" % g._vis)
+	await shot("09_sun_glare")
+	p.head.rotation.x = -0.6
+	for i in 40:
+		await get_tree().process_frame
+	check(g._vis < 0.1, "glare fades when looking away (%.2f)" % g._vis)
+	p.head.rotation.x = 0.0
 
 	print("== Grapple")
 	p.global_position = Vector3(0, 1, -10)

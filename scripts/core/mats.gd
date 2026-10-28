@@ -28,6 +28,28 @@ static func metal(color: Color, roughness := 0.32) -> StandardMaterial3D:
 	return _cache[key]
 
 
+## Mirror-polished metal (shaders/chrome.gdshader): the chain, arrowhead and cuff.
+static func polished(color: Color) -> ShaderMaterial:
+	var key := "P%s" % color
+	if not _cache.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = preload("res://shaders/chrome.gdshader")
+		m.set_shader_parameter("tint", color)
+		_cache[key] = m
+	return _cache[key]
+
+
+## Point every polished material's fake reflections at the current sky.
+static func set_chrome_env(top: Color, horizon: Color, ground: Color, strength := 1.0) -> void:
+	for k in _cache:
+		var m = _cache[k]
+		if m is ShaderMaterial and str(k).begins_with("P"):
+			m.set_shader_parameter("env_top", top)
+			m.set_shader_parameter("env_horizon", horizon)
+			m.set_shader_parameter("env_ground", ground)
+			m.set_shader_parameter("strength", strength)
+
+
 ## Unshaded colour (UI-ish world markers).
 static func flat(color: Color) -> StandardMaterial3D:
 	var key := "F%s" % color
