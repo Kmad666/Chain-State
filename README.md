@@ -47,7 +47,7 @@ The game opens on a **level select**. Click a level or press its number. In a le
 - **Test Range:** the flat plane with the floating cube, the NPC and four practice clues.
 - **Level 1:** two floating islands level with each other, with a short gap. Start near the edge facing the far island.
 - **Level 2:** two floating islands, the far one further away and 16 m higher, so you need height and momentum.
-- **Enemy Test (Ground)** and **Enemy Test (Air):** one Sentry each (see below).
+- **Enemy Test (Ground)** and **Enemy Test (Air):** one caster each, a wizard and a witch (see below).
 
 The islands have flat, grassy tops to walk on and jagged rock cones underneath. Every surface can be grappled, including the cliffs and the undersides. There are no obstacles or details yet: this is a blank countryside for practising level design. Falling off sends you back to the start.
 
