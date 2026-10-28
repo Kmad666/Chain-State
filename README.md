@@ -2,7 +2,7 @@
 
 *Working title.* Foundation for a first-person detective game: half **Verlet-style grapple platforming**, half **investigation and dialogue**. You play a detective solving crimes caused by magic across the floating, chained-together states of the Gordian Empire, a Victorian-style society. Built in **Godot 4.7** for **desktop** (keyboard and mouse).
 
-**Play the latest build in your browser:** https://kmad666.github.io/chain-state/
+**Play the latest build in your browser:** https://kmad666.github.io/Chain-State/
 **Windows build:** open the latest run under the repo's **Actions** tab and download **ChainState-windows** from Artifacts.
 
 ## What's in the test range
