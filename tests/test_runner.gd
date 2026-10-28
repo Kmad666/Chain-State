@@ -197,6 +197,55 @@ func _ready() -> void:
 		await shot("12_" + lv + "_down")
 		w.queue_free()
 		await get_tree().process_frame
+	print("== Enemy test")
+	Game.level = "enemy_test"
+	var ew = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(ew)
+	for i in 60:
+		await get_tree().physics_frame
+	var ep = ew.player
+	check(ew.sentries.size() == 2, "two Sentries patrol")
+	ep.invuln = 999.0                        # keep the player safe while volleys fill the air
+	for i in 400:
+		await get_tree().physics_frame
+	check(ew.bullets.count() > 20, "Sentries fire volleys (%d projectiles in the air)" % ew.bullets.count())
+	check(get_tree().get_nodes_in_group("hook_orb").size() > 0, "volleys include hookable orbs")
+	await shot("13_enemy_volley")
+	ep.invuln = 0.0
+	var hp: int = ep.health
+	ep.hit(Vector3.FORWARD)
+	check(ep.health == hp - 1 and ep.invuln > 0.0, "a hit costs one health and grants a moment of safety")
+	ep.hit(Vector3.FORWARD)
+	check(ep.health == hp - 1, "no double hits during the safety window")
+	ep.invuln = 999.0
+
+	var s = ew.sentries[0]
+	ep.global_position = s.global_position + Vector3(30, 0, 0)
+	check(not s.on_hooked(ep), "hooking from too far: it shakes the chain off")
+	ep.global_position = s.global_position + Vector3(8, -2, 0)
+	check(s.on_hooked(ep), "hooking from close range holds")
+	ep.attached = true
+	ep.hook_node = s
+	ep.rope_len = 8.0
+	var c: Vector3 = s.global_position
+	for k in 3 * 24 + 6:                      # three-and-a-bit laps around it
+		var a2 := TAU * k / 24.0
+		s._track_wrap(c + Vector3(cos(a2) * 8.0, -2.0, sin(a2) * 8.0))
+		if s.is_subdued:
+			break
+	check(s.is_subdued, "three laps around it subdue the Sentry")
+	check(not ep.attached, "the hook is released once it's bound")
+	await get_tree().physics_frame
+	await shot("14_subdued")
+
+	var orb = get_tree().get_nodes_in_group("hook_orb")[0]
+	var before_pos: Vector3 = orb.global_position
+	check(orb.on_hooked(ep), "a hookable orb accepts the hook")
+	for i in 30:
+		await get_tree().physics_frame
+	check(orb.global_position.distance_to(before_pos) < 0.01, "a hooked orb freezes in mid-air")
+	ew.queue_free()
+	await get_tree().process_frame
 	Game.level = "range"
 
 	print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))

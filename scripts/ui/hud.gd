@@ -10,6 +10,10 @@ var _cross_col := Color(1, 1, 1, 0.6)
 var _last_npc: Node = null
 var _toast: Label
 var _toast_t := 0.0
+var _health: Label
+var _wraps: Label
+var _flash: ColorRect
+var _flash_a := 0.0
 
 
 func _ready() -> void:
@@ -39,6 +43,29 @@ func _ready() -> void:
 	_toast.offset_bottom = 80
 	_toast.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0))
 
+	_flash = ColorRect.new()
+	_flash.color = Color(0.9, 0.1, 0.05, 0.0)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_flash)
+	move_child(_flash, 0)
+
+	_health = _label(30, HORIZONTAL_ALIGNMENT_LEFT)
+	_health.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_health.offset_left = 22
+	_health.offset_top = 16
+	_health.offset_right = 300
+	_health.offset_bottom = 60
+	_health.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
+
+	_wraps = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_wraps.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_wraps.offset_left = -300
+	_wraps.offset_right = 300
+	_wraps.offset_top = 70
+	_wraps.offset_bottom = 104
+	_wraps.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
+
 	_speed = _label(20, HORIZONTAL_ALIGNMENT_LEFT)
 	_speed.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_speed.offset_left = 20
@@ -58,6 +85,11 @@ func _label(sz: int, align: HorizontalAlignment) -> Label:
 	return l
 
 
+## Red flash when the player is hit.
+func flash() -> void:
+	_flash_a = 0.45
+
+
 ## A short message near the top of the screen.
 func toast(t: String, secs := 3.0) -> void:
 	_toast.text = t
@@ -71,6 +103,22 @@ func _process(_dt: float) -> void:
 	_toast.modulate.a = clampf(_toast_t, 0.0, 1.0)
 	var playing := Game.playing()
 	visible = playing
+	_flash_a = maxf(_flash_a - _dt * 1.6, 0.0)
+	_flash.color.a = _flash_a
+	var hp := ""
+	for i in player.MAX_HEALTH:
+		hp += "♥ " if i < player.health else "♡ "
+	_health.text = hp
+	_health.modulate.a = 0.5 if player.invuln > 0.0 and fmod(player.invuln, 0.2) < 0.1 else 1.0
+	var target = player.hook_node if player.attached else null
+	if target and is_instance_valid(target) and target.is_in_group("enemy"):
+		var w: float = target.wraps
+		var pips := ""
+		for i in target.WRAPS_NEEDED:
+			pips += "◉ " if i < floori(w) else "○ "
+		_wraps.text = "WRAP  %s" % pips
+	else:
+		_wraps.text = ""
 
 	var npc = player.look_npc
 	if npc != _last_npc:
@@ -86,6 +134,14 @@ func _process(_dt: float) -> void:
 	if npc:
 		col = Color(1, 0.85, 0.4, 0.9)
 		_prompt.text = ("[E]  Examine: %s" if npc.is_in_group("evidence") else "[E]  Talk to %s") % npc.display_name
+	elif player.aim_enemy and is_instance_valid(player.aim_enemy) and player.aim_enemy.is_in_group("enemy"):
+		var dist: float = player.cam.global_position.distance_to(player.aim_enemy.global_position)
+		var close: bool = dist <= player.aim_enemy.SUBDUE_RANGE
+		col = Color(1.0, 0.35, 0.3, 0.95) if close else Color(1.0, 0.75, 0.5, 0.7)
+		_info.text = ("%d m  ·  in range to wrap" if close else "%d m  ·  too far to wrap") % roundi(dist)
+	elif player.aim_enemy and is_instance_valid(player.aim_enemy):
+		col = Color(0.55, 0.85, 1.0, 0.95)
+		_info.text = "hookable orb"
 	elif player.attached:
 		col = Color(0.75, 0.85, 1.0, 0.8)
 		_info.text = "rope %d m" % roundi(player.rope_len)

@@ -47,8 +47,18 @@ The game opens on a **level select**. Click a level or press its number. In a le
 - **Test Range:** the flat plane with the floating cube, the NPC and four practice clues.
 - **Level 1:** two floating islands level with each other, with a short gap. Start near the edge facing the far island.
 - **Level 2:** two floating islands, the far one further away and 16 m higher, so you need height and momentum.
+- **Enemy Test:** a wide island with two Sentries patrolling around it (see below).
 
 The islands have flat, grassy tops to walk on and jagged rock cones underneath. Every surface can be grappled, including the cliffs and the undersides. There are no obstacles or details yet: this is a blank countryside for practising level design. Falling off sends you back to the start.
+
+## Enemies: the Sentry (Enemy Test level)
+Sentries (placeholder name and look) fly a set path and stop to fire **bullet-hell volleys**: slow orange projectiles in rings, fans aimed at you, and double rings that form lanes. Every volley leaves room to weave through. Before each volley, the Sentry's core swells and brightens as a warning.
+
+- **Getting hit** costs one heart (top left), knocks you back and gives you a moment of safety. Lose all three and you restart at full health.
+- **Hookable orbs:** some projectiles are blue with a silver ring. The chain can catch them. A caught orb freezes in mid-air as a temporary anchor, then fades after you let go.
+- **Subduing:** hook a Sentry from **within 20 m** (the crosshair turns red and says "in range to wrap"). From further away it shakes the chain off. While hooked it stops patrolling and fires at half rate. **Swing around it**: each full lap wraps the chain once more, adds a silver coil and shortens your rope. **Three laps** bind it, and it sinks out of the fight. Let go mid-wrap and the coils slip loose after a moment.
+
+Code: `scripts/combat/sentry.gd` (path, volleys, wrap counting), `bullet_field.gd` (all projectiles, drawn in one batch), `hook_orb.gd` (the catchable ones).
 
 ## Skies
 The range uses Kenney's free CC0 skybox pack: **Day** (default), **Morning**, **Night**, **Space** and **Alien**. Switch between them in the pause menu (Esc → Sky); your choice is remembered. Each sky moves the sun light to where the painted sun sits, and matches the light colour, ambient light and fog to that sky.

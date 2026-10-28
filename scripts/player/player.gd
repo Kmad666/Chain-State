@@ -15,12 +15,18 @@ extends CharacterBody3D
 
 signal grappled
 signal talk_requested(npc: Node)
+signal notice(text: String)      # short messages for the HUD
+signal hurt(health: int)
+signal downed
 
 const Chain := preload("res://scripts/player/chain.gd")
 const Viewmodel := preload("res://scripts/player/viewmodel.gd")
 
 const LAYER_WORLD := 1          # grapple-able and solid
 const LAYER_NPC := 2            # solid, talk-able, NOT grapple-able
+const LAYER_HOOK := 4           # moving grapple targets (enemies, hookable orbs): not solid
+const MAX_HEALTH := 3
+const INVULN_TIME := 1.2
 const EYE_HEIGHT := 0.7         # camera height above the capsule centre
 const MIN_ROPE := 2.0
 const ATTACH_PULL := 0.03       # rope shortens by this fraction on attach (the "tug")
@@ -92,6 +98,11 @@ var air_left := 3
 var hook_state := 0              # chain.gd: STOWED, FLYING, HOOKED, RETURNING
 var hook_tip := Vector3.ZERO
 var hook_goal := Vector3.ZERO
+var hook_node: Node3D = null     # a moving target the hook is flying to / attached to
+var hook_offset := Vector3.ZERO  # where on it, in its local space
+var health := MAX_HEALTH
+var invuln := 0.0
+var aim_enemy: Node = null       # enemy under the crosshair (read by the HUD)
 var dash_cd := 0.0
 
 # what the crosshair is on (read by the HUD)
@@ -182,18 +193,27 @@ func _ray(mask: int, length: float) -> Dictionary:
 func try_grapple() -> void:
 	if hook_state == Chain.FLYING or attached:
 		return
-	var hit := _ray(LAYER_WORLD | LAYER_NPC, tune.grapple_range)
-	if hit.is_empty() or (hit.collider.collision_layer & LAYER_WORLD) == 0:
+	var hit := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, tune.grapple_range)
+	if hit.is_empty() or (hit.collider.collision_layer & (LAYER_WORLD | LAYER_HOOK)) == 0:
 		return
 	if not is_on_floor():
 		if air_left <= 0:
 			return
 		air_left -= 1
 	hook_goal = hit.position
+	hook_node = null
+	if hit.collider.collision_layer & LAYER_HOOK:
+		hook_node = hit.collider
+		hook_offset = Vector3.ZERO          # aim for its centre: it's moving
 	hook_state = Chain.FLYING
 
 
 func _attach() -> void:
+	if hook_node:
+		if not is_instance_valid(hook_node) or not hook_node.has_method("on_hooked") or not hook_node.on_hooked(self):
+			hook_node = null
+			hook_state = Chain.RETURNING      # shaken off
+			return
 	attached = true
 	hook_state = Chain.HOOKED
 	anchor = hook_goal
@@ -212,6 +232,9 @@ func release(hop := false) -> void:
 		return
 	attached = false
 	hook_state = Chain.RETURNING
+	if hook_node and is_instance_valid(hook_node) and hook_node.has_method("on_released"):
+		hook_node.on_released(self)
+	hook_node = null
 	if velocity.length() > 6.0:
 		velocity *= 1.0 + tune.release_boost
 	if hop:
@@ -221,6 +244,12 @@ func release(hop := false) -> void:
 func _update_hook(dt: float) -> void:
 	match hook_state:
 		Chain.FLYING:
+			if hook_node:
+				if not is_instance_valid(hook_node):
+					hook_node = null
+					hook_state = Chain.RETURNING
+					return
+				hook_goal = hook_node.to_global(hook_offset)
 			var to := hook_goal - hook_tip
 			var step: float = tune.arrow_speed * dt
 			if to.length() <= step:
@@ -228,6 +257,12 @@ func _update_hook(dt: float) -> void:
 			else:
 				hook_tip += to / to.length() * step
 		Chain.HOOKED:
+			if hook_node:
+				if not is_instance_valid(hook_node):
+					hook_node = null
+					release()
+					return
+				anchor = hook_node.to_global(hook_offset)
 			hook_tip = anchor
 		Chain.RETURNING:
 			var home: Vector3 = chain.stowed_tip()
@@ -239,6 +274,22 @@ func _update_hook(dt: float) -> void:
 				hook_tip += to / to.length() * step
 		_:
 			hook_tip = chain.stowed_tip()
+
+
+## Struck by a projectile: lose a point of health, get knocked back, and get a
+## moment of invulnerability. At zero you go down and restart at full health.
+func hit(from_dir: Vector3) -> void:
+	if invuln > 0.0 or not Game.playing():
+		return
+	health -= 1
+	invuln = INVULN_TIME
+	velocity += from_dir * 6.0 + Vector3.UP * 2.5
+	hurt.emit(health)
+	if health <= 0:
+		downed.emit()
+		respawn()
+		health = MAX_HEALTH
+		hurt.emit(health)
 
 
 func respawn() -> void:
@@ -284,6 +335,7 @@ func _physics_process(dt: float) -> void:
 
 	# Dash: snap your momentum toward where you look
 	dash_cd = maxf(dash_cd - dt, 0.0)
+	invuln = maxf(invuln - dt, 0.0)
 	if Game.playing() and dash_cd == 0.0 and Input.is_action_just_pressed("dash") and tune.dash_speed > 0.0:
 		velocity = -cam.global_basis.z * maxf(velocity.length(), tune.dash_speed) * (1.0 + tune.release_boost)
 		dash_cd = 1.2
@@ -365,14 +417,17 @@ func _process(dt: float) -> void:
 	# crosshair: an NPC in talk range wins over a grapple target
 	look_npc = null
 	aim_valid = false
+	aim_enemy = null
 	if Game.playing():
-		var hit := _ray(LAYER_WORLD | LAYER_NPC, tune.grapple_range)
+		var hit := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, tune.grapple_range)
 		if not hit.is_empty():
 			var d := cam.global_position.distance_to(hit.position)
 			if hit.collider.is_in_group("npc") or hit.collider.is_in_group("evidence"):
 				if d <= TALK_RANGE:
 					look_npc = hit.collider
 			else:
+				if hit.collider.is_in_group("enemy") or hit.collider.is_in_group("hook_orb"):
+					aim_enemy = hit.collider
 				aim_valid = true
 				aim_point = hit.position
 				aim_distance = d

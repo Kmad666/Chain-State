@@ -13,6 +13,8 @@ const LogbookPanel := preload("res://scripts/ui/logbook_panel.gd")
 const SunGlare := preload("res://scripts/ui/sun_glare.gd")
 const Evidence := preload("res://scripts/world/evidence.gd")
 const FloatingIsland := preload("res://scripts/world/floating_island.gd")
+const BulletField := preload("res://scripts/combat/bullet_field.gd")
+const Sentry := preload("res://scripts/combat/sentry.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -41,6 +43,8 @@ var logbook: Control
 var env: Environment
 var sun: DirectionalLight3D
 var islands: Array = []
+var sentries: Array = []
+var bullets: Node3D
 var start_pos := START_POS
 var start_yaw := 0.0
 var glare: Control
@@ -61,6 +65,10 @@ func _ready() -> void:
 	player.rotation.y = start_yaw
 	player.spawn = player.global_transform
 	player.talk_requested.connect(_talk)
+	if bullets:
+		bullets.player = player
+	for s in sentries:
+		s.player = player
 
 	# sun glare sits between the 3D view and the HUD
 	var glare_layer := CanvasLayer.new()
@@ -77,6 +85,12 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.player = player
 	ui.add_child(hud)
+	player.notice.connect(func(t): hud.toast(t, 2.5))
+	player.hurt.connect(func(_h): hud.flash())
+	player.downed.connect(func():
+		hud.toast("Down! Back to the start.", 3.0)
+		if bullets:
+			bullets.clear())
 	panel = DialoguePanel.new()
 	panel.closed.connect(_on_dialogue_closed)
 	ui.add_child(panel)
@@ -159,6 +173,8 @@ func _build_world() -> void:
 			_build_level_1()
 		"level_2":
 			_build_level_2()
+		"enemy_test":
+			_build_enemy_test()
 		_:
 			_build_range()
 
@@ -175,6 +191,40 @@ func _build_level_2() -> void:
 	var a := _island(Vector3(0, 0, 0), 20.0, 37)
 	var b := _island(Vector3(38, 16, -70), 28.0, 41)
 	_start_on(a, b)
+
+
+## Enemy test: one wide island with two small ones nearby, and two Sentries
+## patrolling loops around it.
+func _build_enemy_test() -> void:
+	var main := _island(Vector3(0, 0, 0), 34.0, 5)
+	_island(Vector3(-52, 10, -30), 12.0, 7)
+	_island(Vector3(48, 6, 36), 10.0, 9)
+	bullets = BulletField.new()
+	add_child(bullets)
+	var loop_a := PackedVector3Array()
+	for i in 10:
+		var a := TAU * i / 10.0
+		loop_a.append(Vector3(cos(a) * 26.0, 13.0 + sin(a * 2.0) * 3.0, sin(a) * 26.0))
+	var loop_b := PackedVector3Array()
+	for i in 12:
+		var a := TAU * i / 12.0
+		loop_b.append(Vector3(sin(a) * 34.0, 22.0, sin(a) * cos(a) * 30.0))   # a figure eight, higher up
+	for loop in [loop_a, loop_b]:
+		var s := Sentry.new()
+		s.path = loop
+		s.field = bullets
+		add_child(s)
+		s.subdued.connect(_on_sentry_subdued)
+		sentries.append(s)
+	start_pos = Vector3(0, 1.0, 22)
+	start_yaw = 0.0
+	main.name = "MainIsland"
+
+
+func _on_sentry_subdued(_s: Node) -> void:
+	var left := sentries.filter(func(x): return is_instance_valid(x) and not x.is_subdued).size()
+	if hud:
+		hud.toast("Sentry subdued.  %d left." % left if left > 0 else "All Sentries subdued!", 4.0)
 
 
 func _island(pos: Vector3, r: float, seed_: int) -> Node3D:
