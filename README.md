@@ -51,17 +51,17 @@ The game opens on a **level select**. Click a level or press its number. In a le
 
 The islands have flat, grassy tops to walk on and jagged rock cones underneath. Every surface can be grappled, including the cliffs and the undersides. There are no obstacles or details yet: this is a blank countryside for practising level design. Falling off sends you back to the start.
 
-## Enemies: the Sentry
-Sentries (placeholder name and look) loop a set path. There are two kinds, each with its own test level:
+## Enemies: witches and wizards
+Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a broom, a glowing casting hand) loop a set path. The glow in the casting hand swells before each volley. There are two kinds, each with its own test level:
 
-- **Ground (Enemy Test (Ground)):** hovers low over the island. Once you come within **38 m** its core turns red, it slows and faces you, and after a warning swell it fires a **spread-out line of five large dark red orbs** straight across, parallel to the ground (NieR-style). Alternate volleys shift by half a gap, so stepping between the orbs works but standing still doesn't.
-- **Air (Enemy Test (Air)):** flies high and doesn't shoot. A **constellation of dark red orbs** spins around it, and **blue orbs** ride a wider ring. Grab a blue orb and it leaves the ring and holds still, a swing point to get close. A new one grows back after a few seconds.
+- **Wizard, ground kind (Enemy Test (Ground)):** blue robe and white beard; flies low over the island. Once you come within **38 m** its core turns red, it slows and faces you, and after a warning swell it fires a **spread-out line of five large dark red orbs** straight across, parallel to the ground (NieR-style). Alternate volleys shift by half a gap, so stepping between the orbs works but standing still doesn't.
+- **Witch, air kind (Enemy Test (Air)):** purple robe and black hat; flies high and doesn't shoot. A **constellation of dark red orbs** spins around it, and **blue orbs** ride a wider ring. Grab a blue orb and it leaves the ring and holds still, a swing point to get close. A new one grows back after a few seconds.
 
 **Getting hit** costs one heart (top left), knocks you back and gives you a moment of safety. Lose all three and you restart at full health.
 
-**Subduing:** hook a Sentry from **within 20 m** (the crosshair turns red: "in range to wrap"). From further away it shakes the chain off. While hooked it stops moving and holds fire. **Swing around it**: each full lap adds a silver coil, and the rope stays the length you hooked at. On the **third lap** it releases a **purple magic burst** and the chain snaps. To make that unmistakable: the screen pulses purple, **SUBDUED** flashes in the centre, time slows for a split second, and your speed is capped at 9 m/s in the direction you were already going, so you don't get flung somewhere unexpected. Let go mid-wrap and the coils slip loose after a moment.
+**Subduing:** hook a caster from **within 20 m** (the crosshair turns red: "in range to wrap"). From further away it shakes the chain off. While hooked it stops moving and holds fire. **Swing around it**: each full lap adds a silver coil, and the rope stays the length you hooked at. On the **third lap** it releases a **purple magic burst** and the chain snaps. To make that unmistakable: the screen pulses purple, **SUBDUED** flashes in the centre, time slows for a split second, and your speed is capped at 9 m/s in the direction you were already going, so you don't get flung somewhere unexpected. Let go mid-wrap and the coils slip loose after a moment.
 
-Code: `scripts/combat/sentry.gd` (both kinds, the wrap), `bullet_field.gd` (projectiles, drawn in one batch), `hook_orb.gd` (the blue grab-orbs), `magic_burst.gd` (the purple burst).
+Code: `scripts/combat/sentry.gd` (both kinds, the broom-rider model, the wrap), `bullet_field.gd` (projectiles, drawn in one batch), `hook_orb.gd` (the blue grab-orbs), `magic_burst.gd` (the purple burst).
 
 ## Skies
 The range uses Kenney's free CC0 skybox pack: **Day** (default), **Morning**, **Night**, **Space** and **Alien**. Switch between them in the pause menu (Esc → Sky); your choice is remembered. Each sky moves the sun light to where the painted sun sits, and matches the light colour, ambient light and fog to that sky.

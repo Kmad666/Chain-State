@@ -206,7 +206,7 @@ func _ready() -> void:
 	var ep = ew.player
 	ep.invuln = 999.0
 	var s = ew.sentries[0]
-	check(ew.sentries.size() == 1 and s.kind == "ground", "one ground Sentry in the test area")
+	check(ew.sentries.size() == 1 and s.kind == "ground" and s.title == "wizard", "one ground Sentry, a wizard on a broom")
 	ep.global_position = s.global_position + Vector3(0, 0, 60)
 	for i in 240:
 		await get_tree().physics_frame
@@ -222,6 +222,9 @@ func _ready() -> void:
 	check(flat, "its orbs fly level, parallel to the ground")
 	_aim(ep, s.global_position)
 	await shot("13_enemy_ground")
+	ep.global_position = s.global_position + Vector3(4, -0.2, -5.5)
+	_aim(ep, s.global_position + Vector3(0, 0.8, 0))
+	await shot("16_wizard_close")
 	ep.invuln = 0.0
 	var hp: int = ep.health
 	ep.hit(Vector3.FORWARD)
@@ -269,7 +272,7 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	var ap = aw.player
 	var air = aw.sentries[0]
-	check(aw.sentries.size() == 1 and air.kind == "air", "one flying Sentry in the air test")
+	check(aw.sentries.size() == 1 and air.kind == "air" and air.title == "witch", "one flying Sentry, a witch on a broom")
 	check(air._reds.size() == 10, "a constellation of red orbs spins around it")
 	for i in 10:
 		await get_tree().physics_frame
@@ -286,6 +289,9 @@ func _ready() -> void:
 	ap.invuln = 999.0
 	var b = blues[0]
 	check(b.on_hooked(ap) and not b.orbiting, "a hooked blue orb leaves the constellation and holds still")
+	ap.global_position = air.global_position + Vector3(3.2, 0.2, -2.8)
+	_aim(ap, air.global_position + Vector3(0, 0.8, 0))
+	await shot("17_witch_close")
 	ap.global_position = air.global_position + Vector3(0, -6, 16)
 	_aim(ap, air.global_position)
 	await shot("15_enemy_air")

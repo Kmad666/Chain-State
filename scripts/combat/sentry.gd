@@ -1,5 +1,6 @@
 extends StaticBody3D
-## Sentry: an enemy (placeholder name and look) that loops a set path.
+## Sentry: a spellcaster on a broom (placeholder low-poly model) that loops a
+## set path. The ground kind is a wizard, the air kind a witch.
 ##
 ## Two kinds:
 ##   ground - hovers low over an island. When you come within ENGAGE_RANGE it
@@ -58,7 +59,8 @@ var _slip_t := -1.0
 var _fall_v := 0.0
 var _core: MeshInstance3D
 var _core_mat: StandardMaterial3D
-var _halo: MeshInstance3D
+var _rig: Node3D                 # the broom and rider, tilted and bobbed for life
+var title := "witch"             # used in messages: "witch" or "wizard"
 var _coils: Array[MeshInstance3D] = []
 var _reds: Array[MeshInstance3D] = []
 var _blues: Array = []           # HookOrb or null (respawning)
@@ -75,41 +77,89 @@ func _ready() -> void:
 	col.shape = shape
 	add_child(col)
 
-	var body_mesh := SphereMesh.new()
-	body_mesh.radius = 1.1
-	body_mesh.height = 2.6
-	body_mesh.radial_segments = 4
-	body_mesh.rings = 2
-	var body := MeshInstance3D.new()
-	body.mesh = body_mesh
-	body.material_override = Mats.lit(Color(0.16, 0.15, 0.18), 0.5)
-	add_child(body)
-
-	var core_mesh := SphereMesh.new()
-	core_mesh.radius = 0.42
-	core_mesh.height = 0.84
-	_core = MeshInstance3D.new()
-	_core.mesh = core_mesh
-	_core_mat = StandardMaterial3D.new()
-	_core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_core.material_override = _core_mat
-	_core.position = Vector3(0, 0, -0.95)
-	add_child(_core)
-
-	var ring := TorusMesh.new()
-	ring.inner_radius = 1.45
-	ring.outer_radius = 1.65
-	ring.rings = 24
-	ring.ring_segments = 6
-	_halo = MeshInstance3D.new()
-	_halo.mesh = ring
-	_halo.material_override = Mats.lit(Color(0.72, 0.55, 0.28), 0.4)
-	add_child(_halo)
+	_build_rider()
 
 	if kind == "air":
 		_build_constellation()
 	if path.size() > 0:
 		global_position = path[0]
+
+
+## A simple low-poly caster on a broom, facing -Z (the way the Sentry looks).
+## Wizard (ground kind): deep blue robe and hat, white beard. Witch (air kind):
+## purple robe, near-black hat. The glowing orb in the casting hand is _core,
+## which swells as the warning before each volley.
+func _build_rider() -> void:
+	var wizard := kind == "ground"
+	title = "wizard" if wizard else "witch"
+	var robe := Color(0.14, 0.19, 0.45) if wizard else Color(0.32, 0.12, 0.38)
+	var hat := Color(0.12, 0.16, 0.38) if wizard else Color(0.10, 0.07, 0.12)
+	var skin := Color(0.86, 0.72, 0.60) if wizard else Color(0.62, 0.78, 0.55)   # a green-tinged witch
+	var wood := Color(0.42, 0.28, 0.16)
+	var straw := Color(0.80, 0.66, 0.36)
+
+	_rig = Node3D.new()
+	_rig.scale = Vector3.ONE * 1.3
+	add_child(_rig)
+
+	# broom: handle along Z, bristles at the back
+	var handle := _part(_cyl(0.06, 0.06, 2.8, 6), Vector3(0, 0, -0.1), Mats.lit(wood), Vector3(deg_to_rad(90), 0, 0))
+	handle.position.y = 0.0
+	_part(_cyl(0.07, 0.34, 0.9, 7), Vector3(0, 0, 1.55), Mats.lit(straw), Vector3(deg_to_rad(-90), 0, 0))
+	_part(_cyl(0.09, 0.09, 0.12, 6), Vector3(0, 0, 1.1), Mats.lit(wood.darkened(0.3)), Vector3(deg_to_rad(90), 0, 0))   # binding
+
+	# rider, seated on the broom
+	_part(_cyl(0.16, 0.5, 0.95, 6), Vector3(0, 0.5, 0.15), Mats.lit(robe))                       # robe
+	_part(_cyl(0.07, 0.07, 0.55, 5), Vector3(0.2, 0.62, -0.25), Mats.lit(robe.darkened(0.15)), Vector3(deg_to_rad(-55), 0, deg_to_rad(-12)))   # arm on the broom
+	_part(_cyl(0.07, 0.07, 0.6, 5), Vector3(-0.28, 0.72, -0.3), Mats.lit(robe.darkened(0.15)), Vector3(deg_to_rad(-75), 0, deg_to_rad(25)))   # casting arm
+	_part(_sphere(0.24, 6, 4), Vector3(0, 1.12, 0.05), Mats.lit(skin))                          # head
+	_part(_cyl(0.48, 0.48, 0.04, 10), Vector3(0, 1.3, 0.05), Mats.lit(hat))                      # hat brim
+	_part(_cyl(0.0, 0.27, 0.85, 7), Vector3(0, 1.72, 0.14), Mats.lit(hat), Vector3(deg_to_rad(-16), 0, 0))   # pointy crown
+	if wizard:
+		_part(_cyl(0.17, 0.0, 0.42, 6), Vector3(0, 0.88, -0.14), Mats.lit(Color(0.92, 0.92, 0.9)))   # beard
+	else:
+		_part(_cyl(0.05, 0.0, 0.16, 4), Vector3(0, 1.08, -0.26), Mats.lit(skin.darkened(0.1)), Vector3(deg_to_rad(-90), 0, 0))   # pointed nose
+
+	# the casting hand's orb (the telegraph)
+	var core_mesh := SphereMesh.new()
+	core_mesh.radius = 0.22
+	core_mesh.height = 0.44
+	_core = MeshInstance3D.new()
+	_core.mesh = core_mesh
+	_core_mat = StandardMaterial3D.new()
+	_core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_core.material_override = _core_mat
+	_core.position = Vector3(-0.38, 0.86, -0.6)
+	_rig.add_child(_core)
+
+
+func _cyl(top: float, bottom: float, h: float, seg: int) -> CylinderMesh:
+	var m := CylinderMesh.new()
+	m.top_radius = top
+	m.bottom_radius = bottom
+	m.height = h
+	m.radial_segments = seg
+	m.rings = 1
+	return m
+
+
+func _sphere(r: float, seg: int, rings: int) -> SphereMesh:
+	var m := SphereMesh.new()
+	m.radius = r
+	m.height = r * 2.0
+	m.radial_segments = seg
+	m.rings = rings
+	return m
+
+
+func _part(mesh: Mesh, pos: Vector3, mat: Material, rot := Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	mi.rotation = rot
+	_rig.add_child(mi)
+	return mi
 
 
 func _build_constellation() -> void:
@@ -143,8 +193,8 @@ func _physics_process(dt: float) -> void:
 	if is_subdued:
 		_fall(dt)
 		return
-	_halo.rotate_object_local(Vector3.FORWARD, dt * 1.2)
-	_halo.rotation.x = 0.6 + sin(_t * 0.8) * 0.2
+	_rig.position.y = sin(_t * 1.6) * 0.12                    # hover bob
+	_rig.rotation.z = sin(_t * 0.9) * 0.08                    # lazy roll on the broom
 
 	var p_ok := player != null and is_instance_valid(player)
 	engaged = p_ok and global_position.distance_to(player.global_position) <= ENGAGE_RANGE
@@ -266,7 +316,7 @@ func on_hooked(p: Node) -> bool:
 		return false
 	if p.global_position.distance_to(global_position) > SUBDUE_RANGE:
 		if p.has_signal("notice"):
-			p.notice.emit("Too far: it shakes the chain off. Get within %d m." % int(SUBDUE_RANGE))
+			p.notice.emit("Too far: the %s shakes the chain off. Get within %d m." % [title, int(SUBDUE_RANGE)])
 		return false
 	_hooked_by = p
 	_slip_t = -1.0
@@ -314,7 +364,7 @@ func _update_coils() -> void:
 		c.mesh = t
 		c.material_override = Mats.polished(Color(0.93, 0.95, 0.99))
 		var k := _coils.size()
-		c.position.y = (k - 1) * 0.42
+		c.position.y = 0.35 + (k - 1) * 0.4
 		c.rotation = Vector3(0.25 * (k - 1), k * 0.9, 0.15)
 		add_child(c)
 		_coils.append(c)
