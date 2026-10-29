@@ -525,7 +525,6 @@ func chain_snapped(max_speed: float) -> void:
 	hook_state = Chain.RETURNING
 	velocity = velocity.limit_length(max_speed)
 	auto_wrap = false
-	Sfx.play("break", 0.0, 0.75)
 	snapped.emit()
 
 

@@ -208,7 +208,7 @@ func _ready() -> void:
 				if w.player.is_on_floor() and Sfx.played.has("land"):
 					break
 			check(Sfx.played.has("jump") and Sfx.played.has("land"), "a jump and a landing make their sounds")
-			check(Sfx._streams.size() == 10 and Sfx._streams["jump"].size() == 4, "all the sound effects load (4 jump variations)")
+			check(Sfx._streams.size() == 8 and Sfx._streams["jump"].size() == 4, "all the sound effects load (4 jump variations)")
 		await shot("11_" + lv)
 		w.player.head.rotation.x = deg_to_rad(-35)
 		await shot("12_" + lv + "_down")
@@ -290,6 +290,14 @@ func _ready() -> void:
 	check(not ep.attached and not ep.auto_wrap, "the chain comes free")
 	check(ep.velocity.length() >= v_before * 0.95 and v_before > 8.0, "you keep your momentum (%.1f -> %.1f m/s)" % [v_before, ep.velocity.length()])
 	check(is_equal_approx(Engine.time_scale, 1.0), "no slow motion or freeze on the arrest")
+	var h = ew.hud
+	check(h._flash_a == 0.0 and h._banner.text == "", "no screen flash and no banner on the arrest: just a line of text")
+	var y_arrest: float = s.global_position.y
+	for i in 240:
+		await get_tree().physics_frame
+	check(s._landed and s.global_position.y < y_arrest - 0.5 and s._coils.size() == 3,
+		"he drops to the ground and lies there with the chain round him (fell %.1f m)" % (y_arrest - s.global_position.y))
+	check(not s._core.visible, "his casting glow goes out")
 	check(not ew.find_children("*", "MeshInstance3D", true, false).any(func(m): return m.mesh is SphereMesh and (m.mesh as SphereMesh).radius == 1.0 and m.material_override and m.material_override.transparency != 0 and m.get_parent().get_parent() == ew),
 		"no effect is spawned on the arrest (effects come later)")
 	for i in 30:
@@ -502,7 +510,7 @@ func _ready() -> void:
 	for _l in aw.find_children("*", "OmniLight3D", true, false):
 		lights_added += 1
 	check(lights_added == 0, "the arrest adds no light")
-	check(Sfx.played.has("break") and Sfx.played.has("subdue"), "arresting her: an arrest sound and the chain coming free")
+	check(not Sfx.played.has("break") and not Sfx.played.has("subdue"), "the arrest plays no sound effect")
 	await get_tree().process_frame
 	check(not is_instance_valid(wd) or wd.is_queued_for_deletion(), "her ward breaks with her")
 	for i in 90:

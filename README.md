@@ -85,7 +85,7 @@ Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a bro
 **Arresting (both):** hook the caster from within range, then wrap the chain round them three times. Each lap adds a silver coil.
 - **Auto-wrap:** press **E** while hooked and you'll circle them automatically, with the camera holding them dead centre. It takes about 2 s a lap at roughly 85 km/h. For the witch, you have to be inside her ward first.
 - **By hand:** swinging round yourself works too.
-- **Arrest:** after the third lap the caster is **bound**. Press **E** again to **ARREST**: an "ARRESTED" banner and a brief tint, and the chain comes free with **your momentum untouched**. There's no slow motion or freeze, so it doesn't break the flow with several casters about.
+- **Arrest:** after the third lap the caster is **bound**. Press **E** again to **ARREST**. They drop to the ground and lie there with the chain coils still round them, your chain comes free with **your momentum untouched**, and a small "Arrested." line appears. There are no effects: no flash, burst, banner, sound or slow motion. (Effects come later; mechanics and performance first.)
 - A witch's ward breaks with her. Let go mid-wrap and the coils slip loose after a moment.
 
 Code: `scripts/combat/sentry.gd` (casters, the wrap), `orb_tree.gd` (the witch's tree), `ward.gd` (the forcefield), `bullet_field.gd` (projectiles), `hook_orb.gd` (blue orbs).
@@ -162,7 +162,6 @@ Sound effects come from Kenney's 3D Platformer and FPS starter kits (CC0) and pl
 | The hook biting | a short, high clack |
 | Being stunned | a hurt hit plus a low thud |
 | A wizard's volley | a casting sound, at his position |
-| Arresting a caster | an arrest sound, at their position, plus the chain coming free |
 | A new logbook entry | coin |
 
 Still to do: a proper chain rattle, the ward's hum, orb whooshes and ambience. Island levels also get Kenney's grass tufts (recoloured to the island green) and slowly drifting clouds. See CREDITS.md.

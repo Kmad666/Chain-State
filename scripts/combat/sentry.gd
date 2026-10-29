@@ -52,6 +52,7 @@ var _hooked_by: Node = null
 var _last_angle := 0.0
 var _slip_t := -1.0
 var _fall_v := 0.0
+var _landed := false
 var _core: MeshInstance3D
 var _core_mat: StandardMaterial3D
 var _rig: Node3D                 # the broom and rider, tilted and bobbed for life
@@ -345,15 +346,16 @@ func _update_coils() -> void:
 		_coils.pop_back().queue_free()
 
 
-## Arrested: the chain comes free. (No visual effect yet: effects come later.)
+## Arrested. Deliberately bare: no effects, sounds, flashes or new nodes. The
+## caster drops to the ground with the chain coils still around them, a witch's
+## ward goes, and the player's chain comes free with their momentum untouched.
 func _subdue() -> void:
 	is_subdued = true
 	ready_to_arrest = false
-	_core_mat.albedo_color = Color(0.35, 0.35, 0.4)
-	_core.scale = Vector3.ONE
-	Sfx.play_at("subdue", global_position, 2.0, 0.8)
+	engaged = false
+	_core.visible = false            # the casting glow goes out
 	if ward and is_instance_valid(ward):
-		ward.queue_free()            # her ward dies with her
+		ward.queue_free()            # her ward goes with her
 	if _hooked_by and is_instance_valid(_hooked_by):
 		var p := _hooked_by
 		_hooked_by = null
@@ -364,13 +366,21 @@ func _subdue() -> void:
 	subdued.emit(self)
 
 
-## Bound: it sinks slowly until it settles on something solid (or drops out of sight).
+## Arrested: it drops like a stone until it hits something solid, then lies there
+## tipped over on its side, coils and all (or falls out of sight off an edge).
 func _fall(dt: float) -> void:
-	_fall_v = minf(_fall_v + 6.0 * dt, 9.0)
-	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * (1.3 + _fall_v * dt), 1)
-	if space.intersect_ray(q).is_empty():
-		global_position.y -= _fall_v * dt
-		rotation.z = lerp_angle(rotation.z, 0.5, dt)
+	if _landed:
+		return
+	_fall_v = minf(_fall_v + 20.0 * dt, 30.0)
+	var step := _fall_v * dt
+	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * (1.2 + step), 1)
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty():
+		global_position.y -= step
+		rotation.z = lerp_angle(rotation.z, 1.2, minf(1.0, dt * 4.0))
+	else:
+		global_position.y = hit.position.y + 1.2
+		rotation.z = 1.2
+		_landed = true
 	if global_position.y < -80.0:
 		queue_free()

@@ -16,9 +16,7 @@ const SOUNDS := {
 	"chain_throw": "res://assets/sounds/fps/weapon_change.ogg",
 	"hurt": "res://assets/sounds/fps/enemy_hurt.ogg",
 	"cast": "res://assets/sounds/fps/enemy_attack.ogg",
-	"subdue": "res://assets/sounds/fps/enemy_destroy.ogg",
 	"fall": "res://assets/sounds/fall.ogg",
-	"break": "res://assets/sounds/break.ogg",
 	"coin": "res://assets/sounds/coin.ogg",
 }
 const POOL := 10

@@ -269,14 +269,9 @@ func _sentry(kind: String, loop: PackedVector3Array) -> Node:
 	return s
 
 
-## A caster arrested: the chain comes free. Clear feedback, but no slow motion: keep the flow.
+## A caster arrested: just a line of text. No flash, banner or sound.
 func _on_chain_snapped() -> void:
-	hud.flash(Color(0.6, 0.25, 1.0), 0.35)
-	hud.banner("ARRESTED", Color(0.85, 0.7, 1.0))
-	for c in hud.get_parent().get_children():
-		if c.has_method("note"):
-			c.note("arrest")
-	hud.toast("Arrested. The chain comes free; you keep your momentum.", 3.0)
+	hud.toast("Arrested.", 2.0)
 
 
 func _on_sentry_subdued(_s: Node) -> void:
