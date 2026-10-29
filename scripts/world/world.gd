@@ -19,6 +19,7 @@ const OrbTree := preload("res://scripts/combat/orb_tree.gd")
 const Ward := preload("res://scripts/combat/ward.gd")
 const Clouds := preload("res://scripts/world/clouds.gd")
 const PerfOverlay := preload("res://scripts/ui/perf_overlay.gd")
+const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -51,6 +52,13 @@ var sentries: Array = []
 var tree: Node3D
 var ward: Node3D
 var clouds: Node3D
+# Platform Test course
+var pads: Array = []              # landing pads, in order
+var anchors: Array = []
+var par := 0
+var checkpoint := 0
+var falls := 0
+var finished := false
 var bullets: Node3D
 var start_pos := START_POS
 var start_yaw := 0.0
@@ -72,6 +80,10 @@ func _ready() -> void:
 	player.rotation.y = start_yaw
 	player.spawn = player.global_transform
 	player.talk_requested.connect(_talk)
+	player.landed_on.connect(_on_landed)
+	player.fell.connect(func(): falls += 1)
+	if not pads.is_empty():
+		player.fall_limit = -30.0
 	if bullets:
 		bullets.player = player
 	for s in sentries:
@@ -195,14 +207,17 @@ func _build_world() -> void:
 			_build_enemy_test()
 		"enemy_test_air":
 			_build_enemy_test_air()
+		"platform_test":
+			_build_platform_test()
 		_:
 			_build_range()
-	if Game.level != "range" and not islands.is_empty():
+	if Game.level != "range" and (not islands.is_empty() or not pads.is_empty()):
 		var c := Vector3.ZERO
-		for isl in islands:
+		var spots: Array = islands if not islands.is_empty() else pads
+		for isl in spots:
 			c += isl.position
 		clouds = Clouds.new()
-		clouds.centre = c / islands.size()
+		clouds.centre = c / spots.size()
 		add_child(clouds)
 
 
@@ -276,6 +291,67 @@ func _on_chain_snapped() -> void:
 
 func _on_sentry_subdued(_s: Node) -> void:
 	pass   # the snap itself is the feedback (see _on_chain_snapped)
+
+
+## Platform Test: placeholder cubes over the void, one swing per gap.
+## Grey pads (LAND: stand on them, can't grapple them), orange anchors (the only
+## grapple-able things) hung high above each gap. Every gap is too wide to jump
+## or dash across, and they get wider and less level as you go.
+## Each entry: pad top-centre position, plus the anchor between it and the next.
+const COURSE := [
+	{"pad": Vector3(0, 0, 0), "size": Vector3(12, 1.5, 12)},
+	{"pad": Vector3(0, 0, -40), "anchor": Vector3(0, 14, -20), "size": Vector3(8, 1.5, 8)},     # 30 m gap, level
+	{"pad": Vector3(0, 4, -82), "anchor": Vector3(0, 18, -61), "size": Vector3(8, 1.5, 8)},     # 34 m gap, step up
+	{"pad": Vector3(0, 0, -126), "anchor": Vector3(0, 16, -104), "size": Vector3(7, 1.5, 7)},   # 37 m gap, step down
+	{"pad": Vector3(12, 6, -172), "anchor": Vector3(6, 22, -149), "size": Vector3(7, 1.5, 7)},  # 40 m gap, up and to the side
+	{"pad": Vector3(0, 4, -220), "anchor": Vector3(6, 22, -196), "size": Vector3(10, 1.5, 10), "finish": true},  # 41 m gap
+]
+
+
+func _build_platform_test() -> void:
+	var pad_mat := Mats.grid(Color(0.55, 0.56, 0.6), Color(0.5, 0.51, 0.55))
+	var finish_mat := Mats.grid(Color(0.85, 0.75, 0.35), Color(0.78, 0.68, 0.3))
+	for i in COURSE.size():
+		var c: Dictionary = COURSE[i]
+		if c.has("anchor"):
+			var a := SwingAnchor.new()
+			a.position = c.anchor
+			add_child(a)
+			anchors.append(a)
+		var size: Vector3 = c.get("size", Vector3(10, 1.5, 10))
+		var top: Vector3 = c.pad
+		var b := _box(size, top - Vector3(0, size.y * 0.5, 0), finish_mat if c.get("finish", false) else pad_mat)
+		b.collision_layer = Player.LAYER_LAND
+		b.add_to_group("pad")
+		b.set_meta("pad_index", i)
+		pads.append(b)
+	par = anchors.size()
+	start_pos = COURSE[0].pad + Vector3(0, 1.0, 3.0)
+	start_yaw = 0.0                     # facing -Z, down the course
+
+
+## Touched down: landing pads are checkpoints; the last one finishes the course.
+func _on_landed(body: Node) -> void:
+	if body == null or not body.has_meta("pad_index"):
+		return
+	var i: int = body.get_meta("pad_index")
+	if i > checkpoint:
+		checkpoint = i
+		var top: Vector3 = COURSE[i].pad
+		player.spawn = Transform3D(Basis(Vector3.UP, 0.0), top + Vector3(0, 1.0, 0))
+		if i < pads.size() - 1:
+			hud.toast("Pad %d of %d" % [i, pads.size() - 1], 1.5)
+	if i == pads.size() - 1 and not finished:
+		finished = true
+		var rating := "PAR!" if player.swings <= par else "par is %d" % par
+		hud.toast("Course complete: %d swings, %d falls  ·  %s" % [player.swings, falls, rating], 6.0)
+
+
+## The Platform Test's running tally (read by the HUD each frame).
+func course_text() -> String:
+	if pads.is_empty():
+		return ""
+	return "SWINGS %d  ·  PAR %d      PAD %d / %d      FALLS %d" % [player.swings, par, checkpoint, pads.size() - 1, falls]
 
 
 func _island(pos: Vector3, r: float, seed_: int) -> Node3D:

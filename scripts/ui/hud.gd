@@ -12,6 +12,8 @@ var _toast: Label
 var _toast_t := 0.0
 var _health: Label
 var _wraps: Label
+var _course: Label
+var _below: Label
 var _flash: ColorRect
 var _flash_a := 0.0
 var _banner: Label
@@ -68,6 +70,19 @@ func _ready() -> void:
 	_health.offset_bottom = 60
 	_health.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
 
+	_course = _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	_course.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_course.offset_left = -400
+	_course.offset_right = 400
+	_course.offset_top = 78
+	_course.offset_bottom = 106
+	_course.add_theme_color_override("font_color", Color(0.95, 0.9, 0.75))
+	_below = _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	_below.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_below.offset_left = -300
+	_below.offset_right = 300
+	_below.offset_top = -92
+	_below.offset_bottom = -62
 	_wraps = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
 	_wraps.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_wraps.offset_left = -300
@@ -128,6 +143,21 @@ func _process(_dt: float) -> void:
 	# stun: a countdown in place of the old hearts
 	_health.text = "STUNNED  %.1f" % player.stunned if player.stunned > 0.0 else ""
 	_health.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
+	# the Platform Test's tally
+	var w_node := get_parent().get_parent()
+	_course.text = w_node.course_text() if w_node and w_node.has_method("course_text") else ""
+	# land below: shown whenever you're off the ground
+	if player.is_on_floor() or not Game.playing():
+		_below.text = ""
+	elif player.latching:
+		_below.text = "▼  latching down"
+		_below.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
+	elif player.land_below >= 0.0:
+		_below.text = "▼  LAND %d m  ·  [Space] latch down" % roundi(player.land_below)
+		_below.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
+	else:
+		_below.text = "▽  no land below"
+		_below.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45, 0.8))
 	var target = player.hook_node if player.attached else null
 	if target and is_instance_valid(target) and target.is_in_group("enemy"):
 		var w: float = target.wraps
@@ -169,9 +199,12 @@ func _process(_dt: float) -> void:
 	elif player.aim_enemy and is_instance_valid(player.aim_enemy):
 		col = GOLD if player.aim_enemy == player.highlight_target else Color(0.55, 0.85, 1.0, 0.95)
 		_info.text = "%s  ·  magic, free grapple" % player.aim_enemy.get("grapple_name") if player.aim_enemy.get("grapple_name") else "magic, free grapple"
+	elif player.aim_blocked and not player.attached:
+		col = Color(0.6, 0.6, 0.6, 0.6)
+		_info.text = "can't grapple this"
 	elif player.attached:
 		col = Color(0.75, 0.85, 1.0, 0.8)
-		_info.text = "rope %d m" % roundi(player.rope_len)
+		_info.text = "rope %d m  ·  [Q] reel in  [E] slack" % roundi(player.rope_len)
 	elif player.aim_valid and (player.is_on_floor() or player.air_left > 0):
 		col = Color(0.45, 1.0, 0.6, 0.85)
 		_info.text = "%d m" % roundi(player.aim_distance)
@@ -251,12 +284,13 @@ func _draw_lock() -> void:
 		dir = Vector2(0, 1)
 	dir = dir.normalized()
 	var c := size * 0.5
-	var half := c - Vector2(margin, margin)
+	var half := c - Vector2(margin, 150.0)      # stay clear of the tally (top) and land-below line (bottom)
 	var s := minf(half.x / maxf(absf(dir.x), 0.001), half.y / maxf(absf(dir.y), 0.001))
 	var tip := c + dir * s
 	var side := Vector2(-dir.y, dir.x)
 	var tri := PackedVector2Array([tip, tip - dir * 34.0 + side * 10.0, tip - dir * 26.0, tip - dir * 34.0 - side * 10.0])
-	draw_colored_polygon(tri, GOLD)
+	draw_colored_polygon(PackedVector2Array([tri[0], tri[1], tri[2]]), GOLD)   # two triangles: never fails to triangulate
+	draw_colored_polygon(PackedVector2Array([tri[0], tri[2], tri[3]]), GOLD)
 	draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2], tri[3], tri[0]]), shade, 2.0, true)
 	var lsize := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15)
 	var at2 := (tip - dir * (54.0 + absf(dir.x) * lsize.x * 0.5)) + Vector2(-lsize.x * 0.5, 5.0)

@@ -13,7 +13,7 @@ var _vis := 0.0                  # smoothed 0..1 visibility
 var _t := 0.0
 var _soft: Texture2D
 
-const OCCLUDE_MASK := 1 | 2      # world and NPCs/props block the sun
+const OCCLUDE_MASK := 1 | 2 | 8      # world, NPCs/props and landing pads block the sun
 
 
 func _ready() -> void:
@@ -74,6 +74,8 @@ func _draw() -> void:
 		pos *= vs / cam_vs
 	var a := _vis * strength
 	var unit := vs.y / 1080.0
+	if not pos.is_finite() or pos.length() > 20000.0 or unit <= 0.0:
+		return      # sun nearly edge-on to the view: the projection blows up, nothing sensible to draw
 
 	# wide halo, then a hot core
 	_disc(pos, 520.0 * unit, Color(tint, 0.22 * a))
@@ -89,6 +91,8 @@ func _draw() -> void:
 		var d := Vector2(cos(ang), sin(ang))
 		var n := Vector2(-d.y, d.x) * width
 		var tip := pos + d * length
+		if n.length() < 0.05 or length < 0.5:
+			continue        # too thin to draw (and a flat triangle can't be triangulated)
 		draw_polygon(PackedVector2Array([pos + n, tip, pos - n]),
 			PackedColorArray([Color(tint, 0.5 * a), Color(tint, 0.0), Color(tint, 0.5 * a)]))
 

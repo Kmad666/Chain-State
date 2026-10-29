@@ -27,6 +27,9 @@ const Viewmodel := preload("res://scripts/player/viewmodel.gd")
 const LAYER_WORLD := 1          # grapple-able and solid
 const LAYER_NPC := 2            # solid, talk-able, NOT grapple-able
 const LAYER_HOOK := 4           # moving grapple targets (enemies, hookable orbs): not solid
+const LAYER_LAND := 8           # solid ground you can stand on but NOT grapple (landing platforms)
+const LATCH_RANGE := 120.0      # how far down the land-below check looks
+const LATCH_REEL := 40.0        # m/s the ground latch reels you in
 const MAX_HEALTH := 3
 const INVULN_TIME := 1.2
 const STUN_TIME := 3.0          # touching magic: no control, no chain, you drop
@@ -61,6 +64,7 @@ var tune := {
 	"dash_speed": 10.0,
 	"mouse_sensitivity": 0.25,
 	"aim_assist": 70.0,
+	"fov": 90.0,
 	"lock_cone": 30.0,
 }
 const TUNING := [
@@ -80,6 +84,7 @@ const TUNING := [
 	{"key": "dash_speed", "label": "Dash speed", "min": 0.0, "max": 30.0, "step": 0.5},
 	{"key": "mouse_sensitivity", "label": "Mouse sensitivity", "min": 0.05, "max": 1.0, "step": 0.01},
 	{"key": "aim_assist", "label": "Reticle size (aim assist)", "min": 0.0, "max": 160.0, "step": 5.0},
+	{"key": "fov", "label": "Field of view", "min": 70.0, "max": 110.0, "step": 1.0},
 	{"key": "lock_cone", "label": "Auto-aim lock cone (deg)", "min": 0.0, "max": 60.0, "step": 1.0},
 ]
 const PRESETS := [
@@ -117,6 +122,14 @@ var dash_cd := 0.0
 var aim_valid := false
 var aim_point := Vector3.ZERO
 var aim_distance := 0.0
+var swings := 0                 # grapples that bit (not counting the ground latch): the course counts these
+var latching := false            # Space in the air over land: hook straight down and reel in fast
+var land_below := -1.0           # metres to land straight below, or -1 if none (read by the HUD)
+var _land_point := Vector3.ZERO
+var aim_blocked := false         # the centre of the view is on something you can't grapple
+signal landed_on(body: Node)
+signal fell                      # dropped into the void and respawned
+var fall_limit := -60.0     # touched down on something (the world uses it for checkpoints)
 var auto_wrap := false          # E on a hooked caster: circle them automatically
 var _wrap_sign := 1.0
 var _wrap_r := 6.0
@@ -134,7 +147,7 @@ var _bob_t := 0.0
 
 func _ready() -> void:
 	collision_layer = 0
-	collision_mask = LAYER_WORLD | LAYER_NPC
+	collision_mask = LAYER_WORLD | LAYER_NPC | LAYER_LAND
 	floor_max_angle = deg_to_rad(50)
 
 	var col := CollisionShape3D.new()
@@ -148,7 +161,7 @@ func _ready() -> void:
 	head.position.y = EYE_HEIGHT
 	add_child(head)
 	cam = Camera3D.new()
-	cam.fov = 80
+	cam.fov = tune.fov
 	cam.near = 0.02
 	cam.far = 2000
 	head.add_child(cam)
@@ -187,7 +200,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			try_grapple()
 	elif event.is_action_released("grapple"):
-		release()
+		if not latching:
+			release()
 	elif event.is_action_pressed("interact"):
 		interact()
 	elif event is InputEventMouseButton and event.pressed and attached:
@@ -223,7 +237,7 @@ func _ray_dir(dir: Vector3, mask: int, length: float) -> Dictionary:
 ##  3. else the surface closest to the centre of the circle, scanning outward ring by ring.
 ## Returns a ray-style hit {collider, position} or {} if nothing is in reach.
 func find_target() -> Dictionary:
-	const MASK := LAYER_WORLD | LAYER_HOOK
+	const MASK := LAYER_WORLD | LAYER_HOOK | LAYER_LAND     # LAND blocks the view but is never a target
 	var r_px := reticle_px()
 	var centre := get_viewport().get_visible_rect().size * 0.5
 	var reach: float = tune.grapple_range
@@ -256,9 +270,9 @@ func find_target() -> Dictionary:
 		if _in_reticle(lock_target.global_position):
 			return lock_hit
 
-	# 3. the surface dead centre
+	# 3. the surface dead centre (unless it's land you can't grapple)
 	var hit := _ray(MASK, reach)
-	if not hit.is_empty():
+	if not hit.is_empty() and not _is_land(hit.collider):
 		return hit
 
 	# 4. a surface elsewhere in the reticle, closest to the centre
@@ -273,7 +287,7 @@ func find_target() -> Dictionary:
 				var a := TAU * (k + 0.5 * (ring % 2)) / SPOKES
 				var sp := centre + Vector2(cos(a), sin(a)) * rr
 				var h := _ray_dir(cam.project_ray_normal(sp), MASK, reach)
-				if h.is_empty():
+				if h.is_empty() or _is_land(h.collider):
 					continue
 				var off := cam.unproject_position(h.position).distance_to(centre)
 				if off < found_off:
@@ -286,6 +300,10 @@ func find_target() -> Dictionary:
 	return lock_hit
 
 
+func _is_land(n: Object) -> bool:
+	return n is CollisionObject3D and (n.collision_layer & LAYER_LAND) != 0 and (n.collision_layer & LAYER_WORLD) == 0
+
+
 func _in_reticle(p: Vector3) -> bool:
 	if cam.is_position_behind(p):
 		return false
@@ -295,7 +313,7 @@ func _in_reticle(p: Vector3) -> bool:
 
 ## Clear line from the eye to this node (nothing solid or hookable in between).
 func _in_sight(n: Node3D) -> bool:
-	var q := PhysicsRayQueryParameters3D.create(cam.global_position, n.global_position, LAYER_WORLD | LAYER_HOOK)
+	var q := PhysicsRayQueryParameters3D.create(cam.global_position, n.global_position, LAYER_WORLD | LAYER_HOOK | LAYER_LAND)
 	q.exclude = [get_rid()]
 	var h := get_world_3d().direct_space_state.intersect_ray(q)
 	return h.is_empty() or h.collider == n
@@ -422,6 +440,33 @@ func _face_wrap_target(dt: float) -> void:
 	head.rotation.x = lerp_angle(head.rotation.x, atan2(d.y, Vector2(d.x, d.z).length()), k)
 
 
+## Space in mid-air with land below: aim straight down, hook the ground and reel
+## in fast for a quick, safe landing. Free: it isn't a swing and costs no air grapple.
+func ground_latch() -> void:
+	if land_below < 0.0 or stunned > 0.0:
+		return
+	if attached or hook_state == Chain.FLYING:
+		release()
+	latching = true
+	hook_node = null
+	hook_goal = _land_point
+	hook_state = Chain.FLYING
+	Sfx.play("chain_throw", -5.0, 1.1)
+
+
+## Straight down from your feet: is there land within LATCH_RANGE?
+func _check_land_below() -> void:
+	land_below = -1.0
+	if is_on_floor():
+		return
+	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * LATCH_RANGE, LAYER_WORLD | LAYER_LAND)
+	q.exclude = [get_rid()]
+	var h := get_world_3d().direct_space_state.intersect_ray(q)
+	if not h.is_empty():
+		land_below = global_position.y - 0.9 - h.position.y
+		_land_point = h.position
+
+
 # ---------------------------------------------------------------- grapple
 ## Fire the arrowhead at whatever surface is under the crosshair.
 func try_grapple() -> void:
@@ -453,6 +498,8 @@ func _attach() -> void:
 			hook_state = Chain.RETURNING      # shaken off
 			return
 	attached = true
+	if not latching:
+		swings += 1
 	Sfx.play("land", -6.0, 1.7)          # the hook bites: a short, bright clack
 	hook_state = Chain.HOOKED
 	anchor = hook_goal
@@ -464,6 +511,7 @@ func _attach() -> void:
 
 ## Let go (or cancel a shot still in flight).
 func release(hop := false) -> void:
+	latching = false
 	if hook_state == Chain.FLYING:
 		hook_state = Chain.RETURNING
 		return
@@ -558,6 +606,7 @@ func _drop_chain() -> void:
 
 func respawn() -> void:
 	release()
+	latching = false
 	stunned = 0.0
 	global_transform = spawn
 	head.rotation.x = 0.0
@@ -604,6 +653,9 @@ func _physics_process(dt: float) -> void:
 		var cur := Vector3(velocity.x, 0, velocity.z).dot(wish)
 		if wish != Vector3.ZERO and cur < tune.air_speed:
 			velocity += wish * minf(tune.air_accel * dt, tune.air_speed - cur)
+	if not is_on_floor() and Game.playing() and stunned <= 0.0 and not latching \
+			and Input.is_action_just_pressed("jump") and land_below >= 0.0 and not auto_wrap:
+		ground_latch()
 
 	# Dash: snap your momentum toward where you look
 	dash_cd = maxf(dash_cd - dt, 0.0)
@@ -634,9 +686,15 @@ func _physics_process(dt: float) -> void:
 				# harder landings are louder and a touch deeper
 				var k := clampf((fall_speed - 2.0) / 18.0, 0.0, 1.0)
 				Sfx.play("land", lerpf(-10.0, 0.0, k), lerpf(1.1, 0.8, k))
+			var col := get_last_slide_collision()
+			if col:
+				landed_on.emit(col.get_collider())
+		if latching and attached:
+			release()
 	_was_on_floor = is_on_floor()
 	_update_hook(dt)
-	if global_position.y < -60.0:
+	if global_position.y < fall_limit:
+		fell.emit()
 		respawn()
 
 
@@ -660,8 +718,14 @@ func _swing(wish: Vector3, dt: float) -> void:
 	var push := wish - rope_dir * wish.dot(rope_dir)
 	velocity += push * tune.pump * dt
 
+	# E held: give slack. The rope pays out freely (no bungee tug, no auto pull-in)
+	var slack: bool = Game.playing() and Input.is_action_pressed("reel_out") \
+			and not (hook_node and is_instance_valid(hook_node) and hook_node.is_in_group("enemy"))
+	if slack:
+		pull_left = 0.0
+
 	# bungee: the rope tugs you toward the hook, harder the farther you are
-	if tune.elastic > 0.0:
+	if tune.elastic > 0.0 and not slack:
 		var dist := global_position.distance_to(anchor)
 		velocity -= rope_dir * minf(tune.elastic * maxf(dist - 3.0, 0.0), 22.0) * dt
 		rope_len = minf(rope_len, dist + 0.5)
@@ -671,10 +735,12 @@ func _swing(wish: Vector3, dt: float) -> void:
 		rope_len -= p
 		pull_left -= p
 	if Game.playing():
-		if Input.is_action_pressed("reel_in") or Input.is_action_pressed("jump"):
+		if Input.is_action_pressed("reel_in"):
 			rope_len -= tune.reel_speed * dt
-		if Input.is_action_pressed("reel_out"):
+		if slack:
 			rope_len += tune.reel_speed * dt
+	if latching:
+		rope_len -= LATCH_REEL * dt
 	rope_len = clampf(rope_len, MIN_ROPE, tune.grapple_range)
 
 	# Verlet distance constraint: predict, then project back onto the rope sphere
@@ -696,6 +762,10 @@ func _process(dt: float) -> void:
 	aim_valid = false
 	aim_enemy = null
 	var lit: Node3D = null
+	aim_blocked = false
+	_check_land_below()
+	if latching and hook_state == Chain.FLYING:
+		head.rotation.x = lerp_angle(head.rotation.x, deg_to_rad(-80.0), 1.0 - exp(-14.0 * dt))
 	if Game.playing():
 		_update_lock(dt)
 		var near := _ray(LAYER_WORLD | LAYER_NPC | LAYER_HOOK, TALK_RANGE)
@@ -711,10 +781,13 @@ func _process(dt: float) -> void:
 				aim_valid = true
 				aim_point = hit.position
 				aim_distance = cam.global_position.distance_to(hit.position)
+			else:
+				var c := _ray(LAYER_WORLD | LAYER_HOOK | LAYER_LAND, tune.grapple_range)
+				aim_blocked = not c.is_empty() and _is_land(c.collider)
 	_set_highlight(lit)
 
 	var spd := velocity.length()
-	cam.fov = lerpf(cam.fov, 80.0 + clampf((spd - 6.0) * 0.8, 0.0, 18.0), 0.08)
+	cam.fov = lerpf(cam.fov, tune.fov + clampf((spd - 6.0) * 0.6, 0.0, 12.0), 0.08)
 
 	# head bob on foot, and a lean into sideways swings
 	var hs := Vector2(velocity.x, velocity.z).length()

@@ -25,6 +25,8 @@
 | **1–9** / click | Pick a dialogue choice. **Esc** leaves the conversation |
 | **L** / Tab / J | Open the Agent's logbook |
 | **E** on a clue | Examine it and log it as evidence |
+| **Q** / **E** while hooked | **Q** reels in, **E** gives slack (right mouse and Ctrl still work) |
+| **Space** in the air | If the bottom of the screen shows **▼ LAND**, aim straight down, latch on and reel in fast. Doesn't count as a swing |
 | **E** while hooked to a caster | Auto-wrap round them; after 3 laps, **E** again to **arrest** |
 | **F2** | Dialogue editor |
 | **F3** | Performance readout: FPS, the slowest recent frame, and the last hitch with what had just happened |
@@ -165,3 +167,17 @@ Sound effects come from Kenney's 3D Platformer and FPS starter kits (CC0) and pl
 | A new logbook entry | coin |
 
 Still to do: a proper chain rattle, the ward's hum, orb whooshes and ambience. Island levels also get Kenney's grass tufts (recoloured to the island green) and slowly drifting clouds. See CREDITS.md.
+
+## Platform Test
+
+A course of placeholder cubes over the void, built for the core puzzle: **cross every gap in as few swings as you can.**
+
+- **Grey pads:** you land on these. They're solid but **can't be grappled** (they sit on their own physics layer, `Player.LAYER_LAND`). Aim at one and the crosshair greys out with "can't grapple this".
+- **Orange anchors:** small cubes hung high above each gap. They're the **only** things the chain can bite, and auto-aim locks onto them in gold.
+- **The gaps:** this first section takes one swing per gap. There are five gaps, from 30 m up to 41 m, getting less level and stepping to the side. None can be crossed with a running jump and dash. The gold finish pad is at the end.
+- **The tally:** "SWINGS n · PAR 5 · PAD n/5 · FALLS n" at the top. Each pad is a checkpoint; fall into the void and you're back on the last one.
+- **Rope control:** Q reels in and E gives slack while you hang. Slack pays out freely, without the bungee tug.
+- **Land below:** the line at the bottom of the screen says whether there's land straight under you. Over a pad, press **Space** to latch down onto it, which is handy when a swing overshoots.
+- **Tested:** a bot plays the whole course in the test suite, at exactly par, so every gap is proven crossable in one swing. The release windows are roughly 12–16 m wide, except pad 3 to 4, which is about 2 m.
+
+Field of view is now **90** (slider in the pause menu), widening a little with speed.

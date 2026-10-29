@@ -70,10 +70,10 @@ func _ready() -> void:
 	check(p.attached, "hook flew and attached")
 	var y0: float = p.global_position.y
 	for i in 120:
-		Input.action_press("jump")
+		Input.action_press("reel_in")
 		await get_tree().physics_frame
-	Input.action_release("jump")
-	check(p.global_position.y > y0 + 3.0, "reeling in lifts the player (%.1f -> %.1f)" % [y0, p.global_position.y])
+	Input.action_release("reel_in")
+	check(p.global_position.y > y0 + 3.0, "reeling in (Q) lifts the player (%.1f -> %.1f)" % [y0, p.global_position.y])
 	check(p.global_position.distance_to(p.anchor) <= p.rope_len + 0.6, "rope constraint holds")
 	await shot("02_hooked")
 	p.release()
@@ -214,6 +214,124 @@ func _ready() -> void:
 		await shot("12_" + lv + "_down")
 		w.queue_free()
 		await get_tree().process_frame
+	print("== Platform Test")
+	Game.level = "platform_test"
+	var pw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(pw)
+	for i in 20:
+		await get_tree().physics_frame
+	var pp = pw.player
+	var CO: Array = pw.COURSE
+	check(pw.pads.size() == 6 and pw.anchors.size() == 5 and pw.par == 5, "6 landing pads, 5 swing anchors, par 5")
+	check(pw.pads.all(func(b): return b.collision_layer == pp.LAYER_LAND), "landing pads are solid but on the no-grapple layer")
+	check(pw.anchors.all(func(a): return a.is_in_group("grapple_target")), "anchors are labelled grapple targets")
+	check(is_equal_approx(pp.tune.fov, 90.0), "field of view is 90")
+	# aiming at a pad: nothing to grapple, and the HUD knows why
+	pp.tune.lock_cone = 0.0
+	_aim(pp, CO[0].pad + Vector3(4, -0.5, -4))
+	for i in 3:
+		await get_tree().process_frame
+	check(pp.find_target().is_empty() and pp.aim_blocked, "aiming at a landing pad: can't grapple it")
+	pp.tune.lock_cone = 30.0
+	# Q / E: reel in and slack while hooked to an anchor
+	pp.global_position = CO[1].anchor + Vector3(0, -8, 6)
+	pp.velocity = Vector3.ZERO
+	_aim(pp, CO[1].anchor)
+	await get_tree().process_frame
+	pp.try_grapple()
+	for i in 40:
+		await get_tree().physics_frame
+	check(pp.attached and pp.hook_node == null, "hooked onto an anchor")
+	var r0: float = pp.rope_len
+	Input.action_press("reel_out")
+	for i in 60:
+		await get_tree().physics_frame
+	Input.action_release("reel_out")
+	var r1: float = pp.rope_len
+	Input.action_press("reel_in")
+	for i in 60:
+		await get_tree().physics_frame
+	Input.action_release("reel_in")
+	check(r1 > r0 + 1.0 and pp.rope_len < r1 - 1.0, "E gives slack (%.1f -> %.1f m), Q reels in (-> %.1f m)" % [r0, r1, pp.rope_len])
+	check(InputMap.action_get_events("reel_in").any(func(e): return e is InputEventKey and e.physical_keycode == KEY_Q)
+		and InputMap.action_get_events("reel_out").any(func(e): return e is InputEventKey and e.physical_keycode == KEY_E), "Q is bound to reel in, E to slack")
+	pp.release()
+	# land below + Space: latch down
+	for i in 20:
+		await get_tree().physics_frame
+	var sw0: int = pp.swings
+	pp.global_position = CO[1].pad + Vector3(0, 22, 0)
+	pp.velocity = Vector3.ZERO
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	check(pp.land_below > 15.0, "in the air over a pad, the HUD reports land below (%.0f m)" % pp.land_below)
+	check(pw.hud._below.text.begins_with("▼"), "...shown at the bottom of the screen")
+	await shot("20_land_below")
+	pp.ground_latch()
+	var tl := 0
+	while tl < 240 and not pp.is_on_floor():
+		await get_tree().physics_frame
+		tl += 1
+	check(pp.is_on_floor() and tl < 150 and not pp.attached and pp.swings == sw0,
+		"Space latches straight down and reels you in (%.1f s), without counting as a swing" % (tl / 120.0))
+	pp.global_position = CO[1].pad + Vector3(30, 5, 0)
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	check(pp.land_below < 0.0 and pw.hud._below.text.begins_with("▽"), "over the void: no land below")
+
+	# a bot runs the whole course, one swing per gap
+	pp.respawn()
+	pp.swings = 0
+	pw.checkpoint = 0
+	var release_at := [0.0, 0.0, 0.0, 9.0, 0.0]
+	for gi in range(CO.size() - 1):
+		var from_b: Vector3 = CO[gi].pad
+		var to_b: Vector3 = CO[gi + 1].pad
+		var an_b: Vector3 = CO[gi + 1].anchor
+		var dir_b := to_b - from_b
+		dir_b.y = 0.0
+		dir_b = dir_b.normalized()
+		var half_b: float = (CO[gi].get("size", Vector3(10, 1.5, 10)) as Vector3).z * 0.5
+		pp.global_position = from_b + dir_b * (half_b - 0.6) + Vector3(0, 1.0, 0)
+		pp.velocity = dir_b * pp.tune.walk_speed + Vector3(0, pp.tune.jump, 0)
+		var fired_b := false
+		var let_go_b := false
+		var latched_b := 0
+		var tb := 0
+		Input.action_press("move_forward")
+		while tb < 120 * 8:
+			tb += 1
+			if not let_go_b:
+				_aim(pp, an_b)
+			else:
+				var d2_b: Vector3 = to_b - pp.global_position
+				pp.rotation = Vector3(0, atan2(-d2_b.x, -d2_b.z), 0)
+			await get_tree().physics_frame
+			if not fired_b and tb > 12:
+				pp.try_grapple()
+				fired_b = true
+			if pp.attached and not let_go_b and (pp.global_position - an_b).dot(dir_b) > release_at[gi] and pp.velocity.y > -2.0:
+				pp.release()
+				let_go_b = true
+			# over the next pad after letting go: Space, latch down onto it
+			if let_go_b and not pp.latching and pp.land_below >= 0.0:
+				var flat_b: Vector3 = pp.global_position - to_b
+				flat_b.y = 0.0
+				var half_n: float = (CO[gi + 1].get("size", Vector3(10, 1.5, 10)) as Vector3).x * 0.5
+				if flat_b.length() < half_n - 1.0:
+					pp.ground_latch()
+					latched_b += 1
+			if pp.is_on_floor() and tb > 30:
+				break
+		Input.action_release("move_forward")
+		for i in 5:
+			await get_tree().physics_frame
+		print("  info gap %d: checkpoint now %d, swings %d, latched down %d" % [gi, pw.checkpoint, pp.swings, latched_b])
+	check(pw.finished and pp.swings == pw.par, "the course can be crossed in exactly par: %d swings, one per gap" % pp.swings)
+	await shot("21_platform_test")
+	pw.queue_free()
+	await get_tree().process_frame
+
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
 	var ew = load("res://scenes/world.tscn").instantiate()
