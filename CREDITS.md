@@ -6,3 +6,4 @@
 - **More sound effects**: jump variations, footsteps loop, enemy attack/hurt and weapon change from "Starter Kit FPS" by Kenney (www.kenney.nl), CC0 1.0. In `assets/sounds/fps/`.
 - **Platform Test pieces**: grass blocks, strong crate, flag, trees, rocks, flowers, grass and mushrooms from "Platformer Kit" (4.1) by Kenney (www.kenney.nl), CC0 1.0. In `assets/models/kenney/platformer/`.
 - **Hamlet buildings**: sample houses and towers from "Modular Buildings" (2.1) by Kenney (www.kenney.nl), CC0 1.0. In `assets/models/kenney/buildings/`. Barrels, fences, signpost and pines from the Platformer Kit.
+- **City**: wall blocks, roofs, trees and cobblestone texture from "Retro Fantasy Kit" (2.0) by Kenney (www.kenney.nl), CC0 1.0. In `assets/models/kenney/fantasy/`.

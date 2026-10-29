@@ -189,3 +189,12 @@ A small hamlet on a floating island about 130 m across, built from Kenney's **Mo
 - **Layout:** you arrive from the south and walk up the road into the square, which has a well and a signpost. A lane runs east to west, and a road runs north to the chapel bell tower. Around them are four houses, the inn and the smithy.
 - **Grappling** follows the Platform Test rules. Buildings, the ground and the well are solid but **can't be grappled**. The grapple points are crates above each roof and on the bell tower, the signpost and a tall tree in the south-west. Each one is within chain reach of another, so there's a rooftop route as well as the streets.
 - **The case:** the Harrow house in the north-east burnt from the inside. The **innkeeper** (by the inn) and a **neighbour** (in the square) have short dialogues, and there are three fire clues to examine and log: the door, the back-gate latch and a ring of ash in the fenced back yard.
+
+## City
+
+A dense city on a 130 m island, built from Kenney's **Retro Fantasy Kit**.
+
+- **Buildings:** every block is wall-to-wall **five-storey stone terraces** (about 17.5 m, plus a gable). Street-facing walls get windows and doors; some buildings are plain stone and some painted.
+- **Streets**, all cobblestone: two tree-lined **boulevards** cross at a **fountain plaza** ringed with trees. A grid of 6 m **streets**, 3 m **narrow streets** and 2.5 m **alleys** (two of them diagonal) cuts the blocks, and a tree-lined **ring promenade** runs round the edge. You enter by the south gate.
+- **Grappling:** 12 crate anchors hang about 25 m up over the crossroads, above the rooftops. Buildings and cobbles are solid but can't be grappled, so you swing down the street canyons from crossing to crossing.
+- **Performance:** the terraces are drawn in bulk, one draw call per kind of wall block (`MultiMesh`), with one collision box per run of terrace. Hidden inner cells draw only their top storey.

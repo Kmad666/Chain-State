@@ -211,6 +211,8 @@ func _build_world() -> void:
 			_build_platform_test()
 		"hamlet":
 			_build_hamlet()
+		"city":
+			_build_city()
 		_:
 			_build_range()
 	if Game.level != "range" and (not islands.is_empty() or not pads.is_empty()):
@@ -220,7 +222,7 @@ func _build_world() -> void:
 			c += isl.position
 		clouds = Clouds.new()
 		clouds.centre = c / spots.size()
-		if Game.level == "hamlet":
+		if Game.level == "hamlet" or Game.level == "city":
 			clouds.y_low = -70.0           # keep them under the island, out of the streets
 			clouds.y_high = -14.0
 			clouds.spread = 170.0
@@ -601,6 +603,237 @@ func _build_hamlet() -> void:
 
 	start_pos = Vector3(0, 1.0, 54)
 	start_yaw = 0.0                     # facing north, up the road into the hamlet
+
+
+const FK := "res://assets/models/kenney/fantasy/%s.glb"
+const STOREY := 3.5                # Retro Fantasy Kit modules are 1-unit cubes: one storey each
+const STOREYS := 5
+const CITY_R := 54.0               # buildings stop here; the ring promenade runs outside it
+
+## The street plan (metres, north = -Z). Axis-aligned strips: [x0, z0, x1, z1].
+const CITY_STREETS := [
+	[-5, -60, 5, 60], [-60, -5, 60, 5],                         # the two boulevards, 10 m
+	[-35, -60, -29, 60], [29, -60, 35, 60],                     # streets, 6 m
+	[-60, -35, 60, -29], [-60, 29, 60, 35],
+	[-45.5, -60, -42.5, 60], [42.5, -60, 45.5, 60],             # narrow streets, 3 m
+	[-60, -45.5, 60, -42.5], [-60, 42.5, 60, 45.5],
+	[-60, -17.25, -10, -14.75], [10, 14.75, 60, 17.25],         # alleys, 2.5 m
+	[-17.25, -60, -14.75, -10], [14.75, 10, 17.25, 60],
+	[-60, 14.75, -10, 17.25], [10, -17.25, 60, -14.75],
+]
+const CITY_DIAGONALS := [[Vector2(-47.5, 45), Vector2(-22.5, 20)], [Vector2(22.5, -20), Vector2(47.5, -45)]]
+const PLAZA_R := 15.5
+
+var city_cells := 0                # how many building footprints were laid (tests read it)
+
+
+## Is this ground point open (street, alley, plaza, or outside the built-up area)?
+func _city_open(x: float, z: float) -> bool:
+	if Vector2(x, z).length() > CITY_R or Vector2(x, z).length() < PLAZA_R:
+		return true
+	for r in CITY_STREETS:
+		if x > r[0] and x < r[2] and z > r[1] and z < r[3]:
+			return true
+	for d in CITY_DIAGONALS:
+		var a: Vector2 = d[0]
+		var b: Vector2 = d[1]
+		var p := Vector2(x, z)
+		var t := clampf((p - a).dot(b - a) / (b - a).length_squared(), 0.0, 1.0)
+		if p.distance_to(a + (b - a) * t) < 1.4:
+			return true
+	return false
+
+
+## City: a 130 m island paved in cobbles, packed with five-storey terraces built
+## from Retro Fantasy Kit wall blocks (drawn in bulk: one MultiMesh per block
+## type, one collision box per run of terrace). Tree-lined boulevards cross at a
+## fountain plaza; streets, narrow streets and alleys cut the blocks; a ring
+## promenade runs round the edge. Grapple anchors hang over the crossroads.
+func _build_city() -> void:
+	var isl := FloatingIsland.new()
+	isl.radius = 64.0
+	isl.island_seed = 77
+	isl.wobble = 0.03
+	isl.grass = false
+	add_child(isl)
+	islands.append(isl)
+	isl.collision_layer = Player.LAYER_LAND
+	var cob := StandardMaterial3D.new()
+	cob.albedo_texture = load("res://assets/models/kenney/fantasy/Textures/cobblestone.png")
+	cob.albedo_color = Color(0.82, 0.8, 0.76)
+	cob.uv1_triplanar = true
+	cob.uv1_world_triplanar = true
+	cob.uv1_scale = Vector3.ONE * 0.4
+	cob.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+	cob.roughness = 1.0
+	isl.top_mesh.material_override = cob
+
+	# lay out the terraces block by block: each block (the land between two streets
+	# each way) gets its own grid of cells sized to fill it exactly, wall to wall
+	const BANDS := [[-54.0, -45.5], [-42.5, -35.0], [-29.0, -5.0], [5.0, 29.0], [35.0, 42.5], [45.5, 54.0]]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1871
+	var xf := {}                     # block model name -> Array[Transform3D]
+	var dirs := [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]
+	var h := STOREYS * STOREY + STOREY * 0.5
+	city_cells = 0
+	for bx in BANDS:
+		for bz in BANDS:
+			var w: float = bx[1] - bx[0]
+			var d: float = bz[1] - bz[0]
+			var nx := maxi(1, roundi(w / STOREY))
+			var nz := maxi(1, roundi(d / STOREY))
+			var cw := w / nx
+			var cd := d / nz
+			var built := {}
+			for i in nx:
+				for j in nz:
+					var cx: float = bx[0] + (i + 0.5) * cw
+					var cz: float = bz[0] + (j + 0.5) * cd
+					var ok := true
+					for o in [Vector2.ZERO, Vector2(0.4, 0.4), Vector2(-0.4, 0.4), Vector2(0.4, -0.4), Vector2(-0.4, -0.4)]:
+						if _city_open(cx + o.x * cw, cz + o.y * cd):
+							ok = false
+							break
+					if ok:
+						built[Vector2i(i, j)] = Vector3(cx, 0, cz)
+			city_cells += built.size()
+			for c in built:
+				var cell: Vector2i = c
+				var pos: Vector3 = built[c]
+				# which side faces the street? (the kit puts windows and doors on -Z)
+				var face := Vector2i.ZERO
+				for dd in dirs:
+					if not built.has(cell + dd):
+						face = dd
+						break
+				var yaw := atan2(-float(face.x), -float(face.y)) if face != Vector2i.ZERO else 0.0
+				var local := Vector3(cw, STOREY, cd) if face.x == 0 else Vector3(cd, STOREY, cw)
+				var basis := Basis(Vector3.UP, yaw) * Basis.from_scale(local)
+				var painted := (hash(Vector2i(floori(pos.x / 10.0), floori(pos.z / 10.0))) % 3) == 0
+				for f in STOREYS:
+					var block := "wall"
+					if face != Vector2i.ZERO:
+						var r := rng.randf()
+						if f == 0:
+							block = "wall-door" if r < 0.35 else ("wall-window" if r < 0.8 else "wall")
+						else:
+							block = ("wall-paint-window" if painted else "wall-window") if r < 0.75 else ("wall-paint" if painted else "wall-detail")
+					elif f < STOREYS - 1:
+						continue                     # hidden inside a block: only the top storey shows
+					if not xf.has(block):
+						xf[block] = []
+					xf[block].append(Transform3D(basis, pos + Vector3(0, f * STOREY, 0)))
+				if not xf.has("roof"):
+					xf["roof"] = []
+				xf["roof"].append(Transform3D(basis, pos + Vector3(0, STOREYS * STOREY, 0)))
+			# collision: one box per east-west run of cells in this block
+			for j in nz:
+				var i := 0
+				while i < nx:
+					if not built.has(Vector2i(i, j)):
+						i += 1
+						continue
+					var i0 := i
+					while built.has(Vector2i(i, j)):
+						i += 1
+					var body := StaticBody3D.new()
+					body.collision_layer = Player.LAYER_LAND
+					body.collision_mask = 0
+					body.position = Vector3(bx[0] + (i0 + i) * 0.5 * cw, h * 0.5, bz[0] + (j + 0.5) * cd)
+					var bs := BoxShape3D.new()
+					bs.size = Vector3((i - i0) * cw, h, cd)
+					var col := CollisionShape3D.new()
+					col.shape = bs
+					body.add_child(col)
+					add_child(body)
+					buildings.append(body)
+	for block in xf:
+		_multimesh(FK % block, xf[block])
+
+	# the fountain
+	var basin := StaticBody3D.new()
+	basin.collision_layer = Player.LAYER_LAND
+	var bcs := CylinderShape3D.new()
+	bcs.radius = 4.0
+	bcs.height = 0.9
+	var bcol := CollisionShape3D.new()
+	bcol.shape = bcs
+	bcol.position.y = 0.45
+	basin.add_child(bcol)
+	var bm := MeshInstance3D.new()
+	var bcm := CylinderMesh.new()
+	bcm.top_radius = 4.0
+	bcm.bottom_radius = 4.2
+	bcm.height = 0.9
+	bcm.radial_segments = 24
+	bm.mesh = bcm
+	bm.position.y = 0.45
+	bm.material_override = Mats.lit(Color(0.62, 0.6, 0.56))
+	basin.add_child(bm)
+	var wat := MeshInstance3D.new()
+	wat.mesh = _disc(3.6)
+	wat.position.y = 0.8
+	wat.material_override = Mats.lit(Color(0.2, 0.38, 0.55))
+	basin.add_child(wat)
+	var spout := MeshInstance3D.new()
+	var sm := CylinderMesh.new()
+	sm.top_radius = 0.35
+	sm.bottom_radius = 0.6
+	sm.height = 2.6
+	spout.mesh = sm
+	spout.position.y = 1.3
+	spout.material_override = Mats.lit(Color(0.62, 0.6, 0.56))
+	basin.add_child(spout)
+	add_child(basin)
+
+	# street trees (about two storeys, well under the anchors)
+	var trees: Array = []
+	for z in [-50.0, -42.0, -26.0, -20.0, 20.0, 26.0, 40.0, 50.0]:
+		trees.append(Vector3(-3.6, 0, z))
+		trees.append(Vector3(3.6, 0, z))
+		trees.append(Vector3(z, 0, -3.6))
+		trees.append(Vector3(z, 0, 3.6))
+	for k in 8:
+		var a := TAU * (k + 0.5) / 8.0
+		trees.append(Vector3(cos(a), 0, sin(a)) * 11.0)
+	for p in [Vector2(-32, -26), Vector2(32, -26), Vector2(-32, 26), Vector2(32, 26), Vector2(-26, -32), Vector2(26, -32), Vector2(-26, 32), Vector2(26, 32)]:
+		trees.append(Vector3(p.x, 0, p.y))
+	for k in 16:
+		var a := TAU * (k + 0.5) / 16.0
+		if absf(wrapf(a - PI * 0.5, -PI, PI)) < 0.3:
+			continue                       # keep the south gate clear
+		trees.append(Vector3(cos(a), 0, sin(a)) * 59.0)
+	var tx: Array = []
+	for t in trees:
+		var tp: Vector3 = t
+		tx.append(Transform3D(Basis(Vector3.UP, tp.x * 0.37 + tp.z).scaled(Vector3.ONE * rng.randf_range(3.6, 4.4)), tp))
+	_multimesh(FK % "tree-large", tx)
+
+	# grapple anchors over the crossroads, above the rooftops
+	for p in [Vector2(-32, -32), Vector2(0, -32), Vector2(32, -32), Vector2(-32, 0), Vector2(32, 0),
+			Vector2(-32, 32), Vector2(0, 32), Vector2(32, 32), Vector2(0, -52), Vector2(0, 52), Vector2(-52, 0), Vector2(52, 0)]:
+		_anchor(Vector3(p.x, STOREYS * STOREY + 7.5, p.y))
+
+	start_pos = Vector3(0, 1.0, 58)
+	start_yaw = 0.0                     # through the south gate, facing up the boulevard
+
+
+## Many copies of one Kenney model in a single draw call per surface.
+func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
+	var mesh := KenneyMesh.get_mesh(path)
+	if mesh == null or transforms.is_empty():
+		return null
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = transforms.size()
+	for k in transforms.size():
+		mm.set_instance_transform(k, transforms[k])
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
+	add_child(mi)
+	return mi
 
 
 ## Touched down: landing pads are checkpoints; the last one finishes the course.

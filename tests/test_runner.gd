@@ -400,6 +400,57 @@ func _ready() -> void:
 	hw.queue_free()
 	await get_tree().process_frame
 
+	print("== City")
+	Game.level = "city"
+	var cw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(cw)
+	for i in 40:
+		await get_tree().physics_frame
+	var cp = cw.player
+	check(cp.is_on_floor(), "city: you arrive standing at the south gate")
+	check(cw.city_cells > 180, "city: packed with terraces (%d building plots)" % cw.city_cells)
+	check(cw.anchors.size() == 12, "city: 12 grapple anchors over the crossroads")
+	var cspace = cw.get_world_3d().direct_space_state
+	var c_top := PhysicsRayQueryParameters3D.create(Vector3(-20, 60, -20), Vector3(-20, -5, -20), cp.LAYER_LAND)
+	var c_th = cspace.intersect_ray(c_top)
+	check(not c_th.is_empty() and c_th.position.y > 17.0, "city: the terraces stand five storeys (%.1f m)" % (c_th.position.y if not c_th.is_empty() else 0.0))
+	var c_road := true
+	for z in range(-50, 52, 4):
+		var q := PhysicsPointQueryParameters3D.new()
+		q.position = Vector3(0, 1, z)
+		q.collision_mask = cp.LAYER_LAND
+		for hh in cspace.intersect_point(q):
+			if hh.collider in cw.buildings:
+				c_road = false
+	check(c_road, "city: the north-south boulevard runs clear end to end")
+	var c_linked := true
+	for a in cw.anchors:
+		var c_near := false
+		for b in cw.anchors:
+			if a != b and a.global_position.distance_to(b.global_position) <= cp.tune.grapple_range:
+				c_near = true
+		c_linked = c_linked and c_near
+	check(c_linked, "city: every anchor has another within chain reach")
+	await shot("27_city_gate")
+	cp.global_position = Vector3(0, 1, 22)
+	_aim(cp, Vector3(0, 3, 0))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("28_city_boulevard")
+	cp.global_position = Vector3(31, 1, 12)
+	_aim(cp, Vector3(31, 8, -20))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("29_city_street")
+	cp.global_position = Vector3(0, 70, 95)
+	cp.velocity = Vector3.ZERO
+	_aim(cp, Vector3(0, 0, -5))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("30_city_overview")
+	cw.queue_free()
+	await get_tree().process_frame
+
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
 	var ew = load("res://scenes/world.tscn").instantiate()

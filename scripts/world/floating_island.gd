@@ -10,6 +10,7 @@ extends StaticBody3D
 @export var depth := 0.0         # how far the rock cone hangs; 0 = radius * 0.9
 @export var island_seed := 1
 @export var wobble := 0.14       # how irregular the outline is (fraction of radius)
+@export var grass := true        # scatter grass tufts on top (off for paved islands)
 
 const RIM_POINTS := 56
 const SOIL := 1.6                # soil band under the grass edge, metres
@@ -100,7 +101,8 @@ func build() -> void:
 		col.shape = m.create_trimesh_shape()
 		add_child(col)
 
-	_grass(rng, rim)
+	if grass:
+		_grass(rng, rim)
 
 
 var tufts := 0
