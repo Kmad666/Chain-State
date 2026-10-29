@@ -47,6 +47,11 @@ jobs:
             -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
           rm Godot_v${GODOT_VERSION}-stable_export_templates.tpz
 
+      - name: Stamp the build number
+        run: |
+          echo "{\"build\": \"${GITHUB_SHA::7}\", \"date\": \"$(date -u '+%Y-%m-%d %H:%M') UTC\"}" > data/build.json
+          cat data/build.json
+
       - name: Export for web
         run: |
           GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64

@@ -98,8 +98,20 @@ func _ready() -> void:
 	rule2.custom_minimum_size.y = 1
 	col.add_child(rule2)
 	col.add_child(_label("Click a level or press its number.   Esc in a level returns here through the pause menu.", 14, SOFT))
+	col.add_child(_label(build_stamp(), 13, Color(PAPER, 0.4)))
 	if _buttons.size() > 0:
 		_buttons[0].grab_focus.call_deferred()
+
+
+## "BUILD 1c67fcd · 2026-10-29 18:11 UTC": written by CI into data/build.json,
+## so you can tell at a glance whether you're on the newest version.
+static func build_stamp() -> String:
+	var f := FileAccess.open("res://data/build.json", FileAccess.READ)
+	if f:
+		var d = JSON.parse_string(f.get_as_text())
+		if d is Dictionary:
+			return "BUILD %s  ·  %s" % [d.get("build", "?"), d.get("date", "")]
+	return "BUILD dev (local)"
 
 
 func _label(t: String, sz: int, c: Color) -> Label:

@@ -176,6 +176,8 @@ func _ready() -> void:
 	get_tree().root.add_child(menu)
 	await get_tree().process_frame
 	check(menu._buttons.size() == Levels.LIST.size(), "menu lists every level")
+	check(menu._buttons.any(func(b): return "Platform Test" in b.text), "the Platform Test is on the menu")
+	check(menu.build_stamp().begins_with("BUILD "), "the menu shows a build number (%s)" % menu.build_stamp())
 	await shot("10_level_select")
 	menu.queue_free()
 	await get_tree().process_frame

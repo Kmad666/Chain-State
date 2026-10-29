@@ -2,3 +2,4 @@
 build/
 *.tmp
 _*.gd.uid
+data/build.json
