@@ -473,6 +473,58 @@ func _ready() -> void:
 		max_gap = maxf(max_gap, aw2.ascent[k].global_position.distance_to(aw2.ascent[k + 1].global_position))
 	check(max_gap < ap2.tune.grapple_range - 6.0, "ascent: each anchor is within easy reach of the last (widest %.1f m)" % max_gap)
 	await shot("31_ascent_start")
+	# the apprentices: weaker flyers that shoot big fast orbs straight at you
+	var apps: Array = aw2.sentries.filter(func(x): return x.kind == "apprentice")
+	check(apps.size() == 5 and apps.all(func(x): return x.wraps_needed == 1 and x.title == "apprentice"),
+		"ascent: five apprentices along the climb, one wrap each")
+	var app = apps[0]
+	ap2.global_position = app.global_position + Vector3(0, -2, 22)
+	ap2.velocity = Vector3.ZERO
+	ap2.invuln = 0.0
+	var got_shot := false
+	var shot_ok := false
+	for i in 120 * 5:
+		ap2.global_position = app.global_position + Vector3(0, -2, 22)     # hold still in the air
+		ap2.velocity = Vector3.ZERO
+		await get_tree().physics_frame
+		var f = aw2.bullets
+		for b in f._pos.size():
+			var v: Vector3 = f._vel[b]
+			var to_p: Vector3 = (ap2.global_position - f._pos[b]).normalized()
+			if v.length() > 20.0 and f._rad[b] > 1.0 and v.normalized().dot(to_p) > 0.9:
+				shot_ok = true
+		if ap2.stunned > 0.0:
+			got_shot = true
+			break
+	check(shot_ok, "an apprentice fires large, fast orbs aimed at you")
+	check(got_shot, "...and one hits if you hang about")
+	ap2.global_position = app.global_position + Vector3(2, -1, 9)
+	_aim(ap2, app.global_position)
+	await shot("34_apprentice")
+	ap2.stunned = 0.0
+	ap2.invuln = 999.0
+	ap2.global_position = app.global_position + Vector3(8, -1, 0)
+	ap2.velocity = Vector3.ZERO
+	check(app.on_hooked(ap2), "hooking an apprentice holds")
+	ap2.attached = true
+	ap2.hook_node = app
+	ap2.hook_offset = Vector3.ZERO
+	ap2.hook_state = 2
+	ap2.anchor = app.global_position
+	ap2.rope_len = 8.0
+	await get_tree().physics_frame
+	ap2.interact()
+	var fr := 0
+	while fr < 120 * 6 and not app.ready_to_arrest:
+		await get_tree().physics_frame
+		fr += 1
+	check(app.ready_to_arrest, "one auto-wrap lap binds an apprentice (%.1f s)" % (fr / 120.0))
+	ap2.interact()
+	check(app.is_subdued and not ap2.attached, "E arrests it, and the chain comes free")
+	ap2.respawn()
+	aw2.bullets.clear()
+	for i in 10:
+		await get_tree().physics_frame
 	# the bot climbs: hook, let the rope pull you up, then aim at the next and swap
 	_aim(ap2, aw2.ascent[0].global_position)
 	Input.action_press("jump")

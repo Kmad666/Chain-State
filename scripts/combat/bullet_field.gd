@@ -14,6 +14,7 @@ var player: Node                 # set by the world
 var _pos := PackedVector3Array()
 var _vel := PackedVector3Array()
 var _life := PackedFloat32Array()
+var _rad := PackedFloat32Array()   # each orb's radius (an apprentice's are larger)
 var _mm: MultiMesh
 
 
@@ -44,7 +45,7 @@ func count() -> int:
 
 
 ## Fire one bullet. A hookable bullet becomes a HookOrb the chain can catch.
-func spawn(at: Vector3, vel: Vector3, life := 8.0, hookable := false) -> void:
+func spawn(at: Vector3, vel: Vector3, life := 8.0, hookable := false, radius := RADIUS) -> void:
 	if hookable:
 		var orb := HookOrb.new()
 		orb.velocity = vel
@@ -58,12 +59,14 @@ func spawn(at: Vector3, vel: Vector3, life := 8.0, hookable := false) -> void:
 	_pos.append(at)
 	_vel.append(vel)
 	_life.append(life)
+	_rad.append(radius)
 
 
 func clear() -> void:
 	_pos.clear()
 	_vel.clear()
 	_life.clear()
+	_rad.clear()
 	for o in get_tree().get_nodes_in_group("hook_orb"):
 		o.queue_free()
 
@@ -77,27 +80,27 @@ func _physics_process(dt: float) -> void:
 		_pos[i] += _vel[i] * dt
 		_life[i] -= dt
 		var dead := _life[i] <= 0.0
-		if not dead and p_pos != Vector3.INF and _hits_player(_pos[i], p_pos):
+		if not dead and p_pos != Vector3.INF and _hits_player(_pos[i], p_pos, _rad[i]):
 			player.hit(_vel[i].normalized())
 			dead = true
 		if dead:
 			# swap-remove keeps this O(1)
 			var last := _pos.size() - 1
-			_pos[i] = _pos[last]; _vel[i] = _vel[last]; _life[i] = _life[last]
-			_pos.resize(last); _vel.resize(last); _life.resize(last)
+			_pos[i] = _pos[last]; _vel[i] = _vel[last]; _life[i] = _life[last]; _rad[i] = _rad[last]
+			_pos.resize(last); _vel.resize(last); _life.resize(last); _rad.resize(last)
 		else:
 			i += 1
 	var n := _pos.size()
 	_mm.visible_instance_count = n
 	for k in n:
-		_mm.set_instance_transform(k, Transform3D(Basis(), _pos[k]))
+		_mm.set_instance_transform(k, Transform3D(Basis.from_scale(Vector3.ONE * (_rad[k] / RADIUS)), _pos[k]))
 
 
 ## Bullet vs the player's capsule (a vertical segment from feet to head).
-func _hits_player(b: Vector3, p: Vector3) -> bool:
+func _hits_player(b: Vector3, p: Vector3, radius := RADIUS) -> bool:
 	var y := clampf(b.y, p.y - 0.5, p.y + 0.5)
 	var dx := b.x - p.x
 	var dz := b.z - p.z
 	var dy := b.y - y
-	var r := RADIUS + PLAYER_RADIUS
+	var r := radius + PLAYER_RADIUS
 	return dx * dx + dy * dy + dz * dz < r * r

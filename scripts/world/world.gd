@@ -980,6 +980,18 @@ func _build_ascent() -> void:
 	high.cloud_seed = 99
 	add_child(high)
 
+	# five apprentices along the way, hovering just off the route, shooting at you
+	for k in [7, 16, 25, 34, 43]:
+		var p := ascent_point(k)
+		var out := Vector3(p.x, 0, p.z).normalized()
+		var c := p + out * 14.0 + Vector3(0, 4.0, 0)
+		var loop := PackedVector3Array()
+		for q in 6:
+			var a := TAU * q / 6.0
+			loop.append(c + Vector3(cos(a) * 5.0, sin(a * 2.0) * 1.5, sin(a) * 5.0))
+		var ap := _sentry("apprentice", loop)
+		ap.speed = 3.0
+
 	var first := ascent_point(0)
 	start_pos = Vector3(first.x + 14.0, 1.0, first.z + 10.0)
 	var to_first := first - start_pos

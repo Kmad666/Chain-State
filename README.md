@@ -220,4 +220,8 @@ A long ride.
 - **The readout:** "ANCHOR n/50 · HEIGHT · TIME · FALLS" at the top. The clock starts at the first anchor and stops when you land on the gold platform.
 - **Tested:** a bot chains all 50 anchors to the top in about 85 seconds without breaking top speed.
 
+**Apprentices:** five of them hover just off the route, near anchors 8, 17, 26, 35 and 44. An apprentice is a weaker flying caster: a smaller broom-rider in a green robe.
+- **Its shots:** within 45 m it fires a **single large, fast orb** (24 m/s, about twice the wizard's orb size) **straight at you**, leading your movement a little, every 2.2 s. A hit stuns you like any red orb, so you drop, and below a rest ledge you're put back on it.
+- **Arresting it:** hook it and press **E**. **One lap** binds it (about 3 s of auto-wrap). Then **E** again to arrest, and it drops out of the sky.
+
 **Aim rule:** for half a second after you let go of an anchor, the aim ignores it, and auto-aim never locks onto the anchor you're hanging from. Swapping to the next anchor never re-hooks the one you just left.

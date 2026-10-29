@@ -2,7 +2,7 @@ extends StaticBody3D
 ## Sentry: a spellcaster on a broom (placeholder low-poly model) that loops a
 ## set path. The ground kind is a wizard, the air kind a witch.
 ##
-## Two kinds:
+## Three kinds:
 ##   ground - hovers low over an island. When you come within ENGAGE_RANGE it
 ##            turns to face you and fires spread-out lines of large dark red orbs
 ##            straight across, parallel to the ground (NieR-style). Few orbs, with gaps.
@@ -10,7 +10,11 @@ extends StaticBody3D
 ##            the top of her orb tree (orb_tree.gd). You can only wrap her once you're
 ##            inside the ward: fly in through its opening.
 ##
-## Arresting (both kinds): hook it from within subdue_range(), then wrap the
+##   apprentice - a weaker flyer: a smaller broom-rider in green who hovers on a
+##            small loop and, within its engage range, fires single large, fast orbs
+##            straight at you (leading your movement a little). One wrap binds it.
+##
+## Arresting (all kinds): hook it from within subdue_range(), then wrap the
 ## chain around it three times, either swinging round yourself or by pressing E
 ## to auto-wrap (the player circles it with the camera locked on). Each lap adds
 ## a silver coil. After the third, press E again to ARREST:
@@ -36,6 +40,10 @@ const BREAK_SPEED := INF         # no speed cap when the chain comes free: keep 
 @export var speed := 5.0
 @export var volley_every := 2.4
 @export var bullet_speed := 9.0
+var wraps_needed := WRAPS_NEEDED   # 3 for the wizard and witch, 1 for an apprentice
+var engage_range := ENGAGE_RANGE
+const APPRENTICE_SHOT_SPEED := 24.0
+const APPRENTICE_SHOT_RADIUS := 1.1
 
 var field: Node                  # BulletField (ground kind)
 var player: Node
@@ -83,15 +91,23 @@ func _ready() -> void:
 ## which swells as the warning before each volley.
 func _build_rider() -> void:
 	var wizard := kind == "ground"
-	title = "wizard" if wizard else "witch"
+	var apprentice := kind == "apprentice"
+	title = "wizard" if wizard else ("apprentice" if apprentice else "witch")
 	var robe := Color(0.14, 0.19, 0.45) if wizard else Color(0.32, 0.12, 0.38)
 	var hat := Color(0.12, 0.16, 0.38) if wizard else Color(0.10, 0.07, 0.12)
 	var skin := Color(0.86, 0.72, 0.60) if wizard else Color(0.62, 0.78, 0.55)   # a green-tinged witch
+	if apprentice:
+		robe = Color(0.16, 0.42, 0.24)       # green: reads apart from the blue wizard and purple witch
+		hat = Color(0.30, 0.22, 0.12)
+		skin = Color(0.86, 0.72, 0.60)
+		wraps_needed = 1
+		engage_range = 45.0
+		volley_every = 2.2
 	var wood := Color(0.42, 0.28, 0.16)
 	var straw := Color(0.80, 0.66, 0.36)
 
 	_rig = Node3D.new()
-	_rig.scale = Vector3.ONE * 1.3
+	_rig.scale = Vector3.ONE * (1.0 if apprentice else 1.3)
 	add_child(_rig)
 
 	# broom: handle along Z, bristles at the back
@@ -107,7 +123,9 @@ func _build_rider() -> void:
 	_part(_sphere(0.24, 6, 4), Vector3(0, 1.12, 0.05), Mats.lit(skin))                          # head
 	_part(_cyl(0.48, 0.48, 0.04, 10), Vector3(0, 1.3, 0.05), Mats.lit(hat))                      # hat brim
 	_part(_cyl(0.0, 0.27, 0.85, 7), Vector3(0, 1.72, 0.14), Mats.lit(hat), Vector3(deg_to_rad(-16), 0, 0))   # pointy crown
-	if wizard:
+	if apprentice:
+		pass                                                                                     # young: no beard
+	elif wizard:
 		_part(_cyl(0.17, 0.0, 0.42, 6), Vector3(0, 0.88, -0.14), Mats.lit(Color(0.92, 0.92, 0.9)))   # beard
 	else:
 		_part(_cyl(0.05, 0.0, 0.16, 4), Vector3(0, 1.08, -0.26), Mats.lit(skin.darkened(0.1)), Vector3(deg_to_rad(-90), 0, 0))   # pointed nose
@@ -163,7 +181,7 @@ func _physics_process(dt: float) -> void:
 	_rig.rotation.z = sin(_t * 0.9) * 0.08                    # lazy roll on the broom
 
 	var p_ok := player != null and is_instance_valid(player)
-	engaged = p_ok and global_position.distance_to(player.global_position) <= ENGAGE_RANGE
+	engaged = p_ok and global_position.distance_to(player.global_position) <= engage_range
 	var hooked: bool = _hooked_by != null and is_instance_valid(_hooked_by) and _hooked_by.attached
 	if hooked:
 		_track_wrap(_hooked_by.global_position)
@@ -184,7 +202,7 @@ func _physics_process(dt: float) -> void:
 	if engaged:
 		var to: Vector3 = player.global_position - global_position
 		if kind == "ground":
-			to.y = 0.0
+			to.y = 0.0                   # an apprentice turns fully to face you: it aims
 		if to.length_squared() > 0.01:
 			basis = basis.slerp(Basis.looking_at(to.normalized(), Vector3.UP), 1.0 - exp(-4.0 * dt)).orthonormalized()
 
@@ -201,7 +219,10 @@ func _physics_process(dt: float) -> void:
 	_core.scale = Vector3.ONE * (1.0 + wind * 0.9)
 	_core_mat.albedo_color = (Color(0.9, 0.15, 0.2) if engaged else Color(0.7, 0.45, 0.2)).lerp(Color(1.0, 0.85, 0.8), wind)
 	if _fire_t <= 0.0:
-		_fire_line()
+		if kind == "apprentice":
+			_fire_aimed()
+		else:
+			_fire_line()
 		_fire_t = volley_every
 
 
@@ -237,6 +258,20 @@ func _fire_line() -> void:
 		var dir := to.rotated(Vector3.UP, f * spread)
 		field.spawn(global_position + dir * 1.8 + Vector3(0, -0.4, 0), dir * bullet_speed, 7.0)
 	Sfx.play_at("cast", global_position, -2.0, 0.85)
+	_volley += 1
+
+
+## Apprentice: one large, fast orb straight at you, leading your movement a little.
+func _fire_aimed() -> void:
+	if field == null or player == null:
+		return
+	var from := global_position + Vector3(0, 0.6, 0)
+	var target: Vector3 = player.global_position + Vector3(0, 0.6, 0)
+	var t := from.distance_to(target) / APPRENTICE_SHOT_SPEED
+	target += player.velocity * t * 0.5
+	var dir := (target - from).normalized()
+	field.spawn(from + dir * 1.6, dir * APPRENTICE_SHOT_SPEED, 4.0, false, APPRENTICE_SHOT_RADIUS)
+	Sfx.play_at("cast", global_position, -4.0, 1.25)
 	_volley += 1
 
 
@@ -290,11 +325,11 @@ func _track_wrap(player_pos: Vector3) -> void:
 	_turn += delta
 	wraps = absf(_turn) / TAU
 	var after := floori(wraps)
-	if after > before and _hooked_by and _hooked_by.has_signal("notice") and after < WRAPS_NEEDED:
-		_hooked_by.notice.emit("Wrap %d of %d" % [after, WRAPS_NEEDED])
-	if wraps >= WRAPS_NEEDED:
-		_turn = signf(_turn) * TAU * WRAPS_NEEDED     # bound: extra laps don't pile up
-		wraps = WRAPS_NEEDED
+	if after > before and _hooked_by and _hooked_by.has_signal("notice") and after < wraps_needed:
+		_hooked_by.notice.emit("Wrap %d of %d" % [after, wraps_needed])
+	if wraps >= wraps_needed:
+		_turn = signf(_turn) * TAU * wraps_needed     # bound: extra laps don't pile up
+		wraps = wraps_needed
 		if not ready_to_arrest:
 			ready_to_arrest = true
 			if _hooked_by and _hooked_by.has_signal("notice"):
@@ -327,7 +362,7 @@ func arrest() -> bool:
 
 
 func _update_coils() -> void:
-	var want := mini(floori(wraps), WRAPS_NEEDED)
+	var want := mini(floori(wraps), wraps_needed)
 	while _coils.size() < want:
 		var t := TorusMesh.new()
 		t.inner_radius = 1.05

@@ -162,7 +162,7 @@ func _process(_dt: float) -> void:
 	if target and is_instance_valid(target) and target.is_in_group("enemy"):
 		var w: float = target.wraps
 		var pips := ""
-		for i in target.WRAPS_NEEDED:
+		for i in target.wraps_needed:
 			pips += "◉ " if i < floori(w) else "○ "
 		if target.ready_to_arrest:
 			_wraps.text = "[E]  ARREST"
