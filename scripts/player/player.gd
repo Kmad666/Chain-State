@@ -129,7 +129,10 @@ var aim_blocked := false         # the centre of the view is on something you ca
 signal landed_on(body: Node)
 signal fell                      # dropped into the void and respawned
 var fall_limit := -60.0     # touched down on something (the world uses it for checkpoints)
-var auto_wrap := false          # E on a hooked caster: circle them automatically
+var auto_wrap := false
+var _hooked_body: Object = null  # what the current grapple bit
+var _skip_body: Object = null    # the anchor you just let go of: ignored by the aim for a moment
+var _skip_t := 0.0          # E on a hooked caster: circle them automatically
 var _wrap_sign := 1.0
 var _wrap_r := 6.0
 var _wrap_t := 0.0
@@ -219,7 +222,7 @@ func _ray(mask: int, length: float) -> Dictionary:
 	var from := cam.global_position
 	var to := from - cam.global_basis.z * length
 	var q := PhysicsRayQueryParameters3D.create(from, to, mask)
-	q.exclude = [get_rid()]
+	q.exclude = _excludes()
 	return get_world_3d().direct_space_state.intersect_ray(q)
 
 
@@ -231,7 +234,7 @@ func reticle_px() -> float:
 func _ray_dir(dir: Vector3, mask: int, length: float) -> Dictionary:
 	var from := cam.global_position
 	var q := PhysicsRayQueryParameters3D.create(from, from + dir * length, mask)
-	q.exclude = [get_rid()]
+	q.exclude = _excludes()
 	return get_world_3d().direct_space_state.intersect_ray(q)
 
 
@@ -304,6 +307,21 @@ func find_target() -> Dictionary:
 	return lock_hit
 
 
+## Rays ignore you, and for half a second the anchor you just let go of,
+## so swapping to the next anchor never re-hooks the one you were on.
+func _excludes() -> Array[RID]:
+	var ex: Array[RID] = [get_rid()]
+	if _skip_t > 0.0 and is_instance_valid(_skip_body) and _skip_body is CollisionObject3D:
+		ex.append((_skip_body as CollisionObject3D).get_rid())
+	return ex
+
+
+## Not a lock-on candidate right now: the anchor you're hanging from, or the one
+## you just let go of. (Auto-aim moves on to the next.)
+func _is_spent(n: Object) -> bool:
+	return (attached and n == _hooked_body) or (n == _skip_body and _skip_t > 0.0)
+
+
 func _is_land(n: Object) -> bool:
 	return n is CollisionObject3D and (n.collision_layer & LAYER_LAND) != 0 and (n.collision_layer & LAYER_WORLD) == 0
 
@@ -318,7 +336,7 @@ func _in_reticle(p: Vector3) -> bool:
 ## Clear line from the eye to this node (nothing solid or hookable in between).
 func _in_sight(n: Node3D) -> bool:
 	var q := PhysicsRayQueryParameters3D.create(cam.global_position, n.global_position, LAYER_WORLD | LAYER_HOOK | LAYER_LAND)
-	q.exclude = [get_rid()]
+	q.exclude = _excludes()
 	var h := get_world_3d().direct_space_state.intersect_ray(q)
 	return h.is_empty() or h.collider == n
 
@@ -342,7 +360,7 @@ func _update_lock(dt: float) -> void:
 	var best: Node3D = null
 	var best_ang := INF
 	for n in get_tree().get_nodes_in_group("grapple_target"):
-		if not is_instance_valid(n) or n == hook_node or not (n is Node3D):
+		if not is_instance_valid(n) or n == hook_node or not (n is Node3D) or _is_spent(n):
 			continue
 		var p: Vector3 = n.global_position
 		if eye.distance_to(p) > reach:
@@ -356,7 +374,7 @@ func _update_lock(dt: float) -> void:
 
 	# keep the current lock while it's valid; a brief loss of sight is forgiven
 	if lock_target != null:
-		if not is_instance_valid(lock_target) or lock_target == hook_node \
+		if not is_instance_valid(lock_target) or lock_target == hook_node or _is_spent(lock_target) \
 				or eye.distance_to(lock_target.global_position) > reach:
 			lock_target = null
 		elif not _in_sight(lock_target):
@@ -453,6 +471,7 @@ func ground_latch() -> void:
 		release()
 	latching = true
 	hook_node = null
+	_hooked_body = null              # a latch isn't an anchor: nothing to skip afterwards
 	hook_goal = _land_point
 	hook_state = Chain.FLYING
 	Sfx.play("chain_throw", -5.0, 1.1)
@@ -464,7 +483,7 @@ func _check_land_below() -> void:
 	if is_on_floor():
 		return
 	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * LATCH_RANGE, LAYER_WORLD | LAYER_LAND)
-	q.exclude = [get_rid()]
+	q.exclude = _excludes()
 	var h := get_world_3d().direct_space_state.intersect_ray(q)
 	if not h.is_empty():
 		land_below = global_position.y - 0.9 - h.position.y
@@ -485,6 +504,7 @@ func try_grapple() -> void:
 			return
 		air_left -= 1
 	hook_goal = hit.position
+	_hooked_body = hit.collider
 	hook_node = null
 	if hit.collider.collision_layer & LAYER_HOOK:
 		hook_node = hit.collider
@@ -523,11 +543,14 @@ func release(hop := false) -> void:
 		return
 	attached = false
 	hook_state = Chain.RETURNING
+	_skip_body = _hooked_body
+	_skip_t = 0.5 if _hooked_body != null else 0.0
+	_hooked_body = null
 	if hook_node and is_instance_valid(hook_node) and hook_node.has_method("on_released"):
 		hook_node.on_released(self)
 	hook_node = null
 	if velocity.length() > 6.0:
-		velocity *= 1.0 + tune.release_boost
+		velocity = (velocity * (1.0 + tune.release_boost)).limit_length(maxf(top_speed(), velocity.length()))
 	if hop:
 		velocity.y = maxf(velocity.y, 0.0) + RELEASE_HOP
 
@@ -611,6 +634,7 @@ func _drop_chain() -> void:
 func respawn() -> void:
 	release()
 	latching = false
+	_skip_t = 0.0
 	stunned = 0.0
 	global_transform = spawn
 	head.rotation.x = 0.0
@@ -773,6 +797,7 @@ func _process(dt: float) -> void:
 	aim_enemy = null
 	var lit: Node3D = null
 	aim_blocked = false
+	_skip_t = maxf(_skip_t - dt, 0.0)
 	_check_land_below()
 	if latching and hook_state == Chain.FLYING:
 		head.rotation.x = lerp_angle(head.rotation.x, deg_to_rad(-80.0), 1.0 - exp(-14.0 * dt))

@@ -9,6 +9,7 @@ const LIST := [
 	{"id": "platform_test", "name": "Platform Test", "blurb": "Grass blocks over the void: you land on them but can't grapple them. Swing from the crates. Cross every gap in as few swings as you can."},
 	{"id": "hamlet", "name": "Hamlet", "blurb": "A small hamlet on a floating island. Walk the lanes or swing between rooftop anchors; a house has burnt from the inside. Talk to the locals and find the clues."},
 	{"id": "city", "name": "City", "blurb": "A dense city island: five-storey stone terraces wall to wall, cobbled streets, alleys and a fountain plaza. Swing between the anchors over the crossroads."},
+	{"id": "ascent", "name": "The Ascent", "blurb": "A great forest island and 50 anchors spiralling up round its giant tree to a finish platform 400 m in the sky. Anchors are free: chain them all. Rest ledges every 10."},
 	{"id": "enemy_test", "name": "Enemy Test (Ground)", "blurb": "A wizard on a broom, flying low. Get close and he fires lines of orbs across the ground. Hook him and swing around."},
 	{"id": "enemy_test_air", "name": "Enemy Test (Air)", "blurb": "The witch's tree: climb a slowly turning cone of red orbs using the blue ones, then get inside her ward."},
 ]

@@ -208,3 +208,16 @@ A dense city on a 130 m island, built from Kenney's **Retro Fantasy Kit**.
 - **Exception:** the ground latch's fast reel-in is a landing aid, not travel, so it isn't capped.
 - **Sliders:** both live in the pause menu, as "Air steer speed" and "Top speed above walk".
 - **Saved settings:** older saved settings for these two are reset to the new defaults.
+
+## The Ascent
+
+A long ride.
+- **The island:** a great forest island about 220 m across, about 500 trees, shrubs, rocks and mushrooms from the two Kenney kits, drawn in bulk. A giant tree stands at its heart.
+- **The route:** **50 crate anchors** spiral up round the giant tree, about 8 m higher each time and 19–27 m apart, to a gold **finish platform about 405 m up**.
+- **Free anchors:** they cost no air grapples, so you can chain the whole climb without touching ground. Hang on, aim at the next one, let go and fire. The bungee pull lifts you as you go.
+- **Rest ledges** below anchors 10, 20, 30 and 40 are checkpoints. Drop more than 45 m below your last one and you're put back on it.
+- **Clouds:** a second cloud layer between about 120 and 360 m to climb through.
+- **The readout:** "ANCHOR n/50 · HEIGHT · TIME · FALLS" at the top. The clock starts at the first anchor and stops when you land on the gold platform.
+- **Tested:** a bot chains all 50 anchors to the top in about 85 seconds without breaking top speed.
+
+**Aim rule:** for half a second after you let go of an anchor, the aim ignores it, and auto-aim never locks onto the anchor you're hanging from. Swapping to the next anchor never re-hooks the one you just left.

@@ -11,6 +11,7 @@ const LIT := Color(1.0, 0.86, 0.3)
 
 @export var size := 1.6
 var grapple_name := "anchor"
+@export var free := false            # true: grapples on it cost no air grapple (long chains)
 var highlighted := false
 var _meshes: Array = []
 var _glow: StandardMaterial3D
@@ -21,6 +22,8 @@ func _ready() -> void:
 	collision_mask = 0
 	add_to_group("grapple_target")
 	add_to_group("swing_anchor")
+	if free:
+		add_to_group("magic")            # Player.is_magic(): free, like the blue orbs
 	var shape := BoxShape3D.new()
 	shape.size = Vector3.ONE * size
 	var col := CollisionShape3D.new()

@@ -213,6 +213,8 @@ func _build_world() -> void:
 			_build_hamlet()
 		"city":
 			_build_city()
+		"ascent":
+			_build_ascent()
 		_:
 			_build_range()
 	if Game.level != "range" and (not islands.is_empty() or not pads.is_empty()):
@@ -222,10 +224,10 @@ func _build_world() -> void:
 			c += isl.position
 		clouds = Clouds.new()
 		clouds.centre = c / spots.size()
-		if Game.level == "hamlet" or Game.level == "city":
+		if Game.level == "hamlet" or Game.level == "city" or Game.level == "ascent":
 			clouds.y_low = -70.0           # keep them under the island, out of the streets
 			clouds.y_high = -14.0
-			clouds.spread = 170.0
+			clouds.spread = 170.0 if Game.level != "ascent" else 240.0
 		add_child(clouds)
 
 
@@ -838,6 +840,19 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 
 ## Touched down: landing pads are checkpoints; the last one finishes the course.
 func _on_landed(body: Node) -> void:
+	if body and body.has_meta("ascent_cp"):
+		var cp_i: int = body.get_meta("ascent_cp")
+		if body.has_meta("finish"):
+			if not finished:
+				finished = true
+				ascent_running = false
+				hud.toast("THE TOP: %d m in %d:%04.1f, %d falls" % [roundi(player.global_position.y), int(ascent_time / 60.0), fmod(ascent_time, 60.0), falls], 8.0)
+			return
+		if body.global_position.y > ascent_cp_y:
+			ascent_cp_y = body.global_position.y
+			player.spawn = Transform3D(player.global_basis.orthonormalized(), body.global_position + Vector3(0, 1.2, 0))
+			hud.toast("Rest ledge %d of 4  ·  checkpoint" % cp_i, 2.0)
+		return
 	if body == null or not body.has_meta("pad_index"):
 		return
 	var i: int = body.get_meta("pad_index")
@@ -855,9 +870,142 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if not ascent.is_empty():
+		var t := ascent_time
+		return "ANCHOR %d / %d      HEIGHT %d m      TIME %d:%04.1f      FALLS %d" % [ascent_reached + 1 if ascent_reached >= 0 else 0, ascent.size(),
+			maxi(0, roundi(player.global_position.y)), int(t / 60.0), fmod(t, 60.0), falls]
 	if pads.is_empty():
 		return ""
 	return "SWINGS %d  ·  PAR %d      PAD %d / %d      FALLS %d" % [player.swings, par, checkpoint, pads.size() - 1, falls]
+
+
+
+# ---------------------------------------------------------------- The Ascent
+const ASCENT_N := 50
+var ascent: Array = []             # the 50 anchors, in order
+var ascent_reached := -1           # index of the highest anchor you've hooked
+var ascent_cp_y := -1.0            # top of the last rest ledge you stood on
+var ascent_time := 0.0
+var ascent_running := false
+
+
+## Anchor k of the spiral: round the giant tree, climbing about 8 m each time,
+## a little wider and further apart near the top.
+static func ascent_point(k: int) -> Vector3:
+	var a := 0.0
+	for i in k:
+		a += 0.5 + 0.003 * i
+	var r := 38.0 + 4.0 * sin(k * 0.9)
+	var y := 12.0 + k * 7.6 + 0.012 * k * k
+	return Vector3(cos(a) * r, y, sin(a) * r)
+
+
+## The Ascent: a big forest island (about 220 m across) with a giant tree at its
+## heart, and 50 free anchors spiralling up round it to a gold finish platform
+## about 400 m up. Rest ledges below anchors 10, 20, 30 and 40 are checkpoints:
+## fall well below your last one and you're put back on it.
+func _build_ascent() -> void:
+	var isl = _island(Vector3.ZERO, 110.0, 4242)
+	isl.collision_layer = Player.LAYER_LAND
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 50
+
+	# the forest, in bulk: one draw call per kind of tree
+	var kinds := {
+		KIT % "tree": [5.0, 6.0], KIT % "tree-pine": [5.5, 7.0], KIT % "tree-pine-small": [5.0, 7.0],
+		FK % "tree-large": [6.0, 8.0], FK % "tree-shrub": [4.0, 6.0],
+		KIT % "rocks": [3.0, 5.0], KIT % "mushrooms": [3.0, 4.0], KIT % "flowers": [2.5, 3.5],
+	}
+	var xf := {}
+	for k in kinds:
+		xf[k] = []
+	var names := kinds.keys()
+	var weights := [5, 6, 4, 6, 4, 2, 2, 2]
+	var total := 0
+	for wgt in weights:
+		total += wgt
+	for n in 520:
+		var ang := rng.randf() * TAU
+		var rad := sqrt(rng.randf()) * 100.0
+		var p := Vector3(cos(ang) * rad, 0, sin(ang) * rad)
+		if rad < 24.0 or p.distance_to(Vector3(54, 0, 10)) < 12.0:
+			continue                       # the giant tree's root clearing, and the start
+		var pick := rng.randi() % total
+		var idx := 0
+		while pick >= weights[idx]:
+			pick -= weights[idx]
+			idx += 1
+		var sc: Array = kinds[names[idx]]
+		xf[names[idx]].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(sc[0], sc[1])), p))
+	for k in xf:
+		_multimesh(k, xf[k])
+	# the giant tree the route climbs around (looks only)
+	_multimesh(FK % "tree-large", [Transform3D(Basis.from_scale(Vector3.ONE * 46.0), Vector3.ZERO)])
+
+	# the 50 anchors: free, so the whole climb can be one long chain
+	for k in ASCENT_N:
+		var a := SwingAnchor.new()
+		a.free = true
+		a.position = ascent_point(k)
+		add_child(a)
+		anchors.append(a)
+		ascent.append(a)
+	# rest ledges: small platforms just below and outside anchors 10, 20, 30, 40
+	var ledge_mat := Mats.grid(Color(0.55, 0.42, 0.28), Color(0.5, 0.38, 0.25))
+	for i in 4:
+		var k := (i + 1) * 10 - 1
+		var p := ascent_point(k)
+		var out := Vector3(p.x, 0, p.z).normalized()
+		var ledge := _box(Vector3(7, 1.2, 7), p + out * 7.0 + Vector3(0, -9.0, 0), ledge_mat)
+		ledge.collision_layer = Player.LAYER_LAND
+		ledge.set_meta("ascent_cp", i + 1)
+	# the finish: a broad gold platform just past the last anchor, with a flag
+	var last := ascent_point(ASCENT_N - 1)
+	var ahead := ascent_point(ASCENT_N) - last
+	ahead.y = 0
+	var fin_pos := last + ahead.normalized() * 14.0 + Vector3(0, -7.0, 0)
+	var fin := _box(Vector3(16, 2.0, 16), fin_pos, Mats.grid(Color(0.85, 0.72, 0.3), Color(0.78, 0.65, 0.25)))
+	fin.collision_layer = Player.LAYER_LAND
+	fin.set_meta("ascent_cp", 5)
+	fin.set_meta("finish", true)
+	_kit("flag", fin_pos + Vector3(4, 1.0, -4), 6.0, 0.4)
+	ascent_finish = fin
+
+	# a second cloud layer high up, to climb through
+	var high := Clouds.new()
+	high.count = 34
+	high.spread = 120.0
+	high.y_low = 120.0
+	high.y_high = 360.0
+	high.cloud_seed = 99
+	add_child(high)
+
+	var first := ascent_point(0)
+	start_pos = Vector3(first.x + 14.0, 1.0, first.z + 10.0)
+	var to_first := first - start_pos
+	start_yaw = atan2(-to_first.x, -to_first.z)
+
+
+var ascent_finish: Node3D
+
+
+## Track the climb: the highest anchor hooked, the clock, and falls below the last ledge.
+func _ascent_tick(dt: float) -> void:
+	if ascent.is_empty() or not Game.playing():
+		return
+	if ascent_running:
+		ascent_time += dt
+	if player.attached:
+		for k in range(ascent.size() - 1, ascent_reached, -1):
+			if player.anchor.distance_to(ascent[k].global_position) < 2.0:
+				ascent_reached = k
+				if not ascent_running and not finished:
+					ascent_running = true
+				break
+	if ascent_cp_y > 0.0 and player.global_position.y < ascent_cp_y - 45.0:
+		falls += 1
+		player.respawn()
+		hud.toast("Back to the rest ledge", 1.5)
 
 
 func _island(pos: Vector3, r: float, seed_: int) -> Node3D:
@@ -1081,6 +1229,7 @@ func _set_paused(on: bool) -> void:
 
 
 func _process(_dt: float) -> void:
+	_ascent_tick(_dt)
 	# In a browser, Esc releases the mouse before the game sees the key: treat that as pause.
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if OS.has_feature("web") and Game.playing() and _had_capture and not captured:
