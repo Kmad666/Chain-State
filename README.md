@@ -170,10 +170,10 @@ Still to do: a proper chain rattle, the ward's hum, orb whooshes and ambience. I
 
 ## Platform Test
 
-A course of placeholder cubes over the void, built for the core puzzle: **cross every gap in as few swings as you can.**
+A course of Kenney Platformer Kit pieces over the void, built for the core puzzle: **cross every gap in as few swings as you can.**
 
-- **Grey pads:** you land on these. They're solid but **can't be grappled** (they sit on their own physics layer, `Player.LAYER_LAND`). Aim at one and the crosshair greys out with "can't grapple this".
-- **Orange anchors:** small cubes hung high above each gap. They're the **only** things the chain can bite, and auto-aim locks onto them in gold.
+- **Grass-block pads** (Kenney Platformer Kit): you land on these. They're solid but **can't be grappled** (they sit on their own physics layer, `Player.LAYER_LAND`). Aim at one and the crosshair greys out with "can't grapple this".
+- **Crate anchors:** metal-framed crates hung high above each gap. They're the **only** things the chain can bite, and auto-aim locks onto them in gold.
 - **The gaps:** this first section takes one swing per gap. There are five gaps, from 30 m up to 41 m, getting less level and stepping to the side. None can be crossed with a running jump and dash. The gold finish pad is at the end.
 - **The tally:** "SWINGS n · PAR 5 · PAD n/5 · FALLS n" at the top. Each pad is a checkpoint; fall into the void and you're back on the last one.
 - **Rope control:** Q reels in and E gives slack while you hang. Slack pays out freely, without the bungee tug.

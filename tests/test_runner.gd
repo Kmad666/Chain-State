@@ -228,6 +228,10 @@ func _ready() -> void:
 	check(pw.pads.all(func(b): return b.collision_layer == pp.LAYER_LAND), "landing pads are solid but on the no-grapple layer")
 	check(pw.anchors.all(func(a): return a.is_in_group("grapple_target")), "anchors are labelled grapple targets")
 	check(is_equal_approx(pp.tune.fov, 90.0), "field of view is 90")
+	_aim(pp, CO[1].anchor + Vector3(0, -6, 0))
+	for i in 4:
+		await get_tree().process_frame
+	await shot("22_course_start")
 	# aiming at a pad: nothing to grapple, and the HUD knows why
 	pp.tune.lock_cone = 0.0
 	_aim(pp, CO[0].pad + Vector3(4, -0.5, -4))

@@ -308,9 +308,48 @@ const COURSE := [
 ]
 
 
+const KIT := "res://assets/models/kenney/platformer/%s.glb"
+const KIT_BLOCK := 2.082125        # the grass blocks' width in kit units (1 unit tall, base at 0)
+
+
+## A Kenney Platformer Kit model, placed for looks only (no collision).
+func _kit(model: String, pos: Vector3, scale_by: float, yaw := 0.0, parent: Node = null) -> Node3D:
+	var sc = load(KIT % model)
+	if sc == null:
+		return null
+	var n: Node3D = sc.instantiate()
+	n.position = pos
+	n.rotation.y = yaw
+	n.scale = Vector3.ONE * scale_by
+	(parent if parent else self).add_child(n)
+	_tone_kit(n)
+	return n
+
+
+var _toned := {}
+
+
+## The kit's pastel colours blow out under this sky's light: tone them down a
+## touch (shared materials are toned once and reused, so this stays cheap).
+func _tone_kit(root: Node) -> void:
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
+		for si in mi.mesh.get_surface_count():
+			var m = mi.get_active_material(si)
+			if not (m is BaseMaterial3D):
+				continue
+			if not _toned.has(m):
+				var t: BaseMaterial3D = m.duplicate()
+				t.albedo_color = t.albedo_color * Color(0.72, 0.72, 0.72, 1.0)
+				t.roughness = 1.0
+				t.metallic = 0.0
+				t.metallic_specular = 0.2
+				_toned[m] = t
+			mi.set_surface_override_material(si, _toned[m])
+
+
 func _build_platform_test() -> void:
-	var pad_mat := Mats.grid(Color(0.55, 0.56, 0.6), Color(0.5, 0.51, 0.55))
-	var finish_mat := Mats.grid(Color(0.85, 0.75, 0.35), Color(0.78, 0.68, 0.3))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1871
 	for i in COURSE.size():
 		var c: Dictionary = COURSE[i]
 		if c.has("anchor"):
@@ -320,11 +359,45 @@ func _build_platform_test() -> void:
 			anchors.append(a)
 		var size: Vector3 = c.get("size", Vector3(10, 1.5, 10))
 		var top: Vector3 = c.pad
-		var b := _box(size, top - Vector3(0, size.y * 0.5, 0), finish_mat if c.get("finish", false) else pad_mat)
-		b.collision_layer = Player.LAYER_LAND
-		b.add_to_group("pad")
-		b.set_meta("pad_index", i)
-		pads.append(b)
+		var finish: bool = c.get("finish", false)
+		# a grass block from the kit, scaled to the pad's width; its collision matches it
+		var k := size.x / KIT_BLOCK
+		var body := StaticBody3D.new()
+		body.collision_layer = Player.LAYER_LAND
+		body.collision_mask = 0
+		body.position = top
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(size.x, k, size.z)
+		var col := CollisionShape3D.new()
+		col.shape = shape
+		col.position.y = -k * 0.5
+		body.add_child(col)
+		add_child(body)
+		if _kit("block-grass-large" if finish else "block-grass-overhang-large", Vector3(0, -k, 0), k, 0.0, body) == null:
+			# kit missing: fall back to a plain grey box
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = shape.size
+			mi.mesh = bm
+			mi.position.y = -k * 0.5
+			mi.material_override = Mats.grid(Color(0.55, 0.56, 0.6), Color(0.5, 0.51, 0.55))
+			body.add_child(mi)
+		body.add_to_group("pad")
+		body.set_meta("pad_index", i)
+		pads.append(body)
+		# dressing round the rim, clear of the middle where you land
+		var h := size.x * 0.5 - 1.2
+		var props := ["rocks", "flowers", "grass", "mushrooms"]
+		for j in 3:
+			var ang := rng.randf() * TAU
+			if i == 0:
+				ang = rng.randf_range(PI * 0.15, PI * 0.85)    # start pad: behind you (+Z), out of the opening view
+			var r := rng.randf_range(h * 0.75, h)
+			_kit(props[rng.randi() % props.size()], top + Vector3(cos(ang) * r, 0, sin(ang) * r), 1.8, rng.randf() * TAU)
+		if i == 0 or finish:
+			_kit("tree-pine-small" if i == 0 else "tree", top + Vector3(-h, 0, h * 0.6), 2.6, rng.randf() * TAU)
+		if finish:
+			_kit("flag", top + Vector3(h * 0.5, 0, -h * 0.5), 4.0, PI * 0.5)
 	par = anchors.size()
 	start_pos = COURSE[0].pad + Vector3(0, 1.0, 3.0)
 	start_yaw = 0.0                     # facing -Z, down the course
