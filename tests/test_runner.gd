@@ -360,6 +360,25 @@ func _ready() -> void:
 	check(get_tree().get_nodes_in_group("npc").size() == 2 and DialogueDB.load_tree("hamlet_innkeeper", "Innkeeper").start == "start",
 		"hamlet: an innkeeper and a neighbour, with their own dialogue")
 	check(get_tree().get_nodes_in_group("evidence").size() == 3, "hamlet: three fire clues at the burnt house")
+	# nothing that has to stay reachable may sit inside a building (or the roads)
+	var clear := true
+	var space = hw.get_world_3d().direct_space_state
+	var spots: Array = []
+	for n in get_tree().get_nodes_in_group("evidence") + get_tree().get_nodes_in_group("npc"):
+		spots.append(n.global_position + Vector3(0, 1.0, 0))
+	for z in range(-34, 58, 4):
+		spots.append(Vector3(0, 1.0, z) if absf(z) > 12 else Vector3(14, 1.0, z))
+	for x in range(-52, 54, 4):
+		spots.append(Vector3(x, 1.0, 0) if absf(x) > 12 else Vector3(x, 1.0, 14))
+	for sp in spots:
+		var q := PhysicsPointQueryParameters3D.new()
+		q.position = sp
+		q.collision_mask = hp.LAYER_LAND
+		for h in space.intersect_point(q):
+			if h.collider in hw.buildings:
+				clear = false
+				print("  blocked: ", sp)
+	check(clear, "hamlet: no building covers a road, a clue or a person")
 	await shot("23_hamlet_arrival")
 	hp.global_position = Vector3(-6, 1, 14)
 	_aim(hp, Vector3(30, 4, -17))

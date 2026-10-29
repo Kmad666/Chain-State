@@ -418,7 +418,7 @@ const BLD_SIZE := {
 	"building-sample-tower-a": Vector3(1.1, 2.5, 1.25),
 	"building-sample-tower-b": Vector3(1.1, 1.8875, 1.25),
 }
-const BLD_SCALE := 6.0             # kit units to metres: a door comes out about 2 m tall
+const BLD_SCALE := 9.0             # kit units to metres: grand, two-storey-plus houses, doors about 3 m
 
 var buildings: Array = []
 
@@ -540,9 +540,9 @@ func _build_hamlet() -> void:
 	# buildings: the kit puts each door on the model's +X side, so the yaw below
 	# turns that side to face the road (-90 = door south, 90 = north, 0 = east, 180 = west)
 	var chapel := _building("building-sample-tower-a", Vector3(0, 0, -46), -90.0)
-	var h1 := _building("building-sample-house-b", Vector3(-30, 0, -16), -90.0)
-	var crime := _building("building-sample-house-c", Vector3(30, 0, -17), -90.0)
-	var h3 := _building("building-sample-house-a", Vector3(-44, 0, 15), 90.0)
+	var h1 := _building("building-sample-house-b", Vector3(-30, 0, -14), -90.0)
+	var crime := _building("building-sample-house-c", Vector3(30, 0, -19), -90.0)
+	var h3 := _building("building-sample-house-a", Vector3(-42, 0, 14), 90.0)
 	var inn := _building("building-sample-tower-b", Vector3(44, 0, 15), 90.0)
 	var h4 := _building("building-sample-house-b", Vector3(-17, 0, 30), 0.0)
 	var smithy := _building("building-sample-house-a", Vector3(17, 0, 30), 180.0)
@@ -553,21 +553,21 @@ func _build_hamlet() -> void:
 	# grapple anchors: one above each roof, the bell tower, the signpost, a tall tree
 	for b in [chapel, h1, crime, h3, inn, h4, smithy]:
 		_anchor(b.get_meta("roof") + Vector3(0, 2.5, 0))
-	var post := _box(Vector3(0.35, 11.0, 0.35), Vector3(8, 5.5, -8), Mats.lit(Color(0.42, 0.3, 0.2)))
+	var post := _box(Vector3(0.35, 11.0, 0.35), Vector3(6, 5.5, -12), Mats.lit(Color(0.42, 0.3, 0.2)))
 	post.collision_layer = Player.LAYER_LAND
-	_kit("sign", Vector3(8, 2.2, -7.8), 2.5, 0.0)
-	_anchor(Vector3(8, 12.0, -8))
+	_kit("sign", Vector3(6, 2.2, -11.8), 2.5, 0.0)
+	_anchor(Vector3(6, 12.0, -12))      # signpost: also the link up to the bell tower
 	_kit("tree", Vector3(-40, 0, 44), 9.0, 0.6)
 	_anchor(Vector3(-37, 15.0, 44))
 
 	# trees, barrels and fences for life
 	for t in [[-56, -6], [52, -32], [48, 40], [-12, -52], [14, -54], [-52, 32], [56, 2]]:
 		_kit("tree-pine" if (t[0] + t[1]) % 2 == 0 else "tree", Vector3(t[0], 0, t[1]), 4.0, t[0] * 0.1)
-	for b in [[40, 8], [41, 9.5], [21, 22], [-22, 24]]:
+	for b in [[40, 8], [41, 9.5], [9, 22], [-9, 24]]:
 		_kit("barrel", Vector3(b[0], 0, b[1]), 2.4, b[1])
 	for i in 6:
-		_kit("fence-low-straight", Vector3(22 + i * 3.0, 0, -28), 3.0, 0.0)     # the burnt house's back yard
-		_kit("fence-low-straight", Vector3(22 + i * 3.0, 0, -6.5), 3.0, 0.0)
+		_kit("fence-low-straight", Vector3(22 + i * 3.0, 0, -38), 3.0, 0.0)     # the burnt house's back yard
+		_kit("fence-low-straight", Vector3(22 + i * 3.0, 0, -6.0), 3.0, 0.0)
 
 	# people
 	var keeper := Npc.new()
@@ -587,15 +587,15 @@ func _build_hamlet() -> void:
 	var char_mat := Mats.lit(Color(0.12, 0.10, 0.09))
 	var wood := Mats.lit(Color(0.55, 0.40, 0.25))
 	var door := _evidence("ev_hamlet_door", "fire", "A door scorched from inside",
-		"The front door of the Harrow house is blackened on its inner face only. The outside paint isn't even blistered.", Vector3(26, 0, -9))
+		"The front door of the Harrow house is blackened on its inner face only. The outside paint isn't even blistered.", Vector3(26, 0, -8.5))
 	door.part(Vector3(1.2, 2.2, 0.15), Vector3(0, 1.1, 0), wood)
 	door.part(Vector3(1.0, 1.6, 0.02), Vector3(0, 1.1, -0.09), char_mat, Vector3.ZERO, false)
 	var latch := _evidence("ev_hamlet_latch", "fire", "A latch melted shut",
-		"The back gate's iron latch has run like wax and set again. Iron needs a forge to do that; there's no soot on the gate.", Vector3(34, 0, -27.5))
+		"The back gate's iron latch has run like wax and set again. Iron needs a forge to do that; there's no soot on the gate.", Vector3(34, 0, -37.5))
 	latch.part(Vector3(0.25, 1.1, 0.25), Vector3(0, 0.55, 0), Mats.lit(Color(0.3, 0.3, 0.32)))
 	latch.part(Vector3(0.35, 0.18, 0.35), Vector3(0, 0.9, 0), _glow(Color(1.0, 0.45, 0.15), 0.5), Vector3.ZERO, false)
 	var ring := _evidence("ev_hamlet_ring", "fire", "A circle of ash in the yard",
-		"In the back yard, a perfect ring of fine white ash on bare earth. Nothing was burnt there; there's nothing for the ash to have come from.", Vector3(28, 0, -24))
+		"In the back yard, a perfect ring of fine white ash on bare earth. Nothing was burnt there; there's nothing for the ash to have come from.", Vector3(28, 0, -33))
 	var ash: MeshInstance3D = ring.part(Vector3(1.6, 0.02, 1.6), Vector3(0, 0.03, 0), Mats.lit(Color(0.85, 0.84, 0.8)), Vector3.ZERO, false)
 	ash.mesh = _disc(0.8)
 
