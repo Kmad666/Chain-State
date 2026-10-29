@@ -40,8 +40,7 @@ const MAX_CORRECTION := 25.0    # caps rope-yank velocity so it never explodes
 const RELEASE_HOP := 3.5
 const TALK_RANGE := 3.5
 const RETURN_SPEED := 55.0
-const OVERSPEED_ALLOW := 1.3    # dash/release boost may briefly exceed the cap by 30%...
-const OVERSPEED_BLEED := 2.5    # ...then bleed back down (per second)
+const TUNE_VERSION := 2         # bump to discard saved values whose meaning changed
 const CAM_ROLL := 0.045
 const CAM_ROLL_MAX := 0.16
 
@@ -51,12 +50,12 @@ var tune := {
 	"walk_speed": 6.0,
 	"jump": 6.0,
 	"air_accel": 22.0,
-	"air_speed": 9.0,
+	"air_speed": 6.0,                # air steering tops out at walking pace
 	"rope_gravity": 0.6,
 	"elastic": 1.4,
 	"pump": 16.0,
 	"reel_speed": 7.0,
-	"max_speed": 25.0,
+	"top_over_walk": 10.0,           # top speed = walk speed + this (16 m/s by default)
 	"grapple_range": 40.0,
 	"air_grapples": 3.0,
 	"arrow_speed": 90.0,
@@ -71,12 +70,12 @@ const TUNING := [
 	{"key": "gravity", "label": "Gravity", "min": 4.0, "max": 30.0, "step": 0.5},
 	{"key": "walk_speed", "label": "Walk speed", "min": 2.0, "max": 14.0, "step": 0.5},
 	{"key": "jump", "label": "Jump", "min": 2.0, "max": 14.0, "step": 0.5},
-	{"key": "air_speed", "label": "Air steer speed", "min": 2.0, "max": 20.0, "step": 0.5},
+	{"key": "air_speed", "label": "Air steer speed (default = walk speed)", "min": 2.0, "max": 20.0, "step": 0.5},
 	{"key": "rope_gravity", "label": "Gravity while hooked", "min": 0.0, "max": 1.0, "step": 0.05},
 	{"key": "elastic", "label": "Rope pull (bungee)", "min": 0.0, "max": 4.0, "step": 0.1},
 	{"key": "pump", "label": "Swing push", "min": 0.0, "max": 30.0, "step": 0.5},
 	{"key": "reel_speed", "label": "Reel speed", "min": 1.0, "max": 20.0, "step": 0.5},
-	{"key": "max_speed", "label": "Top speed (m/s)", "min": 8.0, "max": 60.0, "step": 1.0},
+	{"key": "top_over_walk", "label": "Top speed above walk (m/s)", "min": 0.0, "max": 40.0, "step": 1.0},
 	{"key": "grapple_range", "label": "Grapple reach (m)", "min": 10.0, "max": 120.0, "step": 1.0},
 	{"key": "air_grapples", "label": "Air grapples", "min": 1.0, "max": 10.0, "step": 1.0},
 	{"key": "arrow_speed", "label": "Hook speed", "min": 20.0, "max": 300.0, "step": 5.0},
@@ -174,6 +173,11 @@ func _ready() -> void:
 
 	spawn = global_transform
 	air_left = int(tune.air_grapples)
+
+
+## Top speed: walking pace plus the margin (16 m/s with the defaults).
+func top_speed() -> float:
+	return tune.walk_speed + tune.top_over_walk
 
 
 func apply_values(values: Dictionary) -> void:
@@ -420,7 +424,7 @@ func _auto_wrap(dt: float) -> void:
 	flat.y = 0.0
 	var out := flat.normalized() if flat.length() > 0.3 else global_basis.x
 	# steer for the next point on a fixed circle: exact, so it never drifts outward
-	var spd := clampf(_wrap_r * 3.4, 12.0, 24.0)          # about 1.8 s a lap
+	var spd := minf(clampf(_wrap_r * 3.4, 12.0, 24.0), top_speed())   # never past top speed
 	var ang := atan2(out.z, out.x) - _wrap_sign * (spd / _wrap_r) * dt
 	var goal := c + Vector3(cos(ang), 0.0, sin(ang)) * _wrap_r
 	goal.y = c.y - 1.0
@@ -667,13 +671,19 @@ func _physics_process(dt: float) -> void:
 	if Game.playing() and Input.is_action_just_pressed("restart"):
 		respawn()
 
-	# speed cap: boosts may poke above it briefly and bleed back down
-	var spd := velocity.length()
-	var cap: float = tune.max_speed
-	if spd > cap * OVERSPEED_ALLOW:
-		velocity = velocity / spd * cap * OVERSPEED_ALLOW
-	elif spd > cap:
-		velocity = velocity / spd * maxf(cap, spd - cap * OVERSPEED_BLEED * dt)
+	# speed cap: never faster than walk speed + top_over_walk. Swinging, the whole
+	# velocity is capped; in free flight only the horizontal part (you can still fall)
+	var cap: float = top_speed()
+	if latching:
+		pass                         # the ground latch is a landing aid, not travel: it may reel faster
+	elif attached:
+		velocity = velocity.limit_length(cap)
+	else:
+		var hv := Vector2(velocity.x, velocity.z)
+		if hv.length() > cap:
+			hv = hv.limit_length(cap)
+			velocity.x = hv.x
+			velocity.z = hv.y
 
 	floor_snap_length = 0.0 if attached else 0.3
 	var fall_speed := -velocity.y

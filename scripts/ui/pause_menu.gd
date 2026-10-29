@@ -150,6 +150,9 @@ func bind(p: Node) -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		var saved = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if saved is Dictionary:
+			if int(saved.get("_v", 1)) < p.TUNE_VERSION:
+				saved.erase("air_speed")     # these changed meaning: start from the new defaults
+				saved.erase("max_speed")
 			p.apply_values(saved)
 	_refresh()
 
@@ -178,4 +181,6 @@ func _reset_tuning() -> void:
 func _save() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify(player.tune))
+		var out: Dictionary = player.tune.duplicate()
+		out["_v"] = player.TUNE_VERSION
+		f.store_string(JSON.stringify(out))

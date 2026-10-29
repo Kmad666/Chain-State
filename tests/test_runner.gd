@@ -228,6 +228,8 @@ func _ready() -> void:
 	check(pw.pads.all(func(b): return b.collision_layer == pp.LAYER_LAND), "landing pads are solid but on the no-grapple layer")
 	check(pw.anchors.all(func(a): return a.is_in_group("grapple_target")), "anchors are labelled grapple targets")
 	check(is_equal_approx(pp.tune.fov, 90.0), "field of view is 90")
+	check(is_equal_approx(pp.top_speed(), pp.tune.walk_speed + 10.0) and is_equal_approx(pp.tune.air_speed, pp.tune.walk_speed),
+		"top speed is walk speed + 10 (%.0f m/s), air steering matches walk speed" % pp.top_speed())
 	_aim(pp, CO[1].anchor + Vector3(0, -6, 0))
 	for i in 4:
 		await get_tree().process_frame
@@ -289,7 +291,8 @@ func _ready() -> void:
 	pp.respawn()
 	pp.swings = 0
 	pw.checkpoint = 0
-	var release_at := [0.0, 0.0, 0.0, 9.0, 0.0]
+	var release_at := [0.0, 0.0, 0.0, 0.0, 0.0]
+	var max_v := 0.0
 	for gi in range(CO.size() - 1):
 		var from_b: Vector3 = CO[gi].pad
 		var to_b: Vector3 = CO[gi + 1].pad
@@ -316,6 +319,8 @@ func _ready() -> void:
 			if not fired_b and tb > 12:
 				pp.try_grapple()
 				fired_b = true
+			if not pp.latching:
+				max_v = maxf(max_v, pp.velocity.length() if pp.attached else Vector2(pp.velocity.x, pp.velocity.z).length())
 			if pp.attached and not let_go_b and (pp.global_position - an_b).dot(dir_b) > release_at[gi] and pp.velocity.y > -2.0:
 				pp.release()
 				let_go_b = true
@@ -333,6 +338,7 @@ func _ready() -> void:
 		for i in 5:
 			await get_tree().physics_frame
 		print("  info gap %d: checkpoint now %d, swings %d, latched down %d" % [gi, pw.checkpoint, pp.swings, latched_b])
+	check(max_v <= pp.top_speed() + 0.01, "the bot never went faster than top speed (fastest %.1f m/s)" % max_v)
 	check(pw.finished and pp.swings == pw.par, "the course can be crossed in exactly par: %d swings, one per gap" % pp.swings)
 	await shot("21_platform_test")
 	pw.queue_free()
@@ -512,7 +518,7 @@ func _ready() -> void:
 	check(ep.auto_wrap, "E on a hooked caster starts the auto-wrap")
 	var frames := 0
 	var t_wrap := Time.get_ticks_msec()
-	while frames < 120 * 9 and not s.ready_to_arrest:
+	while frames < 120 * 14 and not s.ready_to_arrest:
 		await get_tree().physics_frame
 		frames += 1
 	var to_s: Vector3 = s.global_position - ep.cam.global_position

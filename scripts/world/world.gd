@@ -311,8 +311,8 @@ const COURSE := [
 	{"pad": Vector3(0, 0, -40), "anchor": Vector3(0, 14, -20), "size": Vector3(8, 1.5, 8)},     # 30 m gap, level
 	{"pad": Vector3(0, 4, -82), "anchor": Vector3(0, 18, -61), "size": Vector3(8, 1.5, 8)},     # 34 m gap, step up
 	{"pad": Vector3(0, 0, -126), "anchor": Vector3(0, 16, -104), "size": Vector3(7, 1.5, 7)},   # 37 m gap, step down
-	{"pad": Vector3(12, 6, -172), "anchor": Vector3(6, 22, -149), "size": Vector3(7, 1.5, 7)},  # 40 m gap, up and to the side
-	{"pad": Vector3(0, 4, -220), "anchor": Vector3(6, 22, -196), "size": Vector3(10, 1.5, 10), "finish": true},  # 41 m gap
+	{"pad": Vector3(10, 5, -164), "anchor": Vector3(5, 20, -145), "size": Vector3(7, 1.5, 7)},  # 31 m gap, up and to the side
+	{"pad": Vector3(0, 4, -204), "anchor": Vector3(5, 20, -184), "size": Vector3(10, 1.5, 10), "finish": true},  # 33 m gap
 ]
 
 

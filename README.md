@@ -36,7 +36,7 @@
 You get 3 grapples in the air by default; touching the ground refills them.
 
 ## Tuning the feel
-Pause with **Esc**. On the right there's a slider for every movement number: gravity, walk speed, jump, gravity while hooked, rope pull, swing push, reel speed, top speed, reach, air grapples, hook speed, release boost, dash, mouse sensitivity and reticle size (aim assist). Changes apply instantly and are saved. Three presets give starting points:
+Pause with **Esc**. On the right there's a slider for every movement number: gravity, walk speed, jump, gravity while hooked, rope pull, swing push, reel speed, top speed above walk, reach, air grapples, hook speed, release boost, dash, mouse sensitivity and reticle size (aim assist). Changes apply instantly and are saved. Three presets give starting points:
 
 1. **Float**: no gravity on the rope, so you drift on momentum.
 2. **Pendulum**: full gravity on a rigid rope, for classic Verlet swing arcs.
@@ -174,11 +174,11 @@ A course of Kenney Platformer Kit pieces over the void, built for the core puzzl
 
 - **Grass-block pads** (Kenney Platformer Kit): you land on these. They're solid but **can't be grappled** (they sit on their own physics layer, `Player.LAYER_LAND`). Aim at one and the crosshair greys out with "can't grapple this".
 - **Crate anchors:** metal-framed crates hung high above each gap. They're the **only** things the chain can bite, and auto-aim locks onto them in gold.
-- **The gaps:** this first section takes one swing per gap. There are five gaps, from 30 m up to 41 m, getting less level and stepping to the side. None can be crossed with a running jump and dash. The gold finish pad is at the end.
+- **The gaps:** this first section takes one swing per gap. There are five gaps of 30–37 m, getting less level and stepping to the side. None can be crossed with a running jump and dash. The gold finish pad is at the end.
 - **The tally:** "SWINGS n · PAR 5 · PAD n/5 · FALLS n" at the top. Each pad is a checkpoint; fall into the void and you're back on the last one.
 - **Rope control:** Q reels in and E gives slack while you hang. Slack pays out freely, without the bungee tug.
 - **Land below:** the line at the bottom of the screen says whether there's land straight under you. Over a pad, press **Space** to latch down onto it, which is handy when a swing overshoots.
-- **Tested:** a bot plays the whole course in the test suite, at exactly par, so every gap is proven crossable in one swing. The release windows are roughly 12–16 m wide, except pad 3 to 4, which is about 2 m.
+- **Tested:** a bot plays the whole course in the test suite, at exactly par, so every gap is proven crossable in one swing. Each gap gives roughly 8–12 m of leeway on when you let go.
 
 Field of view is now **90** (slider in the pause menu), widening a little with speed.
 
@@ -198,3 +198,13 @@ A dense city on a 130 m island, built from Kenney's **Retro Fantasy Kit**.
 - **Streets**, all cobblestone: two tree-lined **boulevards** cross at a **fountain plaza** ringed with trees. A grid of 6 m **streets**, 3 m **narrow streets** and 2.5 m **alleys** (two of them diagonal) cuts the blocks, and a tree-lined **ring promenade** runs round the edge. You enter by the south gate.
 - **Grappling:** 12 crate anchors hang about 25 m up over the crossroads, above the rooftops. Buildings and cobbles are solid but can't be grappled, so you swing down the street canyons from crossing to crossing.
 - **Performance:** the terraces are drawn in bulk, one draw call per kind of wall block (`MultiMesh`), with one collision box per run of terrace. Hidden inner cells draw only their top storey.
+
+## Speed
+
+- **Air steering** tops out at **walking pace**, 6 m/s by default.
+- **Top speed** is **walk speed + 10**, so 16 m/s by default. It's a hard cap: swings, dashes and release boosts all stop there.
+  - While swinging, your whole velocity is capped.
+  - In free flight, only your horizontal speed is capped, so falling still works.
+- **Exception:** the ground latch's fast reel-in is a landing aid, not travel, so it isn't capped.
+- **Sliders:** both live in the pause menu, as "Air steer speed" and "Top speed above walk".
+- **Saved settings:** older saved settings for these two are reset to the new defaults.
