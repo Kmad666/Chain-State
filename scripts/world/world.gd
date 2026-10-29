@@ -18,7 +18,7 @@ const Sentry := preload("res://scripts/combat/sentry.gd")
 const OrbTree := preload("res://scripts/combat/orb_tree.gd")
 const Ward := preload("res://scripts/combat/ward.gd")
 const Clouds := preload("res://scripts/world/clouds.gd")
-const MagicBurst := preload("res://scripts/combat/magic_burst.gd")
+const PerfOverlay := preload("res://scripts/ui/perf_overlay.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -80,13 +80,6 @@ func _ready() -> void:
 		tree.player = player
 	if ward:
 		ward.player = player
-	if not sentries.is_empty():
-		# draw a subdue burst invisibly in front of the camera for a few frames now,
-		# so the GPU has its shaders ready and the real one never stalls a frame
-		var warm := MagicBurst.new()
-		warm.warmup = true
-		player.cam.add_child(warm)
-		warm.position = Vector3(0, 0, -3)
 
 	# sun glare sits between the 3D view and the HUD
 	var glare_layer := CanvasLayer.new()
@@ -103,7 +96,11 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.player = player
 	ui.add_child(hud)
-	player.notice.connect(func(t): hud.toast(t, 2.5))
+	var perf := PerfOverlay.new()
+	ui.add_child(perf)
+	player.notice.connect(func(t):
+		hud.toast(t, 2.5)
+		perf.note(t))
 	player.stun_started.connect(func():
 		hud.flash(Color(0.55, 0.25, 1.0), 0.5)
 		hud.toast("Stunned! You drop for %d seconds." % int(player.STUN_TIME), 2.5))
@@ -276,6 +273,9 @@ func _sentry(kind: String, loop: PackedVector3Array) -> Node:
 func _on_chain_snapped() -> void:
 	hud.flash(Color(0.6, 0.25, 1.0), 0.35)
 	hud.banner("ARRESTED", Color(0.85, 0.7, 1.0))
+	for c in hud.get_parent().get_children():
+		if c.has_method("note"):
+			c.note("arrest")
 	hud.toast("Arrested. The chain comes free; you keep your momentum.", 3.0)
 
 

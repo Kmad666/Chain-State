@@ -290,7 +290,8 @@ func _ready() -> void:
 	check(not ep.attached and not ep.auto_wrap, "the chain comes free")
 	check(ep.velocity.length() >= v_before * 0.95 and v_before > 8.0, "you keep your momentum (%.1f -> %.1f m/s)" % [v_before, ep.velocity.length()])
 	check(is_equal_approx(Engine.time_scale, 1.0), "no slow motion or freeze on the arrest")
-	check(get_tree().get_nodes_in_group("enemy").size() >= 1 and ew.get_children().any(func(x): return x.get_script() == preload("res://scripts/combat/magic_burst.gd")), "a purple magic burst goes off")
+	check(not ew.find_children("*", "MeshInstance3D", true, false).any(func(m): return m.mesh is SphereMesh and (m.mesh as SphereMesh).radius == 1.0 and m.material_override and m.material_override.transparency != 0 and m.get_parent().get_parent() == ew),
+		"no effect is spawned on the arrest (effects come later)")
 	for i in 30:
 		await get_tree().process_frame
 	await shot("14_arrested")
@@ -500,8 +501,8 @@ func _ready() -> void:
 	var lights_added := 0
 	for _l in aw.find_children("*", "OmniLight3D", true, false):
 		lights_added += 1
-	check(lights_added == 0, "the subdue burst adds no light (a new light froze the screen while shaders rebuilt)")
-	check(Sfx.played.has("break") and Sfx.played.has("subdue"), "arresting her: a burst sound and the chain coming free")
+	check(lights_added == 0, "the arrest adds no light")
+	check(Sfx.played.has("break") and Sfx.played.has("subdue"), "arresting her: an arrest sound and the chain coming free")
 	await get_tree().process_frame
 	check(not is_instance_valid(wd) or wd.is_queued_for_deletion(), "her ward breaks with her")
 	for i in 90:

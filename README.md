@@ -27,6 +27,7 @@
 | **E** on a clue | Examine it and log it as evidence |
 | **E** while hooked to a caster | Auto-wrap round them; after 3 laps, **E** again to **arrest** |
 | **F2** | Dialogue editor |
+| **F3** | Performance readout: FPS, the slowest recent frame, and the last hitch with what had just happened |
 | **R** | Back to the start |
 | **Esc** | Pause: controls, physics presets and live feel sliders |
 
@@ -84,10 +85,10 @@ Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a bro
 **Arresting (both):** hook the caster from within range, then wrap the chain round them three times. Each lap adds a silver coil.
 - **Auto-wrap:** press **E** while hooked and you'll circle them automatically, with the camera holding them dead centre. It takes about 2 s a lap at roughly 85 km/h. For the witch, you have to be inside her ward first.
 - **By hand:** swinging round yourself works too.
-- **Arrest:** after the third lap the caster is **bound**. Press **E** again to **ARREST**: a purple burst, an "ARRESTED" banner, and the chain comes free with **your momentum untouched**. There's no slow motion or freeze, so it doesn't break the flow with several casters about.
+- **Arrest:** after the third lap the caster is **bound**. Press **E** again to **ARREST**: an "ARRESTED" banner and a brief tint, and the chain comes free with **your momentum untouched**. There's no slow motion or freeze, so it doesn't break the flow with several casters about.
 - A witch's ward breaks with her. Let go mid-wrap and the coils slip loose after a moment.
 
-Code: `scripts/combat/sentry.gd` (casters, the wrap), `orb_tree.gd` (the witch's tree), `ward.gd` (the forcefield), `bullet_field.gd` (projectiles), `hook_orb.gd` (blue orbs), `magic_burst.gd`.
+Code: `scripts/combat/sentry.gd` (casters, the wrap), `orb_tree.gd` (the witch's tree), `ward.gd` (the forcefield), `bullet_field.gd` (projectiles), `hook_orb.gd` (blue orbs).
 
 ## Skies
 The range uses Kenney's free CC0 skybox pack: **Day** (default), **Morning**, **Night**, **Space** and **Alien**. Switch between them in the pause menu (Esc → Sky); your choice is remembered. Each sky moves the sun light to where the painted sun sits, and matches the light colour, ambient light and fog to that sky.
@@ -161,7 +162,7 @@ Sound effects come from Kenney's 3D Platformer and FPS starter kits (CC0) and pl
 | The hook biting | a short, high clack |
 | Being stunned | a hurt hit plus a low thud |
 | A wizard's volley | a casting sound, at his position |
-| Subduing a caster | a burst, at their position, plus the chain snapping |
+| Arresting a caster | an arrest sound, at their position, plus the chain coming free |
 | A new logbook entry | coin |
 
 Still to do: a proper chain rattle, the ward's hum, orb whooshes and ambience. Island levels also get Kenney's grass tufts (recoloured to the island green) and slowly drifting clouds. See CREDITS.md.

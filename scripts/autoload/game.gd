@@ -57,6 +57,7 @@ func _setup_input() -> void:
 		"restart": [KEY_R],
 		"pause": [KEY_ESCAPE],
 		"toggle_editor": [KEY_F2],
+		"perf": [KEY_F3],
 		"logbook": [KEY_L, KEY_TAB, KEY_J],
 	}
 	var mouse := {

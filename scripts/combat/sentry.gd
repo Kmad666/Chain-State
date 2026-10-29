@@ -13,8 +13,8 @@ extends StaticBody3D
 ## Arresting (both kinds): hook it from within subdue_range(), then wrap the
 ## chain around it three times, either swinging round yourself or by pressing E
 ## to auto-wrap (the player circles it with the camera locked on). Each lap adds
-## a silver coil. After the third, press E again to ARREST: a purple magic burst,
-## and the chain comes free with your momentum untouched (no slow motion, so it
+## a silver coil. After the third, press E again to ARREST:
+## the chain comes free with your momentum untouched (no slow motion, so it
 ## doesn't break the flow when there are several casters about). Hooking from too
 ## far away fails. Let go mid-wrap and the coils slip loose after a moment.
 ##
@@ -22,7 +22,6 @@ extends StaticBody3D
 
 signal subdued(sentry: Node)
 
-const MagicBurst := preload("res://scripts/combat/magic_burst.gd")
 const HookOrb := preload("res://scripts/combat/hook_orb.gd")
 
 const SUBDUE_RANGE := 20.0
@@ -346,15 +345,12 @@ func _update_coils() -> void:
 		_coils.pop_back().queue_free()
 
 
-## Arrested: a purple magic burst, and the chain comes free.
+## Arrested: the chain comes free. (No visual effect yet: effects come later.)
 func _subdue() -> void:
 	is_subdued = true
 	ready_to_arrest = false
 	_core_mat.albedo_color = Color(0.35, 0.35, 0.4)
 	_core.scale = Vector3.ONE
-	var burst := MagicBurst.new()
-	get_parent().add_child(burst)
-	burst.global_position = global_position
 	Sfx.play_at("subdue", global_position, 2.0, 0.8)
 	if ward and is_instance_valid(ward):
 		ward.queue_free()            # her ward dies with her
