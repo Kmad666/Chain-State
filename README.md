@@ -142,3 +142,19 @@ To add a new NPC, place `scripts/world/npc.gd` in a scene (or add one in `world.
 
 ## Rendering
 For now the project uses Godot's **Compatibility** renderer, so the browser build works for quick testing. When the game moves to desktop-only releases, switch to **Forward+** in Project Settings to get better lighting and effects.
+
+## Sound and decoration
+
+The first sound pass uses CC0 effects from Kenney's 3D Platformer starter kit, played through the `Sfx` autoload (`scripts/autoload/sfx.gd`):
+
+| Event | Sound |
+|---|---|
+| Jumping | jump |
+| Landing (louder and deeper the harder you land) | land |
+| Walking (loops, faster as you speed up) | footsteps |
+| The hook biting | a short, high clack (the landing sound pitched up) |
+| Being stunned | fall plus a soft break |
+| The chain snapping on a subdue | break |
+| A new logbook entry | coin |
+
+There's no proper chain throw or rattle yet, nor any magic or ambient sound; those still need a sound pack. Island levels also get Kenney's grass tufts (recoloured to the island green) and slowly drifting clouds. See CREDITS.md.

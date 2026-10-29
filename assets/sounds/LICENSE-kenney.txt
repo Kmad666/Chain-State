@@ -1,0 +1,3 @@
+Sound effects from Kenney's "Starter Kit 3D Platformer" (https://github.com/KenneyNL/Starter-Kit-3D-Platformer).
+Assets are CC0 1.0 (public domain): https://creativecommons.org/publicdomain/zero/1.0/
+Credit (voluntary): Kenney, www.kenney.nl

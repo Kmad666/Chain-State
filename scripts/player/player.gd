@@ -392,6 +392,7 @@ func _attach() -> void:
 			hook_state = Chain.RETURNING      # shaken off
 			return
 	attached = true
+	Sfx.play("land", -6.0, 1.7)          # the hook bites: a short, bright clack
 	hook_state = Chain.HOOKED
 	anchor = hook_goal
 	hook_tip = anchor
@@ -462,6 +463,7 @@ func chain_snapped(max_speed: float) -> void:
 	attached = false
 	hook_state = Chain.RETURNING
 	velocity = velocity.limit_length(max_speed)
+	Sfx.play("break", 0.0, 0.75)
 	snapped.emit()
 
 
@@ -479,6 +481,8 @@ func hit(_from_dir: Vector3) -> void:
 	stunned = STUN_TIME
 	invuln = STUN_TIME + 0.8
 	velocity = Vector3(velocity.x * 0.15, minf(velocity.y, 0.0), velocity.z * 0.15)
+	Sfx.play("fall", 0.0, 0.6)
+	Sfx.play("break", -8.0, 1.4)
 	stun_started.emit()
 
 
@@ -528,6 +532,7 @@ func _physics_process(dt: float) -> void:
 		_walk(wish, dt)
 		if Game.playing() and stunned <= 0.0 and Input.is_action_just_pressed("jump"):
 			velocity.y = tune.jump
+			Sfx.play("jump", -4.0)
 	else:
 		# air strafe: steer, but can't accelerate past air_speed in the wish direction
 		var cur := Vector3(velocity.x, 0, velocity.z).dot(wish)
@@ -553,11 +558,16 @@ func _physics_process(dt: float) -> void:
 		velocity = velocity / spd * maxf(cap, spd - cap * OVERSPEED_BLEED * dt)
 
 	floor_snap_length = 0.0 if attached else 0.3
+	var fall_speed := -velocity.y
 	move_and_slide()
 	if is_on_floor():
 		air_left = int(tune.air_grapples)
 		if not _was_on_floor:
 			_just_landed = true
+			if fall_speed > 2.0:
+				# harder landings are louder and a touch deeper
+				var k := clampf((fall_speed - 2.0) / 18.0, 0.0, 1.0)
+				Sfx.play("land", lerpf(-10.0, 0.0, k), lerpf(1.1, 0.8, k))
 	_was_on_floor = is_on_floor()
 	_update_hook(dt)
 	if global_position.y < -60.0:
@@ -643,6 +653,7 @@ func _process(dt: float) -> void:
 	# head bob on foot, and a lean into sideways swings
 	var hs := Vector2(velocity.x, velocity.z).length()
 	var walking := is_on_floor() and hs > 0.5
+	Sfx.set_walking(walking and Game.playing() and hs > 1.5, hs)
 	if walking:
 		_bob_t += dt * (6.0 + hs * 1.1)
 	var bob_amt := clampf(hs / tune.walk_speed, 0.0, 1.0) if walking else 0.0

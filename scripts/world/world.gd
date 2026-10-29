@@ -17,6 +17,7 @@ const BulletField := preload("res://scripts/combat/bullet_field.gd")
 const Sentry := preload("res://scripts/combat/sentry.gd")
 const OrbTree := preload("res://scripts/combat/orb_tree.gd")
 const Ward := preload("res://scripts/combat/ward.gd")
+const Clouds := preload("res://scripts/world/clouds.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -48,6 +49,7 @@ var islands: Array = []
 var sentries: Array = []
 var tree: Node3D
 var ward: Node3D
+var clouds: Node3D
 var bullets: Node3D
 var start_pos := START_POS
 var start_yaw := 0.0
@@ -190,6 +192,13 @@ func _build_world() -> void:
 			_build_enemy_test_air()
 		_:
 			_build_range()
+	if Game.level != "range" and not islands.is_empty():
+		var c := Vector3.ZERO
+		for isl in islands:
+			c += isl.position
+		clouds = Clouds.new()
+		clouds.centre = c / islands.size()
+		add_child(clouds)
 
 
 ## Level 1: two islands at the same height, a short gap between them.

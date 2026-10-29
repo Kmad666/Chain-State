@@ -99,3 +99,48 @@ func build() -> void:
 		var col := CollisionShape3D.new()
 		col.shape = m.create_trimesh_shape()
 		add_child(col)
+
+	_grass(rng, rim)
+
+
+var tufts := 0
+
+
+## Kenney grass tufts scattered over the top (decoration: no collision).
+func _grass(rng: RandomNumberGenerator, rim: Array[Vector3]) -> void:
+	var meshes := [KenneyMesh.get_mesh("res://assets/models/kenney/grass.glb"),
+		KenneyMesh.get_mesh("res://assets/models/kenney/grass-small.glb")]
+	for which in 2:
+		var mesh: Mesh = meshes[which]
+		if mesh == null:
+			continue
+		var n := int(radius * (4.0 if which == 1 else 2.0))
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = mesh
+		mm.instance_count = n
+		for i in n:
+			var a := rng.randf() * TAU
+			var edge: Vector3 = rim[int(a / TAU * rim.size()) % rim.size()]
+			var p := Vector3(cos(a), 0, sin(a)) * edge.length() * sqrt(rng.randf()) * 0.88
+			var sc := rng.randf_range(0.7, 1.3)
+			mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * sc), p))
+		var mi := MultiMeshInstance3D.new()
+		mi.multimesh = mm
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.material_override = _grass_mat(which)   # recoloured from Kenney's mint to the island's green
+		add_child(mi)
+		tufts += n
+
+
+static var _gm: Array = []
+
+
+static func _grass_mat(which: int) -> StandardMaterial3D:
+	if _gm.is_empty():
+		for c in [Color(0.27, 0.42, 0.19), Color(0.33, 0.5, 0.23)]:
+			var m := StandardMaterial3D.new()
+			m.albedo_color = c
+			m.roughness = 1.0
+			_gm.append(m)
+	return _gm[which]

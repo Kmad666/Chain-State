@@ -194,6 +194,20 @@ func _ready() -> void:
 		q.exclude = [w.player.get_rid()]
 		var hit = space.intersect_ray(q)
 		check(not hit.is_empty() and hit.collider == far, "%s: the far island is solid and grapple-able" % lv)
+		check(w.islands[0].tufts > 0 and w.clouds and w.clouds.cloud_count() > 0,
+			"%s: grass tufts on the islands (%d) and clouds drifting around (%d)" % [lv, w.islands[0].tufts, w.clouds.cloud_count() if w.clouds else 0])
+		if lv == "level_1":
+			# sounds: jump, land, hook bite
+			Sfx.played.clear()
+			Input.action_press("jump")
+			await get_tree().physics_frame
+			Input.action_release("jump")
+			for i in 150:
+				await get_tree().physics_frame
+				if w.player.is_on_floor() and Sfx.played.has("land"):
+					break
+			check(Sfx.played.has("jump") and Sfx.played.has("land"), "a jump and a landing make their sounds")
+			check(Sfx._streams.size() == 6, "all six sound effects load")
 		await shot("11_" + lv)
 		w.player.head.rotation.x = deg_to_rad(-35)
 		await shot("12_" + lv + "_down")
@@ -430,6 +444,7 @@ func _ready() -> void:
 	ap.global_position = red_world
 	await get_tree().physics_frame
 	check(ap.stunned > 0.0, "touching a red orb stuns you")
+	check(Sfx.played.has("fall"), "being stunned makes a sound")
 	ap.stunned = 0.0
 	ap.invuln = 0.0
 
@@ -470,6 +485,7 @@ func _ready() -> void:
 		if witch.is_subdued:
 			break
 	check(witch.is_subdued, "three laps inside the ward subdue her")
+	check(Sfx.played.has("break"), "the chain snapping makes a sound")
 	await get_tree().process_frame
 	check(not is_instance_valid(wd) or wd.is_queued_for_deletion(), "her ward breaks with her")
 	for i in 90:

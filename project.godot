@@ -16,6 +16,7 @@ config/icon="res://icon.svg"
 Game="*res://scripts/autoload/game.gd"
 DialogueDB="*res://scripts/autoload/dialogue_db.gd"
 Logbook="*res://scripts/autoload/logbook.gd"
+Sfx="*res://scripts/autoload/sfx.gd"
 
 [display]
 
