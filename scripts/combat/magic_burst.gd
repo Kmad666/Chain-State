@@ -6,6 +6,8 @@ const LIFE := 0.9
 const MAX_RADIUS := 11.0
 
 var _t := 0.0
+var warmup := false   # drawn invisibly for a few frames at level load, so its shaders are ready
+var _warm_frames := 3
 var _outer: MeshInstance3D
 var _inner: MeshInstance3D
 var _outer_mat: StandardMaterial3D
@@ -17,11 +19,15 @@ func _ready() -> void:
 	_inner_mat = _mat(Color(0.85, 0.65, 1.0, 0.6))
 	_outer = _sphere(_outer_mat)
 	_inner = _sphere(_inner_mat)
-	var light := OmniLight3D.new()
-	light.light_color = Color(0.7, 0.35, 1.0)
-	light.light_energy = 6.0
-	light.omni_range = 26.0
-	add_child(light)
+	# No OmniLight here on purpose: on the Compatibility renderer the first light
+	# added mid-game makes the driver recompile every lit material in view, which
+	# froze the screen for seconds right as the burst fired. The HUD's purple
+	# flash carries the "light" instead.
+	if warmup:
+		_outer.scale = Vector3.ONE * 0.05
+		_inner.scale = Vector3.ONE * 0.05
+		_outer_mat.albedo_color.a = 0.01
+		_inner_mat.albedo_color.a = 0.01
 
 
 func _mat(c: Color) -> StandardMaterial3D:
@@ -48,6 +54,11 @@ func _sphere(m: Material) -> MeshInstance3D:
 
 
 func _process(dt: float) -> void:
+	if warmup:
+		_warm_frames -= 1
+		if _warm_frames <= 0:
+			queue_free()
+		return
 	_t += dt
 	var k := clampf(_t / LIFE, 0.0, 1.0)
 	var grow := 1.0 - pow(1.0 - k, 3.0)               # fast out, then eases
@@ -55,6 +66,5 @@ func _process(dt: float) -> void:
 	_inner.scale = Vector3.ONE * lerpf(0.3, MAX_RADIUS * 0.55, grow)
 	_outer_mat.albedo_color.a = 0.45 * (1.0 - k)
 	_inner_mat.albedo_color.a = 0.6 * (1.0 - k) * (1.0 - k)
-	get_child(2).light_energy = 6.0 * (1.0 - k)
 	if _t >= LIFE:
 		queue_free()

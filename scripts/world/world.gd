@@ -18,6 +18,7 @@ const Sentry := preload("res://scripts/combat/sentry.gd")
 const OrbTree := preload("res://scripts/combat/orb_tree.gd")
 const Ward := preload("res://scripts/combat/ward.gd")
 const Clouds := preload("res://scripts/world/clouds.gd")
+const MagicBurst := preload("res://scripts/combat/magic_burst.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -79,6 +80,13 @@ func _ready() -> void:
 		tree.player = player
 	if ward:
 		ward.player = player
+	if not sentries.is_empty():
+		# draw a subdue burst invisibly in front of the camera for a few frames now,
+		# so the GPU has its shaders ready and the real one never stalls a frame
+		var warm := MagicBurst.new()
+		warm.warmup = true
+		player.cam.add_child(warm)
+		warm.position = Vector3(0, 0, -3)
 
 	# sun glare sits between the 3D view and the HUD
 	var glare_layer := CanvasLayer.new()

@@ -487,6 +487,10 @@ func _ready() -> void:
 		if witch.is_subdued:
 			break
 	check(witch.is_subdued, "three laps inside the ward subdue her")
+	var lights_added := 0
+	for _l in aw.find_children("*", "OmniLight3D", true, false):
+		lights_added += 1
+	check(lights_added == 0, "the subdue burst adds no light (a new light froze the screen while shaders rebuilt)")
 	check(Sfx.played.has("break") and Sfx.played.has("subdue"), "subduing her: a burst sound and the chain snapping")
 	await get_tree().process_frame
 	check(not is_instance_valid(wd) or wd.is_queued_for_deletion(), "her ward breaks with her")
