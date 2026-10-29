@@ -25,6 +25,7 @@
 | **1–9** / click | Pick a dialogue choice. **Esc** leaves the conversation |
 | **L** / Tab / J | Open the Agent's logbook |
 | **E** on a clue | Examine it and log it as evidence |
+| **E** while hooked to a caster | Auto-wrap round them; after 3 laps, **E** again to **arrest** |
 | **F2** | Dialogue editor |
 | **R** | Back to the start |
 | **Esc** | Pause: controls, physics presets and live feel sliders |
@@ -80,7 +81,11 @@ Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a bro
 - **Wizard (Enemy Test (Ground)):** blue robe and white beard; flies low over the island. Within **38 m** his casting hand glows red, he slows and faces you, and after a warning swell he fires a **spread-out line of five large dark red orbs** straight across, parallel to the ground (NieR-style). Alternate volleys shift by half a gap. Hook him from within **20 m** and swing around.
 - **Witch (Enemy Test (Air)):** she doesn't shoot. Her **tree** is a tall, wide cone of **40 large dark red orbs** (1.8 m radius, never clumped) and **10 blue orbs**, spaced far apart and slowly turning, high above the island: a platforming climb in its own right. The blue orbs spiral up the cone as the route (free grapples, and they keep riding the tree while you hang from them). At the top she hovers inside her **ward**, a large faceted forcefield (17 m radius) with one opening, its rim **traced in gold** so you can find it from across the sky. You can grapple the ward, but touching it stuns you. You can hook her through the opening from just outside (her hook range grows with the ward: 25 m), but **laps only count once you're inside**.
 
-**Subduing (both):** swing around the caster. Each full lap adds a silver coil. On the third lap a **purple magic burst** goes off and the chain snaps: purple flash, **SUBDUED** banner, a split-second of slow motion, and your speed capped at 9 m/s in the direction you were going. A witch's ward breaks with her. Let go mid-wrap and the coils slip loose after a moment.
+**Arresting (both):** hook the caster from within range, then wrap the chain round them three times. Each lap adds a silver coil.
+- **Auto-wrap:** press **E** while hooked and you'll circle them automatically, with the camera holding them dead centre. It takes about 2 s a lap at roughly 85 km/h. For the witch, you have to be inside her ward first.
+- **By hand:** swinging round yourself works too.
+- **Arrest:** after the third lap the caster is **bound**. Press **E** again to **ARREST**: a purple burst, an "ARRESTED" banner, and the chain comes free with **your momentum untouched**. There's no slow motion or freeze, so it doesn't break the flow with several casters about.
+- A witch's ward breaks with her. Let go mid-wrap and the coils slip loose after a moment.
 
 Code: `scripts/combat/sentry.gd` (casters, the wrap), `orb_tree.gd` (the witch's tree), `ward.gd` (the forcefield), `bullet_field.gd` (projectiles), `hook_orb.gd` (blue orbs), `magic_burst.gd`.
 

@@ -10,11 +10,13 @@ extends StaticBody3D
 ##            the top of her orb tree (orb_tree.gd). You can only wrap her once you're
 ##            inside the ward: fly in through its opening.
 ##
-## Subduing (both kinds): hook it from within SUBDUE_RANGE, then swing around it.
-## Each full lap adds a silver coil. On the third lap it releases a purple magic
-## burst and the chain snaps: you keep your swing but at a capped speed, with a
-## moment of slow motion so you can see where you're going. Hooking from too far
-## away fails. Let go mid-wrap and the coils slip loose after a moment.
+## Arresting (both kinds): hook it from within subdue_range(), then wrap the
+## chain around it three times, either swinging round yourself or by pressing E
+## to auto-wrap (the player circles it with the camera locked on). Each lap adds
+## a silver coil. After the third, press E again to ARREST: a purple magic burst,
+## and the chain comes free with your momentum untouched (no slow motion, so it
+## doesn't break the flow when there are several casters about). Hooking from too
+## far away fails. Let go mid-wrap and the coils slip loose after a moment.
 ##
 ## Collision layer 4 (HOOK): grapple-able, but the player passes through it.
 
@@ -28,7 +30,7 @@ const ENGAGE_RANGE := 38.0
 const WRAPS_NEEDED := 3
 const SLIP_DELAY := 1.5
 const TELEGRAPH := 0.8
-const BREAK_SPEED := 9.0         # your speed is capped to this when the chain snaps
+const BREAK_SPEED := INF         # no speed cap when the chain comes free: keep your momentum
 
 @export var kind := "ground"
 @export var path: PackedVector3Array = []     # world-space waypoints, looped
@@ -39,6 +41,7 @@ const BREAK_SPEED := 9.0         # your speed is capped to this when the chain s
 var field: Node                  # BulletField (ground kind)
 var player: Node
 var is_subdued := false
+var ready_to_arrest := false     # three wraps done: press E to arrest
 var engaged := false
 var wraps := 0.0
 var _turn := 0.0
@@ -166,6 +169,7 @@ func _physics_process(dt: float) -> void:
 		_track_wrap(_hooked_by.global_position)
 	else:
 		_hooked_by = null
+		ready_to_arrest = false
 		_patrol(dt)
 		if wraps > 0.0:
 			if _slip_t < 0.0:
@@ -260,7 +264,7 @@ func on_hooked(p: Node) -> bool:
 		if ward and is_instance_valid(ward) and not ward.is_inside(p.global_position):
 			p.notice.emit("Hooked through the opening. Get inside the ward to wrap her.")
 		else:
-			p.notice.emit("Hooked! Swing around it to wrap the chain.")
+			p.notice.emit("Hooked! Press E to auto-wrap, or swing around it yourself.")
 	return true
 
 
@@ -288,9 +292,38 @@ func _track_wrap(player_pos: Vector3) -> void:
 	var after := floori(wraps)
 	if after > before and _hooked_by and _hooked_by.has_signal("notice") and after < WRAPS_NEEDED:
 		_hooked_by.notice.emit("Wrap %d of %d" % [after, WRAPS_NEEDED])
-	_update_coils()
 	if wraps >= WRAPS_NEEDED:
-		_subdue()
+		_turn = signf(_turn) * TAU * WRAPS_NEEDED     # bound: extra laps don't pile up
+		wraps = WRAPS_NEEDED
+		if not ready_to_arrest:
+			ready_to_arrest = true
+			if _hooked_by and _hooked_by.has_signal("notice"):
+				_hooked_by.notice.emit("Bound! Press E to ARREST the %s." % title)
+	_update_coils()
+
+
+## Can this player start wrapping it right now? (In range, and inside her ward.)
+func can_wrap(p: Node3D) -> bool:
+	if is_subdued:
+		return false
+	if p.global_position.distance_to(global_position) > subdue_range():
+		return false
+	return not (ward and is_instance_valid(ward) and not ward.is_inside(p.global_position))
+
+
+## The widest circle the auto-wrap may fly: inside a ward it keeps clear of the shell.
+func wrap_radius_max() -> float:
+	if ward and is_instance_valid(ward):
+		return ward.radius - 3.5
+	return subdue_range() - 2.0
+
+
+## E after the third wrap. Returns true if it worked.
+func arrest() -> bool:
+	if is_subdued or not ready_to_arrest:
+		return false
+	_subdue()
+	return true
 
 
 func _update_coils() -> void:
@@ -313,9 +346,10 @@ func _update_coils() -> void:
 		_coils.pop_back().queue_free()
 
 
-## Third lap: a purple magic burst, and the chain snaps.
+## Arrested: a purple magic burst, and the chain comes free.
 func _subdue() -> void:
 	is_subdued = true
+	ready_to_arrest = false
 	_core_mat.albedo_color = Color(0.35, 0.35, 0.4)
 	_core.scale = Vector3.ONE
 	var burst := MagicBurst.new()

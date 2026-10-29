@@ -101,7 +101,7 @@ func flash(c := Color(0.9, 0.1, 0.05), strength := 0.45) -> void:
 	_flash_a = strength
 
 
-## A big centred word that fades out (e.g. SUBDUED).
+## A big centred word that fades out (e.g. ARRESTED).
 func banner(t: String, c: Color, secs := 1.6) -> void:
 	_banner.text = t
 	_banner.add_theme_color_override("font_color", c)
@@ -134,7 +134,13 @@ func _process(_dt: float) -> void:
 		var pips := ""
 		for i in target.WRAPS_NEEDED:
 			pips += "◉ " if i < floori(w) else "○ "
-		_wraps.text = "WRAP  %s" % pips
+		if target.ready_to_arrest:
+			_wraps.text = "[E]  ARREST"
+			_wraps.add_theme_color_override("font_color", GOLD)
+		else:
+			var hint := "auto-wrapping" if player.auto_wrap else ("[E] auto-wrap" if target.can_wrap(player) else ("get inside the ward" if target.ward else "get closer"))
+			_wraps.text = "WRAP  %s   ·  %s" % [pips, hint]
+			_wraps.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
 	else:
 		_wraps.text = ""
 
@@ -156,7 +162,7 @@ func _process(_dt: float) -> void:
 		var dist: float = player.cam.global_position.distance_to(player.aim_enemy.global_position)
 		var close: bool = dist <= player.aim_enemy.subdue_range()
 		col = Color(1.0, 0.35, 0.3, 0.95) if close else Color(1.0, 0.75, 0.5, 0.7)
-		_info.text = ("%d m  ·  in range to wrap" if close else "%d m  ·  too far to wrap") % roundi(dist)
+		_info.text = ("%d m  ·  in range to arrest" if close else "%d m  ·  too far to arrest") % roundi(dist)
 	elif player.aim_enemy and is_instance_valid(player.aim_enemy) and player.aim_enemy.is_in_group("ward"):
 		col = Color(0.8, 0.6, 1.0, 0.95)
 		_info.text = "ward  ·  free grapple, but don't touch it"

@@ -264,28 +264,36 @@ func _ready() -> void:
 	check(s.on_hooked(ep), "hooking from close range holds")
 	ep.attached = true
 	ep.hook_node = s
+	ep.hook_offset = Vector3.ZERO
+	ep.hook_state = 2
+	ep.anchor = s.global_position
 	ep.rope_len = 8.0
-	ep.velocity = Vector3(0, 0, 25)
-	var c: Vector3 = s.global_position
-	var rope_before: float = ep.rope_len
-	for k in 3 * 24 + 6:
-		var a2 := TAU * k / 24.0
-		s._track_wrap(c + Vector3(cos(a2) * 8.0, -1.0, sin(a2) * 8.0))
-		if k == 30:
-			check(is_equal_approx(ep.rope_len, rope_before), "wrapping no longer reels you in")
-		if s.is_subdued:
-			break
-	check(s.is_subdued, "three laps around it subdue the Sentry")
-	check(not ep.attached, "the chain snaps once it's bound")
-	check(ep.velocity.length() <= 9.01, "your speed is capped when the chain snaps (%.1f m/s)" % ep.velocity.length())
-	check(Engine.time_scale < 1.0, "a moment of slow motion marks the snap")
+	ep.velocity = Vector3(0, 0, 6)
+	ep.rotation.y += 1.4                     # looking away: the auto-wrap should swing the view round
+	await get_tree().physics_frame
+	ep.interact()
+	check(ep.auto_wrap, "E on a hooked caster starts the auto-wrap")
+	var frames := 0
+	var t_wrap := Time.get_ticks_msec()
+	while frames < 120 * 9 and not s.ready_to_arrest:
+		await get_tree().physics_frame
+		frames += 1
+	var to_s: Vector3 = s.global_position - ep.cam.global_position
+	var look_err: float = rad_to_deg((-ep.cam.global_basis.z).angle_to(to_s))
+	check(s.ready_to_arrest and not s.is_subdued and ep.attached,
+		"three automatic laps bind him (%.1f s of game time), and he waits for the arrest" % (frames / 120.0))
+	check(look_err < 12.0, "the camera keeps him in the reticle while wrapping (%.1f deg off)" % look_err)
+	await shot("14_bound")
+	var v_before: float = ep.velocity.length()
+	ep.interact()
+	check(s.is_subdued, "E again: ARREST")
+	check(not ep.attached and not ep.auto_wrap, "the chain comes free")
+	check(ep.velocity.length() >= v_before * 0.95 and v_before > 8.0, "you keep your momentum (%.1f -> %.1f m/s)" % [v_before, ep.velocity.length()])
+	check(is_equal_approx(Engine.time_scale, 1.0), "no slow motion or freeze on the arrest")
 	check(get_tree().get_nodes_in_group("enemy").size() >= 1 and ew.get_children().any(func(x): return x.get_script() == preload("res://scripts/combat/magic_burst.gd")), "a purple magic burst goes off")
-	ep.global_position = s.global_position + Vector3(0, 0.5, 9)
-	_aim(ep, s.global_position)
-	await shot("14_snap")
-	for i in 90:
+	for i in 30:
 		await get_tree().process_frame
-	check(is_equal_approx(Engine.time_scale, 1.0), "time returns to normal")
+	await shot("14_arrested")
 	ew.queue_free()
 	await get_tree().process_frame
 
@@ -486,12 +494,14 @@ func _ready() -> void:
 		witch._track_wrap(wc + Vector3(cos(a3) * 4.0, -1.0, sin(a3) * 4.0))
 		if witch.is_subdued:
 			break
-	check(witch.is_subdued, "three laps inside the ward subdue her")
+	check(witch.ready_to_arrest and not witch.is_subdued, "three laps inside the ward bind her (swinging round by hand works too)")
+	ap.interact()
+	check(witch.is_subdued, "...and E arrests her")
 	var lights_added := 0
 	for _l in aw.find_children("*", "OmniLight3D", true, false):
 		lights_added += 1
 	check(lights_added == 0, "the subdue burst adds no light (a new light froze the screen while shaders rebuilt)")
-	check(Sfx.played.has("break") and Sfx.played.has("subdue"), "subduing her: a burst sound and the chain snapping")
+	check(Sfx.played.has("break") and Sfx.played.has("subdue"), "arresting her: a burst sound and the chain coming free")
 	await get_tree().process_frame
 	check(not is_instance_valid(wd) or wd.is_queued_for_deletion(), "her ward breaks with her")
 	for i in 90:

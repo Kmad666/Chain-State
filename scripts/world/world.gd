@@ -272,13 +272,11 @@ func _sentry(kind: String, loop: PackedVector3Array) -> Node:
 	return s
 
 
-## The chain snapped on a bound Sentry: make it impossible to miss.
+## A caster arrested: the chain comes free. Clear feedback, but no slow motion: keep the flow.
 func _on_chain_snapped() -> void:
-	hud.flash(Color(0.6, 0.25, 1.0), 0.5)
-	hud.banner("SUBDUED", Color(0.85, 0.7, 1.0))
-	hud.toast("The chain snapped. You keep your swing, slowed.", 3.0)
-	Engine.time_scale = 0.3
-	get_tree().create_timer(0.45, true, false, true).timeout.connect(func(): Engine.time_scale = 1.0)
+	hud.flash(Color(0.6, 0.25, 1.0), 0.35)
+	hud.banner("ARRESTED", Color(0.85, 0.7, 1.0))
+	hud.toast("Arrested. The chain comes free; you keep your momentum.", 3.0)
 
 
 func _on_sentry_subdued(_s: Node) -> void:

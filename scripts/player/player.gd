@@ -117,6 +117,10 @@ var dash_cd := 0.0
 var aim_valid := false
 var aim_point := Vector3.ZERO
 var aim_distance := 0.0
+var auto_wrap := false          # E on a hooked caster: circle them automatically
+var _wrap_sign := 1.0
+var _wrap_r := 6.0
+var _wrap_t := 0.0
 var lock_target: Node3D = null   # the grapple target auto-aim has locked onto
 var highlight_target: Node3D = null   # what the chain would bite right now, lit up (read by the HUD)
 var _lock_lost := 0.0
@@ -184,8 +188,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			try_grapple()
 	elif event.is_action_released("grapple"):
 		release()
-	elif event.is_action_pressed("interact") and look_npc:
-		talk_requested.emit(look_npc)
+	elif event.is_action_pressed("interact"):
+		interact()
 	elif event is InputEventMouseButton and event.pressed and attached:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			rope_len = maxf(MIN_ROPE, rope_len - 0.75)
@@ -362,6 +366,62 @@ func _set_highlight(n: Node3D) -> void:
 		n.set_highlight(true)
 
 
+## E: on a hooked caster, start the auto-wrap, then arrest once they're bound;
+## otherwise talk to / examine whatever's in front of you.
+func interact() -> void:
+	var e := hook_node if attached and hook_node and is_instance_valid(hook_node) and hook_node.is_in_group("enemy") else null
+	if e:
+		if e.ready_to_arrest:
+			auto_wrap = false
+			e.arrest()
+		elif not auto_wrap:
+			if e.can_wrap(self):
+				auto_wrap = true
+				var flat := global_position - e.global_position
+				flat.y = 0.0
+				var tangent := Vector3.UP.cross(flat.normalized())
+				_wrap_sign = -1.0 if velocity.dot(tangent) < 0.0 else 1.0
+				_wrap_t = 0.0
+				_wrap_r = clampf(flat.length(), 5.0, minf(10.0, maxf(5.0, e.wrap_radius_max())))
+				notice.emit("Wrapping...")
+			elif e.ward and is_instance_valid(e.ward) and not e.ward.is_inside(global_position):
+				notice.emit("Get inside her ward first: fly in through the gold opening.")
+			else:
+				notice.emit("Too far to wrap. Get within %d m." % int(e.subdue_range()))
+		return
+	if look_npc:
+		talk_requested.emit(look_npc)
+
+
+## Auto-wrap: fly a circle round the caster at about the height of their broom,
+## blending in from your current motion so it never jerks.
+func _auto_wrap(dt: float) -> void:
+	var e := hook_node
+	var c := e.global_position
+	var flat := global_position - c
+	flat.y = 0.0
+	var out := flat.normalized() if flat.length() > 0.3 else global_basis.x
+	# steer for the next point on a fixed circle: exact, so it never drifts outward
+	var spd := clampf(_wrap_r * 3.4, 12.0, 24.0)          # about 1.8 s a lap
+	var ang := atan2(out.z, out.x) - _wrap_sign * (spd / _wrap_r) * dt
+	var goal := c + Vector3(cos(ang), 0.0, sin(ang)) * _wrap_r
+	goal.y = c.y - 1.0
+	var want := (goal - global_position) / dt
+	want = want.limit_length(spd * 1.6)
+	velocity = velocity.lerp(want, 1.0 - exp(-8.0 * dt))
+	rope_len = maxf(MIN_ROPE, global_position.distance_to(anchor))
+
+
+## Keep the caster in the reticle while auto-wrapping.
+func _face_wrap_target(dt: float) -> void:
+	var d := hook_node.global_position - cam.global_position
+	# ease the view round over the first half-second, then hold them dead centre
+	_wrap_t += dt
+	var k := lerpf(1.0 - exp(-10.0 * dt), 1.0, clampf(_wrap_t / 0.5, 0.0, 1.0))
+	rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), k)
+	head.rotation.x = lerp_angle(head.rotation.x, atan2(d.y, Vector2(d.x, d.z).length()), k)
+
+
 # ---------------------------------------------------------------- grapple
 ## Fire the arrowhead at whatever surface is under the crosshair.
 func try_grapple() -> void:
@@ -464,6 +524,7 @@ func chain_snapped(max_speed: float) -> void:
 	attached = false
 	hook_state = Chain.RETURNING
 	velocity = velocity.limit_length(max_speed)
+	auto_wrap = false
 	Sfx.play("break", 0.0, 0.75)
 	snapped.emit()
 
@@ -524,7 +585,12 @@ func _physics_process(dt: float) -> void:
 
 	velocity.y -= tune.gravity * (tune.rope_gravity if attached else 1.0) * dt
 
-	if attached:
+	if auto_wrap and not (attached and hook_node and is_instance_valid(hook_node) and hook_node.is_in_group("enemy") and not hook_node.is_subdued):
+		auto_wrap = false
+	if auto_wrap:
+		_auto_wrap(dt)
+		_face_wrap_target(dt)
+	elif attached:
 		if is_on_floor():
 			_walk(wish, dt)
 		var look_wish := (cam.global_basis * Vector3(input.x, 0, input.y)).normalized()
@@ -661,6 +727,8 @@ func _process(dt: float) -> void:
 	cam.position.y = lerpf(cam.position.y, -absf(cos(_bob_t)) * 0.035 * bob_amt, 0.25)
 	var side_speed := velocity.dot(global_basis.x)
 	var roll := 0.0 if is_on_floor() else clampf(-side_speed * CAM_ROLL, -CAM_ROLL_MAX, CAM_ROLL_MAX)
+	if auto_wrap:
+		roll *= 0.4          # a gentle lean only: circling at speed shouldn't tip the horizon
 	cam.rotation.z = lerp_angle(cam.rotation.z, roll, 1.0 - exp(-5.0 * dt))
 
 	viewmodel.animate(dt, hook_state, hook_tip, velocity, is_on_floor(), _look_delta, _just_landed)
