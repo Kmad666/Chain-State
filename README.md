@@ -145,16 +145,18 @@ For now the project uses Godot's **Compatibility** renderer, so the browser buil
 
 ## Sound and decoration
 
-The first sound pass uses CC0 effects from Kenney's 3D Platformer starter kit, played through the `Sfx` autoload (`scripts/autoload/sfx.gd`):
+Sound effects come from Kenney's 3D Platformer and FPS starter kits (CC0) and play through the `Sfx` autoload (`scripts/autoload/sfx.gd`). Sounds out in the world, such as a wizard casting, are positional: they fade with distance and pan left and right.
 
 | Event | Sound |
 |---|---|
-| Jumping | jump |
+| Jumping | one of four jump variations |
 | Landing (louder and deeper the harder you land) | land |
-| Walking (loops, faster as you speed up) | footsteps |
-| The hook biting | a short, high clack (the landing sound pitched up) |
-| Being stunned | fall plus a soft break |
-| The chain snapping on a subdue | break |
+| Walking (a long loop that speeds up with you) | footsteps |
+| Throwing the chain | a mechanical clack |
+| The hook biting | a short, high clack |
+| Being stunned | a hurt hit plus a low thud |
+| A wizard's volley | a casting sound, at his position |
+| Subduing a caster | a burst, at their position, plus the chain snapping |
 | A new logbook entry | coin |
 
-There's no proper chain throw or rattle yet, nor any magic or ambient sound; those still need a sound pack. Island levels also get Kenney's grass tufts (recoloured to the island green) and slowly drifting clouds. See CREDITS.md.
+Still to do: a proper chain rattle, the ward's hum, orb whooshes and ambience. Island levels also get Kenney's grass tufts (recoloured to the island green) and slowly drifting clouds. See CREDITS.md.

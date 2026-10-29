@@ -232,6 +232,7 @@ func _fire_line() -> void:
 		var f := (float(i) + shift) / float(count - 1) - 0.5
 		var dir := to.rotated(Vector3.UP, f * spread)
 		field.spawn(global_position + dir * 1.8 + Vector3(0, -0.4, 0), dir * bullet_speed, 7.0)
+	Sfx.play_at("cast", global_position, -2.0, 0.85)
 	_volley += 1
 
 
@@ -320,6 +321,7 @@ func _subdue() -> void:
 	var burst := MagicBurst.new()
 	get_parent().add_child(burst)
 	burst.global_position = global_position
+	Sfx.play_at("subdue", global_position, 2.0, 0.8)
 	if ward and is_instance_valid(ward):
 		ward.queue_free()            # her ward dies with her
 	if _hooked_by and is_instance_valid(_hooked_by):

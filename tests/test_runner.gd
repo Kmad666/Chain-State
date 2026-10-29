@@ -64,6 +64,7 @@ func _ready() -> void:
 		await get_tree().process_frame
 	check(p.aim_valid, "crosshair finds the cube")
 	p.try_grapple()
+	check(Sfx.played.has("chain_throw"), "throwing the chain makes a sound")
 	for i in 60:
 		await get_tree().physics_frame
 	check(p.attached, "hook flew and attached")
@@ -207,7 +208,7 @@ func _ready() -> void:
 				if w.player.is_on_floor() and Sfx.played.has("land"):
 					break
 			check(Sfx.played.has("jump") and Sfx.played.has("land"), "a jump and a landing make their sounds")
-			check(Sfx._streams.size() == 6, "all six sound effects load")
+			check(Sfx._streams.size() == 10 and Sfx._streams["jump"].size() == 4, "all the sound effects load (4 jump variations)")
 		await shot("11_" + lv)
 		w.player.head.rotation.x = deg_to_rad(-35)
 		await shot("12_" + lv + "_down")
@@ -232,6 +233,7 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	var n: int = ew.bullets.count()
 	check(s.engaged and n > 0 and n <= 15, "in range: it fires a few large orbs (%d in the air)" % n)
+	check(Sfx.played.has("cast"), "his volleys make a casting sound, out where he is")
 	var flat := true
 	for v in ew.bullets._vel:
 		flat = flat and absf(v.y) < 0.001
@@ -444,7 +446,7 @@ func _ready() -> void:
 	ap.global_position = red_world
 	await get_tree().physics_frame
 	check(ap.stunned > 0.0, "touching a red orb stuns you")
-	check(Sfx.played.has("fall"), "being stunned makes a sound")
+	check(Sfx.played.has("hurt"), "being stunned makes a sound")
 	ap.stunned = 0.0
 	ap.invuln = 0.0
 
@@ -485,7 +487,7 @@ func _ready() -> void:
 		if witch.is_subdued:
 			break
 	check(witch.is_subdued, "three laps inside the ward subdue her")
-	check(Sfx.played.has("break"), "the chain snapping makes a sound")
+	check(Sfx.played.has("break") and Sfx.played.has("subdue"), "subduing her: a burst sound and the chain snapping")
 	await get_tree().process_frame
 	check(not is_instance_valid(wd) or wd.is_queued_for_deletion(), "her ward breaks with her")
 	for i in 90:

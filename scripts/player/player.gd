@@ -383,6 +383,7 @@ func try_grapple() -> void:
 		if hit.collider.is_in_group("ward"):
 			hook_offset = hit.collider.to_local(hit.position)   # a fixed shell: hook where you hit
 	hook_state = Chain.FLYING
+	Sfx.play("chain_throw", -5.0, 1.25)
 
 
 func _attach() -> void:
@@ -481,8 +482,8 @@ func hit(_from_dir: Vector3) -> void:
 	stunned = STUN_TIME
 	invuln = STUN_TIME + 0.8
 	velocity = Vector3(velocity.x * 0.15, minf(velocity.y, 0.0), velocity.z * 0.15)
-	Sfx.play("fall", 0.0, 0.6)
-	Sfx.play("break", -8.0, 1.4)
+	Sfx.play("hurt", 0.0, 0.9)
+	Sfx.play("fall", -4.0, 0.6)
 	stun_started.emit()
 
 
