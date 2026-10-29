@@ -1,0 +1,24 @@
+{
+  "npc_id": "hamlet_neighbour",
+  "name": "Neighbour",
+  "start": "start",
+  "nodes": {
+    "start": {
+      "speaker": "Neighbour",
+      "text": "I heard the latch go, round the back. Then that light. I didn't go over. You don't, with Harrow.",
+      "pos": [0, 180],
+      "choices": [
+        {"text": "Round the back?", "next": "back"},
+        {"text": "[Leave]", "next": ""}
+      ]
+    },
+    "back": {
+      "speaker": "Neighbour",
+      "text": "There's a yard behind his house. Look there, if the chain lets you over the roof.",
+      "pos": [560, 180],
+      "choices": [
+        {"text": "[Leave]", "next": ""}
+      ]
+    }
+  }
+}

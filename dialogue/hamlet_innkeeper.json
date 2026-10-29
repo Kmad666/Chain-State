@@ -1,0 +1,35 @@
+{
+  "npc_id": "hamlet_innkeeper",
+  "name": "Innkeeper",
+  "start": "start",
+  "nodes": {
+    "start": {
+      "speaker": "Innkeeper",
+      "text": "Federal Chain? Out here? It'll be about the Harrow place, then. Burnt from the inside and not a spark seen from the street.",
+      "pos": [0, 180],
+      "choices": [
+        {"text": "Who lives there?", "next": "who"},
+        {"text": "Did anyone see smoke?", "next": "smoke"},
+        {"text": "[Leave]", "next": ""}
+      ]
+    },
+    "who": {
+      "speaker": "Innkeeper",
+      "text": "Old Harrow. Kept to himself. Paid the guild for his kitchen stove, he said, though nobody ever saw it lit.",
+      "pos": [560, -100],
+      "choices": [
+        {"text": "Did anyone see smoke?", "next": "smoke"},
+        {"text": "Back", "next": "start"}
+      ]
+    },
+    "smoke": {
+      "speaker": "Innkeeper",
+      "text": "None. Not a wisp. Just a light in his window, bright as noon, for about the length of a breath.",
+      "pos": [560, 300],
+      "choices": [
+        {"text": "Who lives there?", "next": "who"},
+        {"text": "[Leave]", "next": ""}
+      ]
+    }
+  }
+}

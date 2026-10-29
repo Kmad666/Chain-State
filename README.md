@@ -181,3 +181,11 @@ A course of Kenney Platformer Kit pieces over the void, built for the core puzzl
 - **Tested:** a bot plays the whole course in the test suite, at exactly par, so every gap is proven crossable in one swing. The release windows are roughly 12–16 m wide, except pad 3 to 4, which is about 2 m.
 
 Field of view is now **90** (slider in the pause menu), widening a little with speed.
+
+## Hamlet
+
+A small hamlet on a floating island about 130 m across, built from Kenney's **Modular Buildings** pack, with trees, barrels and fences from the Platformer Kit.
+
+- **Layout:** you arrive from the south and walk up the road into the square, which has a well and a signpost. A lane runs east to west, and a road runs north to the chapel bell tower. Around them are four houses, the inn and the smithy.
+- **Grappling** follows the Platform Test rules. Buildings, the ground and the well are solid but **can't be grappled**. The grapple points are crates above each roof and on the bell tower, the signpost and a tall tree in the south-west. Each one is within chain reach of another, so there's a rooftop route as well as the streets.
+- **The case:** the Harrow house in the north-east burnt from the inside. The **innkeeper** (by the inn) and a **neighbour** (in the square) have short dialogues, and there are three fire clues to examine and log: the door, the back-gate latch and a ring of ash in the fenced back yard.

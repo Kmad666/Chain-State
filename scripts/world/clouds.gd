@@ -8,6 +8,8 @@ extends Node3D
 @export var spread := 150.0          # half-width of the band, metres
 @export var wind := Vector3(1.6, 0, 0.4)
 @export var cloud_seed := 7
+@export var y_low := -45.0           # cloud heights, relative to the centre
+@export var y_high := 18.0
 
 var _mm: MultiMesh
 var _pos := PackedVector3Array()
@@ -24,7 +26,7 @@ func _ready() -> void:
 	for i in count:
 		var a := rng.randf() * TAU
 		var r := rng.randf_range(spread * 0.25, spread)
-		_pos.append(centre + Vector3(cos(a) * r, rng.randf_range(-45.0, 18.0), sin(a) * r))
+		_pos.append(centre + Vector3(cos(a) * r, rng.randf_range(y_low, y_high), sin(a) * r))
 		_scale.append(rng.randf_range(5.0, 13.0))
 		_yaw.append(rng.randf() * TAU)
 	_mm = MultiMesh.new()

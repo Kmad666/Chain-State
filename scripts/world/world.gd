@@ -209,6 +209,8 @@ func _build_world() -> void:
 			_build_enemy_test_air()
 		"platform_test":
 			_build_platform_test()
+		"hamlet":
+			_build_hamlet()
 		_:
 			_build_range()
 	if Game.level != "range" and (not islands.is_empty() or not pads.is_empty()):
@@ -218,6 +220,10 @@ func _build_world() -> void:
 			c += isl.position
 		clouds = Clouds.new()
 		clouds.centre = c / spots.size()
+		if Game.level == "hamlet":
+			clouds.y_low = -70.0           # keep them under the island, out of the streets
+			clouds.y_high = -14.0
+			clouds.spread = 170.0
 		add_child(clouds)
 
 
@@ -401,6 +407,200 @@ func _build_platform_test() -> void:
 	par = anchors.size()
 	start_pos = COURSE[0].pad + Vector3(0, 1.0, 3.0)
 	start_yaw = 0.0                     # facing -Z, down the course
+
+
+const BLD := "res://assets/models/kenney/buildings/%s.glb"
+## Kit footprints (width x height x depth, in kit units; base at y = 0, centred).
+const BLD_SIZE := {
+	"building-sample-house-a": Vector3(1.095643, 1.14375, 2.0),
+	"building-sample-house-b": Vector3(1.091285, 1.98125, 2.2),
+	"building-sample-house-c": Vector3(2.0, 1.98125, 2.2),
+	"building-sample-tower-a": Vector3(1.1, 2.5, 1.25),
+	"building-sample-tower-b": Vector3(1.1, 1.8875, 1.25),
+}
+const BLD_SCALE := 6.0             # kit units to metres: a door comes out about 2 m tall
+
+var buildings: Array = []
+
+
+## A Modular Buildings house: solid (you can stand on it) but not grapple-able.
+## Returns the body; its "roof" meta is the top-centre point (for a roof anchor).
+func _building(model: String, pos: Vector3, yaw_deg: float) -> StaticBody3D:
+	var sz: Vector3 = BLD_SIZE[model] * BLD_SCALE
+	var body := StaticBody3D.new()
+	body.collision_layer = Player.LAYER_LAND
+	body.collision_mask = 0
+	body.position = pos
+	body.rotation_degrees.y = yaw_deg
+	var shape := BoxShape3D.new()
+	shape.size = sz
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	col.position.y = sz.y * 0.5
+	body.add_child(col)
+	add_child(body)
+	var sc = load(BLD % model)
+	if sc:
+		var n: Node3D = sc.instantiate()
+		n.scale = Vector3.ONE * BLD_SCALE
+		body.add_child(n)
+		_tone_kit(n)
+	else:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = sz
+		mi.mesh = bm
+		mi.position.y = sz.y * 0.5
+		mi.material_override = Mats.lit(Color(0.8, 0.7, 0.55))
+		body.add_child(mi)
+	body.set_meta("roof", pos + Vector3(0, sz.y, 0))
+	buildings.append(body)
+	return body
+
+
+func _anchor(at: Vector3) -> Node3D:
+	var a := SwingAnchor.new()
+	a.position = at
+	add_child(a)
+	anchors.append(a)
+	return a
+
+
+## A flat strip of road laid on the grass (looks only).
+func _road(from: Vector3, to: Vector3, width: float) -> void:
+	var d := to - from
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(width, 0.06, d.length())
+	mi.mesh = bm
+	mi.material_override = _road_mat
+	mi.position = (from + to) * 0.5 + Vector3(0, 0.03, 0)
+	mi.rotation.y = atan2(d.x, d.z)
+	add_child(mi)
+
+
+var _road_mat: StandardMaterial3D
+
+
+## Hamlet: a floating island (about 130 m across) with a village square and well,
+## a lane east to west, a road north to the chapel, six houses and the inn.
+## North is -Z. Everything you can stand on is LAND (not grapple-able); the
+## anchors on rooftops, the bell tower, the square's signpost and a tall tree
+## are the only grapple points. A house in the north-east burnt from the inside.
+func _build_hamlet() -> void:
+	var isl = _island(Vector3.ZERO, 64.0, 1871)
+	isl.collision_layer = Player.LAYER_LAND       # the ground can't be grappled here
+
+	_road_mat = StandardMaterial3D.new()
+	_road_mat.albedo_color = Color(0.48, 0.40, 0.31)
+	_road_mat.roughness = 1.0
+	_road(Vector3(0, 0, 58), Vector3(0, 0, 10), 7.0)           # south road, arrival to the square
+	_road(Vector3(0, 0, -10), Vector3(0, 0, -36), 7.0)         # north road to the chapel
+	_road(Vector3(-54, 0, 0), Vector3(-10, 0, 0), 5.5)         # west lane
+	_road(Vector3(10, 0, 0), Vector3(54, 0, 0), 5.5)           # east lane
+	# the square: a round paved patch
+	var sq := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 12.0
+	cm.bottom_radius = 12.0
+	cm.height = 0.06
+	cm.radial_segments = 32
+	sq.mesh = cm
+	sq.material_override = _road_mat
+	sq.position.y = 0.035
+	add_child(sq)
+
+	# the well, in the middle of the square
+	var well := StaticBody3D.new()
+	well.collision_layer = Player.LAYER_LAND
+	well.position = Vector3(0, 0, 2)
+	var ws := CylinderShape3D.new()
+	ws.radius = 1.5
+	ws.height = 1.1
+	var wc := CollisionShape3D.new()
+	wc.shape = ws
+	wc.position.y = 0.55
+	well.add_child(wc)
+	var wm := MeshInstance3D.new()
+	var wcm := CylinderMesh.new()
+	wcm.top_radius = 1.5
+	wcm.bottom_radius = 1.6
+	wcm.height = 1.1
+	wm.mesh = wcm
+	wm.position.y = 0.55
+	wm.material_override = Mats.lit(Color(0.55, 0.55, 0.53))
+	well.add_child(wm)
+	var water := MeshInstance3D.new()
+	water.mesh = _disc(1.15)
+	water.position.y = 1.0
+	water.material_override = Mats.lit(Color(0.18, 0.3, 0.45))
+	well.add_child(water)
+	add_child(well)
+
+	# buildings: the kit puts each door on the model's +X side, so the yaw below
+	# turns that side to face the road (-90 = door south, 90 = north, 0 = east, 180 = west)
+	var chapel := _building("building-sample-tower-a", Vector3(0, 0, -46), -90.0)
+	var h1 := _building("building-sample-house-b", Vector3(-30, 0, -16), -90.0)
+	var crime := _building("building-sample-house-c", Vector3(30, 0, -17), -90.0)
+	var h3 := _building("building-sample-house-a", Vector3(-44, 0, 15), 90.0)
+	var inn := _building("building-sample-tower-b", Vector3(44, 0, 15), 90.0)
+	var h4 := _building("building-sample-house-b", Vector3(-17, 0, 30), 0.0)
+	var smithy := _building("building-sample-house-a", Vector3(17, 0, 30), 180.0)
+	crime.add_to_group("crime_scene")
+	inn.set_meta("name", "inn")
+	smithy.set_meta("name", "smithy")
+
+	# grapple anchors: one above each roof, the bell tower, the signpost, a tall tree
+	for b in [chapel, h1, crime, h3, inn, h4, smithy]:
+		_anchor(b.get_meta("roof") + Vector3(0, 2.5, 0))
+	var post := _box(Vector3(0.35, 11.0, 0.35), Vector3(8, 5.5, -8), Mats.lit(Color(0.42, 0.3, 0.2)))
+	post.collision_layer = Player.LAYER_LAND
+	_kit("sign", Vector3(8, 2.2, -7.8), 2.5, 0.0)
+	_anchor(Vector3(8, 12.0, -8))
+	_kit("tree", Vector3(-40, 0, 44), 9.0, 0.6)
+	_anchor(Vector3(-37, 15.0, 44))
+
+	# trees, barrels and fences for life
+	for t in [[-56, -6], [52, -32], [48, 40], [-12, -52], [14, -54], [-52, 32], [56, 2]]:
+		_kit("tree-pine" if (t[0] + t[1]) % 2 == 0 else "tree", Vector3(t[0], 0, t[1]), 4.0, t[0] * 0.1)
+	for b in [[40, 8], [41, 9.5], [21, 22], [-22, 24]]:
+		_kit("barrel", Vector3(b[0], 0, b[1]), 2.4, b[1])
+	for i in 6:
+		_kit("fence-low-straight", Vector3(22 + i * 3.0, 0, -28), 3.0, 0.0)     # the burnt house's back yard
+		_kit("fence-low-straight", Vector3(22 + i * 3.0, 0, -6.5), 3.0, 0.0)
+
+	# people
+	var keeper := Npc.new()
+	keeper.npc_id = "hamlet_innkeeper"
+	keeper.display_name = "Innkeeper"
+	keeper.position = Vector3(38, 0, 5)
+	add_child(keeper)
+	keeper.look_at(Vector3(0, 0, 4), Vector3.UP, true)
+	var neighbour := Npc.new()
+	neighbour.npc_id = "hamlet_neighbour"
+	neighbour.display_name = "Neighbour"
+	neighbour.position = Vector3(-5, 0, 6)
+	add_child(neighbour)
+	neighbour.look_at(Vector3(0, 0, 30), Vector3.UP, true)
+
+	# the crime: fire, from the inside
+	var char_mat := Mats.lit(Color(0.12, 0.10, 0.09))
+	var wood := Mats.lit(Color(0.55, 0.40, 0.25))
+	var door := _evidence("ev_hamlet_door", "fire", "A door scorched from inside",
+		"The front door of the Harrow house is blackened on its inner face only. The outside paint isn't even blistered.", Vector3(26, 0, -9))
+	door.part(Vector3(1.2, 2.2, 0.15), Vector3(0, 1.1, 0), wood)
+	door.part(Vector3(1.0, 1.6, 0.02), Vector3(0, 1.1, -0.09), char_mat, Vector3.ZERO, false)
+	var latch := _evidence("ev_hamlet_latch", "fire", "A latch melted shut",
+		"The back gate's iron latch has run like wax and set again. Iron needs a forge to do that; there's no soot on the gate.", Vector3(34, 0, -27.5))
+	latch.part(Vector3(0.25, 1.1, 0.25), Vector3(0, 0.55, 0), Mats.lit(Color(0.3, 0.3, 0.32)))
+	latch.part(Vector3(0.35, 0.18, 0.35), Vector3(0, 0.9, 0), _glow(Color(1.0, 0.45, 0.15), 0.5), Vector3.ZERO, false)
+	var ring := _evidence("ev_hamlet_ring", "fire", "A circle of ash in the yard",
+		"In the back yard, a perfect ring of fine white ash on bare earth. Nothing was burnt there; there's nothing for the ash to have come from.", Vector3(28, 0, -24))
+	var ash: MeshInstance3D = ring.part(Vector3(1.6, 0.02, 1.6), Vector3(0, 0.03, 0), Mats.lit(Color(0.85, 0.84, 0.8)), Vector3.ZERO, false)
+	ash.mesh = _disc(0.8)
+
+	start_pos = Vector3(0, 1.0, 54)
+	start_yaw = 0.0                     # facing north, up the road into the hamlet
 
 
 ## Touched down: landing pads are checkpoints; the last one finishes the course.

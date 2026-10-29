@@ -338,6 +338,49 @@ func _ready() -> void:
 	pw.queue_free()
 	await get_tree().process_frame
 
+	print("== Hamlet")
+	Game.level = "hamlet"
+	var hw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(hw)
+	for i in 40:
+		await get_tree().physics_frame
+	var hp = hw.player
+	check(hw.buildings.size() == 7 and hw.anchors.size() == 9, "hamlet: 7 buildings (chapel, inn, smithy, 4 houses) and 9 grapple anchors")
+	check(hp.is_on_floor(), "hamlet: you arrive standing on the south road")
+	check(hw.buildings.all(func(b): return b.collision_layer == hp.LAYER_LAND) and hw.islands[0].collision_layer == hp.LAYER_LAND,
+		"hamlet: buildings and ground are solid but can't be grappled")
+	var linked := true
+	for a in hw.anchors:
+		var near := false
+		for b in hw.anchors:
+			if a != b and a.global_position.distance_to(b.global_position) <= hp.tune.grapple_range:
+				near = true
+		linked = linked and near
+	check(linked, "hamlet: every anchor has another within chain reach (a rooftop route)")
+	check(get_tree().get_nodes_in_group("npc").size() == 2 and DialogueDB.load_tree("hamlet_innkeeper", "Innkeeper").start == "start",
+		"hamlet: an innkeeper and a neighbour, with their own dialogue")
+	check(get_tree().get_nodes_in_group("evidence").size() == 3, "hamlet: three fire clues at the burnt house")
+	await shot("23_hamlet_arrival")
+	hp.global_position = Vector3(-6, 1, 14)
+	_aim(hp, Vector3(30, 4, -17))
+	for i in 4:
+		await get_tree().process_frame
+	await shot("24_hamlet_square")
+	hp.global_position = Vector3(0, 40, 75)
+	hp.velocity = Vector3.ZERO
+	_aim(hp, Vector3(0, 0, -5))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("25_hamlet_overview")
+	hp.global_position = Vector3(0, 1, 30)
+	hp.velocity = Vector3.ZERO
+	_aim(hp, Vector3(17, 2, 30))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("26_hamlet_smithy_door")
+	hw.queue_free()
+	await get_tree().process_frame
+
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
 	var ew = load("res://scenes/world.tscn").instantiate()
