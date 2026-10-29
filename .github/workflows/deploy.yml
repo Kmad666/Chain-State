@@ -62,6 +62,12 @@ jobs:
           ls -la build/web
           grep -q "test test test" build/web/index.pck && echo "dialogue files are in the build" || (echo "dialogue/*.json missing from the build" && exit 1)
           grep -q "Scorching with no fuel" build/web/index.pck && echo "field guide is in the build" || (echo "data/*.json missing from the build" && exit 1)
+          # cache-busting: give the game data a new name every build, so no browser can
+          # keep playing an old copy (GitHub Pages lets browsers cache files for 10 min)
+          SHA=${GITHUB_SHA::7}
+          cp build/web/index.pck build/web/index-$SHA.pck    # index.pck stays for any stale page still asking for it
+          sed -i "s/\"executable\":\"index\"/\"executable\":\"index\",\"mainPack\":\"index-$SHA.pck\"/; s/\"index.pck\":/\"index-$SHA.pck\":/" build/web/index.html
+          grep -q "\"mainPack\":\"index-$SHA.pck\"" build/web/index.html && echo "game data renamed to index-$SHA.pck" || (echo "could not point index.html at the renamed pck" && exit 1)
 
       - name: Smoke tests
         run: |
