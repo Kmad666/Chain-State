@@ -1140,13 +1140,30 @@ func _test_nation() -> void:
 	var far_ok := true
 	for i in range(1, 6):
 		var d: float = Vector2(nw.islands[i].position.x, nw.islands[i].position.z).length()
-		far_ok = far_ok and d > 3000.0 and d < 7500.0
-	check(far_ok, "nation: the state capitals sit 3-7.5 km from Delos, as on the map at 1:50")
+		far_ok = far_ok and d > 1400.0 and d < 3200.0
+	check(far_ok, "nation: the state capitals sit 1.4-3.2 km from Delos, clustered from the 1:50 map")
+	var clear := true
+	for a in nw.islands.size():
+		for b in range(a + 1, nw.islands.size()):
+			var ia = nw.islands[a]
+			var ib = nw.islands[b]
+			var gap: float = Vector2(ia.position.x - ib.position.x, ia.position.z - ib.position.z).length() - ia.radius - ib.radius
+			clear = clear and gap >= 60.0
+	check(clear, "nation: no two islands overlap (at least 60 m of air between rims)")
+	check(nw.nation.rails.size() == nw.islands.size(), "nation: a railway across every island (%d)" % nw.nation.rails.size())
+	var on_isle := true
+	for k in nw.nation.rails.size():
+		var ln: Dictionary = nw.nation.rails[k]
+		for e in [-1.0, 1.0]:
+			var tip: Vector3 = ln.o + ln.dir * ln.half * e
+			var q := PhysicsRayQueryParameters3D.create(tip + Vector3(0, 5, 0), tip + Vector3(0, -5, 0), 1)
+			on_isle = on_isle and not nw.get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+	check(on_isle, "nation: every line ends on its island, not in the air")
 	var ord_ok := true
 	for i in range(21, 33):
 		ord_ok = ord_ok and nw.islands[i].radius >= 50.0 and nw.islands[i].radius <= 200.0
 	check(ord_ok, "nation: ordinary islands are 100-400 m across")
-	check(np.is_on_floor() and nw.nation.where(np.global_position) == "over DELOS", "nation: you start standing on Delos")
+	check(np.is_on_floor() and nw.nation.where(np.global_position) == "over DELOS", "nation: you start standing on Delos's station platform")
 	check(np.cam.far >= 15000.0, "nation: the camera sees from state to state")
 	await shot("39_nation_start")
 	np.set_flying(true)
@@ -1158,14 +1175,15 @@ func _test_nation() -> void:
 		await get_tree().physics_frame
 	Input.action_release("jump")
 	check(np.global_position.y > fy0 + 30.0, "fly: Space rises (%d m in a second)" % roundi(np.global_position.y - fy0))
-	var fz0: float = np.global_position.z
+	var fz0: Vector3 = np.global_position * Vector3(1, 0, 1)
 	Input.action_press("move_forward")
 	Input.action_press("dash")
 	for i in 120:
 		await get_tree().physics_frame
 	Input.action_release("move_forward")
 	Input.action_release("dash")
-	check(fz0 - np.global_position.z > 150.0, "fly: Shift flies five times faster (%d m in a second)" % roundi(fz0 - np.global_position.z))
+	var flown: float = (np.global_position * Vector3(1, 0, 1)).distance_to(fz0)
+	check(flown > 150.0, "fly: Shift flies five times faster (%d m in a second)" % roundi(flown))
 	# up high over Delos, looking north-east toward Gordia
 	np.velocity = Vector3.ZERO
 	np.global_position = Vector3(0, 600, 900)
@@ -1176,14 +1194,23 @@ func _test_nation() -> void:
 	for i in 10:
 		await get_tree().physics_frame
 	await shot("40_nation_over_delos")
-	np.global_position = Vector3(-2500, 2600, 7600)
-	np.look_at(Vector3(800, 0, -600), Vector3.UP)
+	np.global_position = Vector3(-900, 1500, 3400)
+	np.look_at(Vector3(400, 0, -300), Vector3.UP)
 	np.rotation.x = 0.0
 	np.rotation.z = 0.0
 	np.head.rotation.x = deg_to_rad(-24)
 	for i in 10:
 		await get_tree().physics_frame
 	await shot("41_nation_overview")
+	var ln0: Dictionary = nw.nation.rails[0]
+	np.global_position = ln0.o + ln0.dir * 60.0 + ln0.dir.cross(Vector3.UP).normalized() * 9.0 + Vector3(0, 6, 0)
+	np.look_at(ln0.o - ln0.dir * 40.0, Vector3.UP)
+	np.rotation.x = 0.0
+	np.rotation.z = 0.0
+	np.head.rotation.x = deg_to_rad(-12)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("42_nation_station")
 	np.set_flying(false)
 	check(not np.flying and np.collision_mask != 0, "fly: F4 again lands you with collision back on")
 	nw.queue_free()

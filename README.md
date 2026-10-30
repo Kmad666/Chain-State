@@ -249,17 +249,24 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 
 ## The Nation (draft) and dev fly
 
-**The Nation (draft)** lays the whole Gordian Empire out at **1:50** from the casebook map (`scripts/world/nation.gd`). The map's scale bar makes one map unit about 536 m of real Germany, so 10.73 m in game; every state keeps its real bearing from Delos.
+**The Nation (draft)** lays the whole Gordian Empire out from the casebook map (`scripts/world/nation.gd`). The map is scaled to 1:50, where one map unit is 10.73 m, and the states are then pulled in to 42% of that distance so the nation reads as one archipelago. Every state keeps its real bearing from Delos.
 
-- **Delos** (the Bundesinsel) sits in the middle: a 1 km hero island with a blockout city, a domed parliament and a 110 m landmark tower.
-- **The five state capitals** sit 3.7 to 6.7 km out:
+- **Delos** (the Bundesinsel) sits in the middle: a 1 km hero island with a blockout city, a domed parliament, a 110 m landmark tower and the main station. You start on its platform.
+- **The five state capitals** sit 1.6 to 2.8 km out:
   - Gordia (Berlin), north-east
   - Rhenish Gordia (Köln), west
   - Delosen (Dresden), east
   - Arcaden (München), south-east
   - Daedalen (Stuttgart), south-west
-- Each capital is a 520 to 640 m island with a block city in its state colour, a 75 m tower and three satellite isles within 2 km.
+- Each capital is a 520 to 640 m island with a block city in its state colour, a 75 m tower and a station. Each has three satellite isles close by.
 - **Twelve ordinary islands**, 100 to 400 m across, sit along the spokes and round the ring between the states.
+- No two islands come within 60 m of each other.
+- **Victorian railways** (placeholder) run straight across every island. Each one points at its nearest neighbour, so together they read as one network. A line has:
+  - a stone ballast bed you can walk on
+  - timber sleepers every 0.9 m
+  - two iron rails at standard gauge
+  - red buffer stops at both ends
+  - on Delos and the capitals, a 70 m platform under a railway-green iron canopy
 - A thin haze turns the far states into silhouettes. Floating labels name every island and give its size.
 
 **Dev fly** works in every level:
