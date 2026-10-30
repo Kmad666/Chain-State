@@ -267,7 +267,16 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
   - two iron rails at standard gauge
   - red buffer stops at both ends
   - on Delos and the capitals, a 70 m platform under a railway-green iron canopy
-- A thin haze turns the far states into silhouettes. Floating labels name every island and give its size.
+- **Fog sets the scale and does the culling:**
+  - Depth haze is clear to 250 m and solid by 3.6 km. The camera stops drawing 200 m past that, so nothing hidden in the haze costs anything.
+  - A cloud sea pools under the islands: height fog below 40 m down, settling on a cloud floor 300 m down that follows you, so it runs to the horizon.
+  - Each island's detail (city, trees, railway, station) is its own draw batch and switches off about 1.7 km out, deep in the haze. Only the bare rock silhouette stays.
+  - The capitals' towers are never culled, so you can always steer by them.
+- Floating labels name every island and give its size.
+- **Fog tuning in dev fly:**
+  - **[** and **]** move the haze in or out, 250 m a press.
+  - **-** and **=** thin or thicken the cloud sea.
+  - The HUD shows the current values, so you can tell me the numbers you like.
 
 **Dev fly** works in every level:
 - **F4** or **V** toggles noclip flight.

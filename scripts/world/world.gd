@@ -90,8 +90,8 @@ func _ready() -> void:
 		player.fall_limit = -30.0
 	if nation:
 		player.fall_limit = -1200.0
-		player.cam.far = 16000.0       # see from one state to the next
 		player.cam.near = 0.1
+		nation.apply_fog()             # the haze sets the camera's far plane
 	if bullets:
 		bullets.player = player
 	for s in sentries:
@@ -898,7 +898,8 @@ func course_text() -> String:
 	if player and player.flying:
 		var p: Vector3 = player.global_position
 		var here: String = nation.where(p) if nation else "x %d  z %d" % [roundi(p.x), roundi(p.z)]
-		return "DEV FLY  %d m/s  ·  ALT %d m  ·  %s" % [roundi(player.velocity.length()), roundi(p.y), here]
+		var line := "DEV FLY  %d m/s  ·  ALT %d m  ·  %s" % [roundi(player.velocity.length()), roundi(p.y), here]
+		return line + ("\n" + nation.fog_text() if nation else "")
 	if cherub:
 		if cherub.state == "spent":
 			return "THE CHERUB IS SPENT      FALLS %d" % falls
@@ -1295,6 +1296,10 @@ func close_editor() -> void:
 
 # ---------------------------------------------------------------- menus
 func _unhandled_input(event: InputEvent) -> void:
+	if nation and player and player.flying and Game.playing() and event is InputEventKey \
+			and event.pressed and not event.echo and nation.tune_fog(event.physical_keycode):
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("logbook") and Game.playing():
 		open_logbook()
 		get_viewport().set_input_as_handled()
@@ -1327,6 +1332,8 @@ func _set_paused(on: bool) -> void:
 
 func _process(_dt: float) -> void:
 	_ascent_tick(_dt)
+	if nation and player:
+		nation.follow(player.global_position)
 	# In a browser, Esc releases the mouse before the game sees the key: treat that as pause.
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if OS.has_feature("web") and Game.playing() and _had_capture and not captured:

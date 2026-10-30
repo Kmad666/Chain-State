@@ -19,6 +19,17 @@ const CLUSTER := 0.42                       # states sit at 42% of their 1:50 ma
 const GAP := 80.0                           # least clear air between two islands' rims
 const GAUGE := 1.435                        # standard gauge, metres between the rails
 const SLEEPER_EVERY := 0.9
+## Fog and draw distance (tunable in dev fly: [ ] haze distance, - = sea of cloud).
+## The haze is depth fog: clear to FOG_BEGIN, solid by fog_end. The camera stops
+## drawing just past fog_end, and each island's detail (city, trees, railway)
+## switches off DETAIL_RANGE out, deep enough in the haze that you don't see it go.
+const FOG_BEGIN := 250.0
+const FOG_END := 3600.0
+const FOG_CURVE := 0.75            # under 1: the haze builds quickly, then eases
+const DETAIL_RANGE := 1700.0
+const SEA_HEIGHT := -40.0          # cloud sea: fog thickens below this
+const SEA_DENSITY := 0.02
+const FLOOR_Y := -300.0            # the cloud floor the sea fog settles on
 const TREE := "res://assets/models/kenney/platformer/tree.glb"
 const PINE := "res://assets/models/kenney/platformer/tree-pine.glb"
 
@@ -52,6 +63,11 @@ var _buffers: Array = []
 var _platforms: Array = []
 var _canopy: Array = []
 var _spots: Array = []                 # [centre, radius] of every island placed so far
+var landmarks: Array = []              # the towers: never culled, they're how you navigate
+var detail_nodes: Array = []           # every per-island detail batch (for tests)
+var fog_end := FOG_END
+var sea_density := SEA_DENSITY
+var cloud_floor: MeshInstance3D
 var rng := RandomNumberGenerator.new()
 
 
@@ -106,25 +122,26 @@ func build(world: Node3D) -> void:
 		var line := _railway(c, s.r, 45.0 if i == 0 else 30.0, true)
 		_city(c, s.city, s.col, i == 0, line)
 		_trees_ring(c, s.city + 20.0, s.r * 0.85, int(s.r * 0.5), line)
+		_flush(c, s.r)
 		_label(c + Vector3(0, 180 if i == 0 else 120, 0), s.name, "%s\n%d m across" % [s.sub, roundi(s.r * 2.0)], s.col.lightened(0.35), 1.0)
 		places.append({"name": s.name, "pos": c, "r": s.r})
 	for it in sats + ords:
 		_isle(it[0], it[1], it[2], it[3])
 
-	# all the dressing, in bulk: one draw call per kind
-	w._multimesh(TREE, trees)
-	w._multimesh(PINE, pines)
-	for col in blocks:
-		_boxes(blocks[col], col)
-	_mm(_ballast, Mats.lit(Color(0.42, 0.40, 0.37)))
-	_mm(_timber, Mats.lit(Color(0.33, 0.22, 0.14)))
-	_mm(_iron, Mats.metal(Color(0.24, 0.23, 0.22), 0.45))
-	_mm(_buffers, Mats.lit(Color(0.62, 0.12, 0.10)))
-	_mm(_platforms, Mats.grid(Color(0.74, 0.70, 0.62), Color(0.70, 0.66, 0.58), 1))
-	_mm(_canopy, Mats.lit(Color(0.16, 0.30, 0.22)))     # railway green ironwork
-
-	# thin haze: near islands crisp, the far states fading to silhouettes
-	w.env.fog_density = 0.00008
+	# the capitals' towers, always drawn: landmarks to steer by through the haze
+	for t in landmarks:
+		_boxes([t[0]], t[1], 0.0)
+	# the cloud floor: one big flat sheet far below, kept under you as you fly, that
+	# the fog paints into a sea of cloud fading out to the horizon
+	cloud_floor = MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2.ONE
+	cloud_floor.mesh = pm
+	cloud_floor.material_override = Mats.lit(Color(0.93, 0.94, 0.97), 1.0)
+	cloud_floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	cloud_floor.position.y = FLOOR_Y
+	w.add_child(cloud_floor)
+	apply_fog()
 	# you arrive by train: start on Delos's station platform, looking down the line
 	var home: Dictionary = rails[0]
 	var side: Vector3 = home.dir.cross(Vector3.UP).normalized()
@@ -151,6 +168,7 @@ func _isle(p: Vector3, r: float, seed_: int, nm: String) -> void:
 	_make_island(p, r, r * 0.8, seed_)
 	var line := _railway(p, r, 0.0, false)
 	_trees_ring(p, 0.0, r * 0.82, int(r * 0.6), line)
+	_flush(p, r)
 	_label(p + Vector3(0, 45, 0), nm, "%d m across" % roundi(r * 2.0), Color(0.9, 0.95, 1.0), 0.55, 3500.0)
 	places.append({"name": nm, "pos": p, "r": r})
 
@@ -197,7 +215,7 @@ func _city(c: Vector3, radius: float, col: Color, capital: bool, line: Dictionar
 			list.append(Transform3D(Basis.from_scale(sz), c + off + Vector3(0, h * 0.5, 0)))
 	# landmark: a tower you can pick out from the next state over
 	var th := 110.0 if capital else 75.0
-	list.append(Transform3D(Basis.from_scale(Vector3(16, th, 16)), c + Vector3(0, th * 0.5, 0)))
+	landmarks.append([Transform3D(Basis.from_scale(Vector3(16, th, 16)), c + Vector3(0, th * 0.5, 0)), col])
 	blocks[col] = list
 	if capital:
 		var stone := Color(0.86, 0.84, 0.78)
@@ -214,6 +232,7 @@ func _city(c: Vector3, radius: float, col: Color, capital: bool, line: Dictionar
 		dome.mesh = sm
 		dome.material_override = Mats.lit(Color(0.55, 0.72, 0.62))   # verdigris copper
 		dome.position = c + away + Vector3(0, 22, 0)
+		dome.visibility_range_end = DETAIL_RANGE + 500.0
 		w.add_child(dome)
 
 
@@ -298,7 +317,7 @@ func _near_line(p: Vector3, line: Dictionary, width: float) -> bool:
 
 
 ## Decoration boxes, one MultiMesh per material (no collision).
-func _mm(xfs: Array, mat: Material) -> void:
+func _mm(xfs: Array, mat: Material, range_end: float) -> void:
 	if xfs.is_empty():
 		return
 	var mm := MultiMesh.new()
@@ -310,11 +329,14 @@ func _mm(xfs: Array, mat: Material) -> void:
 	var mi := MultiMeshInstance3D.new()
 	mi.multimesh = mm
 	mi.material_override = mat
+	_cull(mi, range_end)
 	w.add_child(mi)
 
 
 ## Plain boxes, one MultiMesh per colour, solid so you can land on the roofs.
-func _boxes(xfs: Array, col: Color) -> void:
+func _boxes(xfs: Array, col: Color, range_end: float) -> void:
+	if xfs.is_empty():
+		return
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = BoxMesh.new()
@@ -335,7 +357,86 @@ func _boxes(xfs: Array, col: Color) -> void:
 	var mi := MultiMeshInstance3D.new()
 	mi.multimesh = mm
 	mi.material_override = Mats.grid(col, col.darkened(0.08), 1)
+	_cull(mi, range_end)
 	w.add_child(mi)
+
+
+## Turn this island's gathered dressing into draw batches of its own, so the engine
+## can skip a whole island's detail when it's off-screen or deep in the haze, and
+## start the next island's lists fresh.
+func _flush(c: Vector3, r: float) -> void:
+	var far := DETAIL_RANGE + r           # measured to the batch's centre: allow for its size
+	var t = w._multimesh(TREE, trees)
+	var pn = w._multimesh(PINE, pines)
+	for mi in [t, pn]:
+		if mi:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_cull(mi, far)
+	for col in blocks:
+		_boxes(blocks[col], col, far)
+	_mm(_ballast, Mats.lit(Color(0.42, 0.40, 0.37)), far)
+	_mm(_timber, Mats.lit(Color(0.33, 0.22, 0.14)), far)
+	_mm(_iron, Mats.metal(Color(0.24, 0.23, 0.22), 0.45), far)
+	_mm(_buffers, Mats.lit(Color(0.62, 0.12, 0.10)), far)
+	_mm(_platforms, Mats.grid(Color(0.74, 0.70, 0.62), Color(0.70, 0.66, 0.58), 1), far)
+	_mm(_canopy, Mats.lit(Color(0.16, 0.30, 0.22)), far)     # railway green ironwork
+	trees = []
+	pines = []
+	blocks = {}
+	for list in [_ballast, _timber, _iron, _buffers, _platforms, _canopy]:
+		list.clear()
+
+
+func _cull(gi: GeometryInstance3D, range_end: float) -> void:
+	if range_end > 0.0:
+		gi.visibility_range_end = range_end
+		detail_nodes.append(gi)
+
+
+## Depth haze that turns solid at fog_end, a cloud sea pooling under the islands,
+## and the camera's far plane just past the haze (nothing hidden gets drawn).
+func apply_fog() -> void:
+	var e: Environment = w.env
+	e.fog_enabled = true
+	e.fog_mode = Environment.FOG_MODE_DEPTH
+	e.fog_depth_begin = FOG_BEGIN
+	e.fog_depth_end = fog_end
+	e.fog_depth_curve = FOG_CURVE
+	e.fog_density = 1.0
+	e.fog_sky_affect = 0.0
+	e.fog_height = SEA_HEIGHT
+	e.fog_height_density = sea_density
+	if w.player:
+		w.player.cam.far = fog_end + 200.0
+	if cloud_floor:
+		cloud_floor.scale = Vector3(fog_end * 2.4, 1, fog_end * 2.4)
+
+
+## Keep the cloud floor centred under the camera, so it never runs out.
+func follow(p: Vector3) -> void:
+	if cloud_floor:
+		cloud_floor.position = Vector3(p.x, FLOOR_Y, p.z)
+
+
+## Dev fly tuning: [ and ] move the haze in or out, - and = thin or thicken the sea.
+func tune_fog(key: int) -> bool:
+	match key:
+		KEY_BRACKETLEFT:
+			fog_end = maxf(fog_end - 250.0, 800.0)
+		KEY_BRACKETRIGHT:
+			fog_end = minf(fog_end + 250.0, 12000.0)
+		KEY_MINUS:
+			sea_density = maxf(sea_density - 0.005, 0.0)
+		KEY_EQUAL:
+			sea_density = minf(sea_density + 0.005, 0.2)
+		_:
+			return false
+	apply_fog()
+	return true
+
+
+func fog_text() -> String:
+	return "HAZE %.1f km [ ]   ·   CLOUD SEA %.3f - =" % [fog_end / 1000.0, sea_density]
 
 
 ## A floating name over an island; drawn on the HUD by PlaceLabels (world.gd).

@@ -1164,11 +1164,31 @@ func _test_nation() -> void:
 		ord_ok = ord_ok and nw.islands[i].radius >= 50.0 and nw.islands[i].radius <= 200.0
 	check(ord_ok, "nation: ordinary islands are 100-400 m across")
 	check(np.is_on_floor() and nw.nation.where(np.global_position) == "over DELOS", "nation: you start standing on Delos's station platform")
-	check(np.cam.far >= 15000.0, "nation: the camera sees from state to state")
+	var nat = nw.nation
+	check(nw.env.fog_mode == Environment.FOG_MODE_DEPTH and nw.env.fog_depth_end == nat.fog_end and nw.env.fog_height_density > 0.0,
+		"fog: depth haze solid by %.1f km, and a cloud sea under the islands" % (nat.fog_end / 1000.0))
+	check(nat.cloud_floor != null and nat.cloud_floor.global_position.y < -200.0, "fog: a cloud floor far below for the sea to settle on")
+	check(np.cam.far > nat.fog_end and np.cam.far <= nat.fog_end + 250.0, "fog: the camera stops drawing just past the haze (%d m)" % roundi(np.cam.far))
+	var culled: bool = nat.detail_nodes.size() > nw.islands.size() * 3
+	for gi in nat.detail_nodes:
+		culled = culled and gi.visibility_range_end > 0.0 and gi.visibility_range_end < nat.fog_end
+	check(culled, "fog: every island's detail is its own batch (%d) and switches off inside the haze" % nat.detail_nodes.size())
+	var max_extent := 0.0
+	for gi in nat.detail_nodes:
+		max_extent = maxf(max_extent, gi.get_aabb().size.length())
+	check(max_extent < 1400.0, "fog: no detail batch spans more than one island (largest %d m)" % roundi(max_extent))
 	await shot("39_nation_start")
 	np.set_flying(true)
 	check(np.flying and np.collision_mask == 0, "fly: F4 / V turns on noclip flight")
 	check(nw.course_text().begins_with("DEV FLY"), "fly: the HUD shows speed, altitude and where you are")
+	var fe0: float = nat.fog_end
+	nat.tune_fog(KEY_BRACKETRIGHT)
+	check(nat.fog_end == fe0 + 250.0 and np.cam.far > nat.fog_end, "fog: ] pushes the haze out (and the far plane with it)")
+	nat.tune_fog(KEY_BRACKETLEFT)
+	var sd0: float = nat.sea_density
+	nat.tune_fog(KEY_EQUAL)
+	check(nw.env.fog_height_density > sd0, "fog: = thickens the cloud sea")
+	nat.tune_fog(KEY_MINUS)
 	var fy0: float = np.global_position.y
 	Input.action_press("jump")
 	for i in 120:
