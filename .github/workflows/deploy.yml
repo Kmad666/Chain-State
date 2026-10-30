@@ -73,8 +73,7 @@ jobs:
         run: |
           mkdir -p build/web/design
           cp -r design/. build/web/design/
-          rm -f build/web/design/.gdignore
-          find build/web/design -name "*.import" -delete
+          find build/web/design -name "*.import" -delete   # keep .gdignore: build/ sits inside the project, and later Godot steps would import the map
           ls -la build/web/design
 
       - name: Smoke tests
