@@ -47,6 +47,7 @@ var _body: Node3D
 var _cone: MeshInstance3D
 var _cone_mat: StandardMaterial3D
 var _cone_k := 0.0                 # 0..1 grow-in
+var _seam_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -67,13 +68,39 @@ func _ready() -> void:
 	_cone_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_cone_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_cone_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_cone_mat.albedo_color = Color(1.0, 0.86, 0.45, 0.01)
+	_cone_mat.albedo_color = Color(1.0, 0.78, 0.3, 0.01)
 	_cone = MeshInstance3D.new()
 	_cone.mesh = cm
 	_cone.material_override = _cone_mat
 	_cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_cone.top_level = true
 	add_child(_cone)
+	# gold seams from the eye to the mouth, so the trap's walls read clearly
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_LINES)
+	var half_h := CONE_LENGTH * 0.5
+	var mouth := cm.bottom_radius
+	for i in 24:
+		var a := TAU * i / 24.0
+		im.surface_add_vertex(Vector3(0, half_h, 0))
+		im.surface_add_vertex(Vector3(cos(a) * mouth, -half_h, sin(a) * mouth))
+	for ring in [0.35, 0.7, 1.0]:
+		for i in 48:
+			var a0 := TAU * i / 48.0
+			var a1 := TAU * (i + 1) / 48.0
+			var y := half_h - CONE_LENGTH * ring
+			im.surface_add_vertex(Vector3(cos(a0) * mouth * ring, y, sin(a0) * mouth * ring))
+			im.surface_add_vertex(Vector3(cos(a1) * mouth * ring, y, sin(a1) * mouth * ring))
+	im.surface_end()
+	_seam_mat = StandardMaterial3D.new()
+	_seam_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_seam_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_seam_mat.albedo_color = Color(1.0, 0.8, 0.3, 0.01)
+	var seams := MeshInstance3D.new()
+	seams.mesh = im
+	seams.material_override = _seam_mat
+	seams.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_cone.add_child(seams)
 	_place_cone(Vector3.FORWARD, 0.02)       # drawn tiny and faint from the start: warms its shader
 
 
@@ -104,7 +131,8 @@ func _physics_process(dt: float) -> void:
 			_look_at_player(dt, 3.0)
 			_cone_k = minf(1.0, _cone_k + dt * 1.2)
 			_place_cone(axis, _cone_k)
-			_cone_mat.albedo_color.a = 0.14 * _cone_k
+			_cone_mat.albedo_color.a = 0.2 * _cone_k
+			_seam_mat.albedo_color.a = 0.75 * _cone_k
 			if _cone_k >= 1.0:
 				_trap_player()
 				_barrage(dt)
@@ -112,7 +140,8 @@ func _physics_process(dt: float) -> void:
 		"spent":
 			_cone_k = maxf(0.0, _cone_k - dt * 0.8)
 			_place_cone(axis, maxf(_cone_k, 0.02))
-			_cone_mat.albedo_color.a = 0.14 * _cone_k
+			_cone_mat.albedo_color.a = 0.2 * _cone_k
+			_seam_mat.albedo_color.a = 0.75 * _cone_k
 			_body.rotation.x = lerpf(_body.rotation.x, 0.7, dt)     # droops
 			_parts.pupil.visible = false                              # the eye closes
 			_parts.iris.visible = false

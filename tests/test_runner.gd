@@ -710,6 +710,12 @@ func _ready() -> void:
 	check(nb > 40 and nb < 600, "cherub: a bullet-hell barrage down the cone (%d orbs in flight)" % nb)
 	check(cb.sages.size() >= 1 and cb.sages.size() <= cb.MAX_SAGES, "cherub: it releases sages (%d out, at most %d)" % [cb.sages.size(), cb.MAX_SAGES])
 	await shot("39_cherub_fight")
+	chp.global_position = Vector3(25, 1, 25)
+	_aim(chp, cb.global_position + Vector3(-40, -30, 40))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("41_cherub_cone_wall")
+	chp.global_position = Vector3(0, 1, 0)
 	var sg = cb.sages[0]
 	for i in 120 * 2:
 		await get_tree().physics_frame              # let it reach its hover spot
