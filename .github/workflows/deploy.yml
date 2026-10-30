@@ -74,6 +74,7 @@ jobs:
           mkdir -p build/web/design
           cp -r design/. build/web/design/
           rm -f build/web/design/.gdignore
+          find build/web/design -name "*.import" -delete
           ls -la build/web/design
 
       - name: Smoke tests
