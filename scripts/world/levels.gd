@@ -6,6 +6,7 @@ const LIST := [
 	{"id": "range", "name": "Test Range", "blurb": "Flat plane, one floating cube, an NPC and four practice clues."},
 	{"id": "level_1", "name": "Level 1", "blurb": "Two floating islands, level with each other. Learn to cross the gap."},
 	{"id": "level_2", "name": "Level 2", "blurb": "Two floating islands, the far one wider apart and higher up."},
+	{"id": "nation", "name": "The Nation (draft)", "blurb": "The whole Gordian Empire at 1:50, blocked out from the casebook map: Delos (1 km) in the middle, the five state capitals 4 to 7 km out, their satellite isles and twelve ordinary islands between. Press F4 or V to fly (Shift = fast)."},
 	{"id": "platform_test", "name": "Platform Test", "blurb": "Grass blocks over the void: you land on them but can't grapple them. Swing from the crates. Cross every gap in as few swings as you can."},
 	{"id": "hamlet", "name": "Hamlet", "blurb": "A small hamlet on a floating island. Walk the lanes or swing between rooftop anchors; a house has burnt from the inside. Talk to the locals and find the clues."},
 	{"id": "city", "name": "City", "blurb": "A dense city island: five-storey stone terraces wall to wall, cobbled streets, alleys and a fountain plaza. Swing between the anchors over the crossroads."},

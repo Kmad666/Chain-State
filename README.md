@@ -29,6 +29,7 @@
 | **Space** in the air | If the bottom of the screen shows **▼ LAND**, aim straight down, latch on and reel in fast. Doesn't count as a swing |
 | **E** while hooked to a caster | Lock your view on them while you swing round (A / D circle you round fast); **E** again frees it. Once they're bound, **E** **arrests** |
 | **F2** | Dialogue editor |
+| **F4** / **V** | Dev fly: noclip flight (WASD, Space up, Ctrl down, Shift fast) |
 | **F3** | Performance readout: FPS, the slowest recent frame, and the last hitch with what had just happened |
 | **R** | Back to the start |
 | **Esc** | Pause: controls, physics presets and live feel sliders |
@@ -245,6 +246,27 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 - **Grappling:** stone and beams are solid but can't be grappled; only the crates can.
 - **Tested:** a bot climbs hook to hook to the top post in about 22 s, then lands on the crown.
 - **Reuse:** to drop one into any level, `var t = preload("res://scripts/world/grapple_tower.gd").new()`, set its position, `add_child(t)`. Exports cover sections, unit size, ledge spacing, hook reach, free hooks and the first hook's direction. `t.hooks` and `t.top_point()` give you its crates and summit.
+
+## The Nation (draft) and dev fly
+
+**The Nation (draft)** lays the whole Gordian Empire out at **1:50** from the casebook map (`scripts/world/nation.gd`). The map's scale bar makes one map unit about 536 m of real Germany, so 10.73 m in game; every state keeps its real bearing from Delos.
+
+- **Delos** (the Bundesinsel) sits in the middle: a 1 km hero island with a blockout city, a domed parliament and a 110 m landmark tower.
+- **The five state capitals** sit 3.7 to 6.7 km out:
+  - Gordia (Berlin), north-east
+  - Rhenish Gordia (Köln), west
+  - Delosen (Dresden), east
+  - Arcaden (München), south-east
+  - Daedalen (Stuttgart), south-west
+- Each capital is a 520 to 640 m island with a block city in its state colour, a 75 m tower and three satellite isles within 2 km.
+- **Twelve ordinary islands**, 100 to 400 m across, sit along the spokes and round the ring between the states.
+- A thin haze turns the far states into silhouettes. Floating labels name every island and give its size.
+
+**Dev fly** works in every level:
+- **F4** or **V** toggles noclip flight.
+- **WASD** flies where you look, **Space** rises and **Ctrl** or **C** sinks.
+- **Shift** goes 5× faster: 60 m/s normally, 300 m/s boosted.
+- The HUD shows your speed, your altitude and the nearest island, either "over DELOS" or "ARCADEN 2.4 km".
 
 ## Cherub (boss) and Sages
 

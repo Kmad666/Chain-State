@@ -18,6 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
+	if OS.get_environment("ONLY") == "nation":     # quick run: just the Nation draft
+		await _test_nation()
+		print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))
+		get_tree().quit(1 if fails else 0)
+		return
 	print("== DialogueDB")
 	var t := DialogueDB.load_tree("test_npc", "NPC")
 	check(t.start == "start", "test tree starts at 'start'")
@@ -751,6 +756,8 @@ func _ready() -> void:
 	chw.queue_free()
 	await get_tree().process_frame
 
+	await _test_nation()
+
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
 	var ew = load("res://scenes/world.tscn").instantiate()
@@ -1118,3 +1125,66 @@ func _hook_on(pl: Node, en: Node) -> bool:
 	pl.anchor = en.global_position
 	pl.rope_len = pl.global_position.distance_to(en.global_position)
 	return true
+
+
+func _test_nation() -> void:
+	print("== Nation (draft) and dev fly")
+	Game.level = "nation"
+	var nw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(nw)
+	for i in 60:
+		await get_tree().physics_frame
+	var np = nw.player
+	check(nw.islands.size() == 6 + 15 + 12, "nation: 6 state islands, 15 satellites, 12 ordinary islands (%d)" % nw.islands.size())
+	check(nw.islands[0].radius * 2.0 >= 1000.0, "nation: Delos is the 1 km hero island")
+	var far_ok := true
+	for i in range(1, 6):
+		var d: float = Vector2(nw.islands[i].position.x, nw.islands[i].position.z).length()
+		far_ok = far_ok and d > 3000.0 and d < 7500.0
+	check(far_ok, "nation: the state capitals sit 3-7.5 km from Delos, as on the map at 1:50")
+	var ord_ok := true
+	for i in range(21, 33):
+		ord_ok = ord_ok and nw.islands[i].radius >= 50.0 and nw.islands[i].radius <= 200.0
+	check(ord_ok, "nation: ordinary islands are 100-400 m across")
+	check(np.is_on_floor() and nw.nation.where(np.global_position) == "over DELOS", "nation: you start standing on Delos")
+	check(np.cam.far >= 15000.0, "nation: the camera sees from state to state")
+	await shot("39_nation_start")
+	np.set_flying(true)
+	check(np.flying and np.collision_mask == 0, "fly: F4 / V turns on noclip flight")
+	check(nw.course_text().begins_with("DEV FLY"), "fly: the HUD shows speed, altitude and where you are")
+	var fy0: float = np.global_position.y
+	Input.action_press("jump")
+	for i in 120:
+		await get_tree().physics_frame
+	Input.action_release("jump")
+	check(np.global_position.y > fy0 + 30.0, "fly: Space rises (%d m in a second)" % roundi(np.global_position.y - fy0))
+	var fz0: float = np.global_position.z
+	Input.action_press("move_forward")
+	Input.action_press("dash")
+	for i in 120:
+		await get_tree().physics_frame
+	Input.action_release("move_forward")
+	Input.action_release("dash")
+	check(fz0 - np.global_position.z > 150.0, "fly: Shift flies five times faster (%d m in a second)" % roundi(fz0 - np.global_position.z))
+	# up high over Delos, looking north-east toward Gordia
+	np.velocity = Vector3.ZERO
+	np.global_position = Vector3(0, 600, 900)
+	np.look_at(nw.islands[1].position + Vector3(0, -400, 0) * 0.0, Vector3.UP)
+	np.rotation.x = 0.0
+	np.rotation.z = 0.0
+	np.head.rotation.x = deg_to_rad(-14)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("40_nation_over_delos")
+	np.global_position = Vector3(-2500, 2600, 7600)
+	np.look_at(Vector3(800, 0, -600), Vector3.UP)
+	np.rotation.x = 0.0
+	np.rotation.z = 0.0
+	np.head.rotation.x = deg_to_rad(-24)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("41_nation_overview")
+	np.set_flying(false)
+	check(not np.flying and np.collision_mask != 0, "fly: F4 again lands you with collision back on")
+	nw.queue_free()
+	await get_tree().process_frame

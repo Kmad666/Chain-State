@@ -139,6 +139,12 @@ var highlight_target: Node3D = null   # what the chain would bite right now, lit
 var _lock_lost := 0.0
 var look_npc: Node = null        # NPC or evidence under the crosshair within reach
 
+# dev fly (F4 / V): no gravity, no collision, fly where you look
+const FLY_SPEED := 60.0          # m/s; Shift = x5
+const FLY_BOOST := 5.0
+var flying := false
+var _fly_mask := 0
+
 var _look_delta := Vector2.ZERO
 var _was_on_floor := true
 var _just_landed := false
@@ -197,6 +203,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		head.rotate_x(-event.relative.y * s)
 		head.rotation.x = clampf(head.rotation.x, deg_to_rad(-88), deg_to_rad(88))
 		_look_delta += event.relative
+	elif event.is_action_pressed("dev_fly"):
+		set_flying(not flying)
 	elif stunned > 0.0 and (event.is_action_pressed("grapple") or event.is_action_pressed("interact")):
 		return
 	elif event.is_action_pressed("grapple"):
@@ -646,8 +654,48 @@ func halt() -> void:
 	velocity = Vector3(0, minf(velocity.y, 0.0), 0)
 
 
+# ---------------------------------------------------------------- dev fly
+## Dev mode: noclip flight for looking round a level at speed. WASD flies where you
+## look, Space rises, Ctrl / C sinks, Shift goes five times faster.
+func set_flying(on: bool) -> void:
+	if on == flying:
+		return
+	flying = on
+	if on:
+		release()
+		latching = false
+		_fly_mask = collision_mask
+		collision_mask = 0
+	else:
+		collision_mask = _fly_mask
+		velocity = Vector3.ZERO
+	notice.emit("DEV FLY on: WASD fly, Space up, Ctrl down, Shift fast. F4 / V to land." if on else "DEV FLY off.")
+
+
+func fly_speed() -> float:
+	return FLY_SPEED * (FLY_BOOST if Input.is_action_pressed("dash") else 1.0)
+
+
+func _fly(dt: float) -> void:
+	var input := Vector2.ZERO
+	var rise := 0.0
+	if Game.playing():
+		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+		if Input.is_action_pressed("jump"):
+			rise += 1.0
+		if Input.is_physical_key_pressed(KEY_CTRL) or Input.is_physical_key_pressed(KEY_C):
+			rise -= 1.0
+	var wish := cam.global_basis * Vector3(input.x, 0, input.y) + Vector3.UP * rise
+	var target := wish.limit_length(1.0) * fly_speed()
+	velocity = velocity.lerp(target, minf(dt * 6.0, 1.0))
+	global_position += velocity * dt
+
+
 # ---------------------------------------------------------------- movement
 func _physics_process(dt: float) -> void:
+	if flying:
+		_fly(dt)
+		return
 	var input := Vector2.ZERO
 	stunned = maxf(stunned - dt, 0.0)
 	if Game.playing() and stunned <= 0.0:

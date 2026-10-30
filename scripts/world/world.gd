@@ -22,6 +22,8 @@ const PerfOverlay := preload("res://scripts/ui/perf_overlay.gd")
 const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
+const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const Nation := preload("res://scripts/world/nation.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -86,6 +88,10 @@ func _ready() -> void:
 	player.fell.connect(func(): falls += 1)
 	if not pads.is_empty():
 		player.fall_limit = -30.0
+	if nation:
+		player.fall_limit = -1200.0
+		player.cam.far = 16000.0       # see from one state to the next
+		player.cam.near = 0.1
 	if bullets:
 		bullets.player = player
 	for s in sentries:
@@ -112,6 +118,12 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.player = player
 	ui.add_child(hud)
+	if nation:
+		var tags := PlaceLabels.new()
+		tags.camera = player.cam
+		ui.add_child(tags)
+		for t in nation.labels:
+			tags.add(t[0], t[1], t[2], t[3], t[4], t[5])
 	var perf := PerfOverlay.new()
 	ui.add_child(perf)
 	player.notice.connect(func(t):
@@ -142,6 +154,8 @@ func _ready() -> void:
 	ui.add_child(logbook)
 
 	Game.set_ui_mode("play")
+	if nation:
+		hud.toast("THE NATION (draft, 1:50)  ·  F4 or V: dev fly", 8.0)
 
 
 # ---------------------------------------------------------------- world
@@ -223,9 +237,12 @@ func _build_world() -> void:
 			_build_tower()
 		"cherub_test":
 			_build_cherub_test()
+		"nation":
+			nation = Nation.new()
+			nation.build(self)
 		_:
 			_build_range()
-	if Game.level != "range" and (not islands.is_empty() or not pads.is_empty()):
+	if Game.level != "range" and Game.level != "nation" and (not islands.is_empty() or not pads.is_empty()):
 		var c := Vector3.ZERO
 		var spots: Array = islands if not islands.is_empty() else pads
 		for isl in spots:
@@ -878,6 +895,10 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if player and player.flying:
+		var p: Vector3 = player.global_position
+		var here: String = nation.where(p) if nation else "x %d  z %d" % [roundi(p.x), roundi(p.z)]
+		return "DEV FLY  %d m/s  ·  ALT %d m  ·  %s" % [roundi(player.velocity.length()), roundi(p.y), here]
 	if cherub:
 		if cherub.state == "spent":
 			return "THE CHERUB IS SPENT      FALLS %d" % falls
@@ -894,6 +915,7 @@ func course_text() -> String:
 
 # ---------------------------------------------------------------- Cherub Test
 var cherub: Node3D
+var nation = null                  # the Nation draft's builder (place names for the fly readout)
 
 
 ## Cherub Test: one plain grassy island (about 120 m across) and a Cherub hovering
