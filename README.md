@@ -225,3 +225,14 @@ A long ride.
 - **Arresting it:** hook it and press **E**. **One lap** binds it (about 3 s of auto-wrap). Then **E** again to arrest, and it drops out of the sky.
 
 **Aim rule:** for half a second after you let go of an anchor, the aim ignores it, and auto-aim never locks onto the anchor you're hanging from. Swapping to the next anchor never re-hooks the one you just left.
+
+## Tower
+
+A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its own grassy island in the **Tower** level.
+
+- **The tower:** 16 round stone sections of 8 m each, from Retro Fantasy Kit pieces with a painted band every third section. About **130 m** to a walkable, battlemented **crown**.
+- **Hooks:** from every section a **wooden beam juts 5 m out**, each a quarter-turn round from the last, with a free grapple crate at its tip. The quarter-turn keeps every crate in clear sight of the next instead of hidden behind the tower.
+- **Rest ledges:** a wide stone ring every 4 sections. The **last hook** stands on a post above the crown, so you swing up and latch down onto the top.
+- **Grappling:** stone and beams are solid but can't be grappled; only the crates can.
+- **Tested:** a bot climbs hook to hook to the top post in about 22 s, then lands on the crown.
+- **Reuse:** to drop one into any level, `var t = preload("res://scripts/world/grapple_tower.gd").new()`, set its position, `add_child(t)`. Exports cover sections, unit size, ledge spacing, hook reach, free hooks and the first hook's direction. `t.hooks` and `t.top_point()` give you its crates and summit.

@@ -584,6 +584,75 @@ func _ready() -> void:
 	aw2.queue_free()
 	await get_tree().process_frame
 
+	print("== Tower")
+	Game.level = "tower"
+	var tw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(tw)
+	for i in 30:
+		await get_tree().physics_frame
+	var tp = tw.player
+	var T = tw.tower
+	check(T.top_point().y > 120.0 and T.hooks.size() == T.sections, "tower: %d m tall with %d hooks" % [roundi(T.top_point().y), T.hooks.size()])
+	var tspace = tw.get_world_3d().direct_space_state
+	var clear_lines := true
+	for k in T.hooks.size() - 1:
+		var q := PhysicsRayQueryParameters3D.create(T.hooks[k].global_position, T.hooks[k + 1].global_position, tp.LAYER_LAND | tp.LAYER_WORLD)
+		q.exclude = [T.hooks[k].get_rid(), T.hooks[k + 1].get_rid()]
+		if not tspace.intersect_ray(q).is_empty() or T.hooks[k].global_position.distance_to(T.hooks[k + 1].global_position) > tp.tune.grapple_range - 6.0:
+			clear_lines = false
+	check(clear_lines, "tower: each hook is in clear sight and easy reach of the next")
+	await shot("35_tower_base")
+	tp.invuln = 999.0
+	_aim(tp, T.hooks[0].global_position)
+	Input.action_press("jump")
+	await get_tree().physics_frame
+	Input.action_release("jump")
+	for i in 10:
+		await get_tree().physics_frame
+	tp.try_grapple()
+	var kt := 0
+	var tt := 0
+	var held_t := 0
+	while kt < T.hooks.size() - 1 and tt < 120 * 90:
+		tt += 1
+		await get_tree().physics_frame
+		if tp.attached and tp.anchor.distance_to(T.hooks[kt].global_position) < 2.0:
+			held_t += 1
+			if held_t > 50 and (tp.global_position.distance_to(T.hooks[kt].global_position) < 9.0 or held_t > 300):
+				_aim(tp, T.hooks[kt + 1].global_position)
+				tp.release()
+				await get_tree().physics_frame
+				_aim(tp, T.hooks[kt + 1].global_position)
+				tp.try_grapple()
+				kt += 1
+				held_t = 0
+		elif not tp.attached and tp.hook_state == 0:
+			_aim(tp, T.hooks[kt].global_position)
+			tp.try_grapple()
+	for i in 90:
+		await get_tree().physics_frame
+	var at_top: bool = tp.attached and tp.anchor.distance_to(T.hooks[-1].global_position) < 2.0
+	check(at_top, "tower: the bot climbs hook to hook to the top post (%.0f s)" % (tt / 120.0))
+	await shot("36_tower_high")
+	# let go above the crown and latch down onto it
+	tp.release()
+	tp.global_position = T.top_point() + Vector3(0, 6, 0)
+	tp.velocity = Vector3.ZERO
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	tp.ground_latch()
+	for i in 240:
+		await get_tree().physics_frame
+		if tp.is_on_floor():
+			break
+	check(tp.is_on_floor() and tp.global_position.y > T.top_point().y - 1.0, "tower: you can stand on the crown (%d m up)" % roundi(tp.global_position.y))
+	_aim(tp, Vector3(0, 0, 60))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("37_tower_crown")
+	tw.queue_free()
+	await get_tree().process_frame
+
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
 	var ew = load("res://scenes/world.tscn").instantiate()

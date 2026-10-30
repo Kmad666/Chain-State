@@ -20,6 +20,7 @@ const Ward := preload("res://scripts/combat/ward.gd")
 const Clouds := preload("res://scripts/world/clouds.gd")
 const PerfOverlay := preload("res://scripts/ui/perf_overlay.gd")
 const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
+const Tower := preload("res://scripts/world/grapple_tower.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -215,6 +216,8 @@ func _build_world() -> void:
 			_build_city()
 		"ascent":
 			_build_ascent()
+		"tower":
+			_build_tower()
 		_:
 			_build_range()
 	if Game.level != "range" and (not islands.is_empty() or not pads.is_empty()):
@@ -879,6 +882,25 @@ func course_text() -> String:
 	return "SWINGS %d  ·  PAR %d      PAD %d / %d      FALLS %d" % [player.swings, par, checkpoint, pads.size() - 1, falls]
 
 
+
+# ---------------------------------------------------------------- Tower
+var tower: Node3D
+
+
+## Tower: a grassy island with one GrappleTower (the reusable piece) in the middle.
+func _build_tower() -> void:
+	var isl = _island(Vector3.ZERO, 44.0, 808)
+	isl.collision_layer = Player.LAYER_LAND
+	tower = Tower.new()
+	add_child(tower)
+	for h in tower.hooks:
+		anchors.append(h)
+	for p in [Vector3(-26, 0, -12), Vector3(24, 0, -20), Vector3(-18, 0, 26), Vector3(30, 0, 14)]:
+		_kit("tree-pine", p, 5.0, p.x)
+	var first: Vector3 = tower.hooks[0].global_position
+	start_pos = Vector3(first.x + 6.0, 1.0, first.z + 18.0)
+	var to_first := first - start_pos
+	start_yaw = atan2(-to_first.x, -to_first.z)
 
 # ---------------------------------------------------------------- The Ascent
 const ASCENT_N := 50
