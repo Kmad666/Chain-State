@@ -2,25 +2,25 @@ extends StaticBody3D
 ## Sentry: a spellcaster on a broom (placeholder low-poly model) that loops a
 ## set path. The ground kind is a wizard, the air kind a witch.
 ##
-## Three kinds:
-##   ground - hovers low over an island. When you come within ENGAGE_RANGE it
-##            turns to face you and fires spread-out lines of large dark red orbs
-##            straight across, parallel to the ground (NieR-style). Few orbs, with gaps.
-##   air    - the witch. She doesn't shoot. She hovers inside her ward (ward.gd) at
-##            the top of her orb tree (orb_tree.gd). You can only wrap her once you're
-##            inside the ward: fly in through its opening.
+## Kinds:
+##   ground - the wizard. Patrols a loop low over an island. Spot him within range and
+##            he follows you (slowly), firing spread-out lines of large dark red orbs
+##            straight across, parallel to the ground (NieR-style).
+##   apprentice - a weaker flyer in green. Patrols a wide circle; once it spots you it
+##            chases until you get far enough away, firing single large, fast orbs
+##            straight at you. Hooked, it zigzags side to side to shake you.
+##   air    - the witch (retired for now, pending a redesign; her test level is hidden).
 ##
-##   apprentice - a weaker flyer: a smaller broom-rider in green who hovers on a
-##            small loop and, within its engage range, fires single large, fast orbs
-##            straight at you (leading your movement a little). One wrap binds it.
+## Awareness is kept simple: within spot_range a caster spots you (a "!" appears over
+## its head) and follows; past leash_range it gives up and goes back to patrolling.
 ##
-## Arresting (all kinds): hook it from within subdue_range(), then wrap the
-## chain around it three times, either swinging round yourself or by pressing E
-## to auto-wrap (the player circles it with the camera locked on). Each lap adds
-## a silver coil. After the third, press E again to ARREST:
-## the chain comes free with your momentum untouched (no slow motion, so it
-## doesn't break the flow when there are several casters about). Hooking from too
-## far away fails. Let go mid-wrap and the coils slip loose after a moment.
+## Arresting: hook it from within subdue_range() and swing round it yourself. E locks
+## your camera onto it while you do. Each full lap adds a silver coil.
+##   - apprentice: one lap binds it.
+##   - wizard: three laps, but each of the first two makes him burn the chain and throw
+##     you back. The coils stay on him: hook him again for the next lap.
+## Once bound, E ARRESTS: it drops to the ground with the coils on, and your chain
+## comes free with your momentum untouched. Let go mid-lap and that lap is lost.
 ##
 ## Collision layer 4 (HOOK): grapple-able, but the player passes through it.
 
@@ -41,7 +41,19 @@ const BREAK_SPEED := INF         # no speed cap when the chain comes free: keep 
 @export var volley_every := 2.4
 @export var bullet_speed := 9.0
 var wraps_needed := WRAPS_NEEDED   # 3 for the wizard and witch, 1 for an apprentice
-var engage_range := ENGAGE_RANGE
+var engage_range := ENGAGE_RANGE   # fires at you within this (while it has spotted you)
+var spot_range := ENGAGE_RANGE     # notices you within this...
+var leash_range := 60.0            # ...and gives up once you're further than this
+var chase_speed := 4.0             # m/s while following you (slower than you: you can get away)
+var keep_dist := 10.0              # it closes in to about this far, no nearer
+var patrol_radius := 0.0           # > 0: patrol a circle this wide round home, instead of a path
+var home := Vector3.ZERO
+var cuts_chain := false            # wizard: each lap short of the last burns the chain
+var chasing := false
+var _laps := 0                     # whole laps completed (coils)
+var _lap_turn := 0.0               # progress round the current lap, radians (signed)
+var _patrol_a := 0.0
+var _alert: Label3D
 const APPRENTICE_SHOT_SPEED := 24.0
 const APPRENTICE_SHOT_RADIUS := 1.1
 
@@ -51,7 +63,6 @@ var is_subdued := false
 var ready_to_arrest := false     # three wraps done: press E to arrest
 var engaged := false
 var wraps := 0.0
-var _turn := 0.0
 var _wp := 0
 var _t := 0.0
 var _fire_t := 1.0
@@ -81,8 +92,39 @@ func _ready() -> void:
 
 	_build_rider()
 
+	if kind == "ground":
+		cuts_chain = true
+		spot_range = 38.0
+		leash_range = 55.0
+		chase_speed = 3.5
+		keep_dist = 12.0
+	elif kind == "apprentice":
+		spot_range = 35.0
+		leash_range = 60.0
+		chase_speed = 9.0              # quick, but slower than your 16 m/s top speed
+		keep_dist = 12.0
+		if patrol_radius <= 0.0:
+			patrol_radius = 25.0
 	if path.size() > 0:
 		global_position = path[0]
+	if home == Vector3.ZERO:
+		home = global_position
+	if patrol_radius > 0.0:
+		global_position = home + Vector3(patrol_radius, 0, 0)
+
+	# the "!" that says it has spotted you
+	_alert = Label3D.new()
+	_alert.text = "!"
+	_alert.font_size = 160
+	_alert.outline_size = 36
+	_alert.modulate = Color(1.0, 0.82, 0.2)
+	_alert.outline_modulate = Color(0.25, 0.05, 0.02)
+	_alert.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_alert.no_depth_test = true
+	_alert.pixel_size = 0.012
+	_alert.position = Vector3(0, 3.6, 0)
+	_alert.visible = false
+	add_child(_alert)
 
 
 ## A simple low-poly caster on a broom, facing -Z (the way the Sentry looks).
@@ -181,22 +223,40 @@ func _physics_process(dt: float) -> void:
 	_rig.rotation.z = sin(_t * 0.9) * 0.08                    # lazy roll on the broom
 
 	var p_ok := player != null and is_instance_valid(player)
-	engaged = p_ok and global_position.distance_to(player.global_position) <= engage_range
+	var dist: float = global_position.distance_to(player.global_position) if p_ok else INF
+	# awareness: spot within spot_range, give up past leash_range
+	if kind == "air":
+		chasing = p_ok and dist <= engage_range
+	elif not chasing and dist <= spot_range:
+		chasing = true
+	elif chasing and dist > leash_range:
+		chasing = false
+	_alert.visible = chasing and kind != "air"
+	engaged = chasing and dist <= engage_range
 	var hooked: bool = _hooked_by != null and is_instance_valid(_hooked_by) and _hooked_by.attached
 	if hooked:
 		_track_wrap(_hooked_by.global_position)
+		if kind == "apprentice" and _hooked_by != null:
+			_zigzag(dt)
 	else:
+		if _hooked_by != null:
+			_lap_turn = 0.0          # let go mid-lap: that lap is lost
 		_hooked_by = null
 		ready_to_arrest = false
-		_patrol(dt)
-		if wraps > 0.0:
+		if chasing and kind != "air":
+			_chase(dt)
+		else:
+			_patrol(dt)
+		if _laps > 0 and not cuts_chain:
+			# an apprentice's coil slips loose a moment after you let go
 			if _slip_t < 0.0:
 				_slip_t = SLIP_DELAY
 			_slip_t -= dt
 			if _slip_t <= 0.0:
-				_turn = move_toward(_turn, 0.0, dt * 1.5 * TAU)
-				wraps = absf(_turn) / TAU
-				_update_coils()
+				_laps = 0
+				_slip_t = -1.0
+		wraps = _laps + absf(_lap_turn) / TAU
+		_update_coils()
 
 	# face the player once engaged (ground kind keeps level so its shots stay level)
 	if engaged:
@@ -227,6 +287,13 @@ func _physics_process(dt: float) -> void:
 
 
 func _patrol(dt: float) -> void:
+	if patrol_radius > 0.0:
+		# a wide circle round home: steer for a point a little ahead on it
+		_patrol_a += speed * dt / patrol_radius
+		var goal := home + Vector3(cos(_patrol_a) * patrol_radius, sin(_patrol_a * 2.0) * 1.5, sin(_patrol_a) * patrol_radius)
+		var to_g := goal - global_position
+		global_position += to_g.limit_length(maxf(speed, chase_speed) * dt)
+		return
 	if path.size() < 2:
 		return
 	var goal: Vector3 = path[_wp]
@@ -237,6 +304,32 @@ func _patrol(dt: float) -> void:
 		_wp = (_wp + 1) % path.size()
 	else:
 		global_position += to / to.length() * step
+
+
+## Spotted you: close in to about keep_dist. A wizard stays at his hovering height;
+## an apprentice flies to a little above you.
+func _chase(dt: float) -> void:
+	var target: Vector3 = player.global_position
+	if kind == "ground":
+		target.y = home.y
+	else:
+		target.y += 4.0
+	var to := target - global_position
+	var flat_d := Vector2(to.x, to.z).length()
+	if flat_d > keep_dist:
+		global_position += to.normalized() * minf(chase_speed * dt, flat_d - keep_dist)
+	else:
+		global_position.y = move_toward(global_position.y, target.y, chase_speed * dt)
+
+
+## Hooked apprentice: it jinks side to side, across the line to you, to shake the chain.
+func _zigzag(dt: float) -> void:
+	var to: Vector3 = _hooked_by.global_position - global_position
+	to.y = 0.0
+	if to.length_squared() < 0.01:
+		return
+	var side := Vector3.UP.cross(to.normalized())
+	global_position += side * sin(_t * 5.0) * 15.0 * dt    # about +/- 3 m, a jink every 0.6 s
 
 
 # ---------------------------------------------------------------- ground: lines of orbs
@@ -294,17 +387,23 @@ func on_hooked(p: Node) -> bool:
 		return false
 	_hooked_by = p
 	_slip_t = -1.0
+	_lap_turn = 0.0
 	_last_angle = _angle_to(p.global_position)
+	if _laps >= wraps_needed:
+		ready_to_arrest = true
 	if p.has_signal("notice"):
-		if ward and is_instance_valid(ward) and not ward.is_inside(p.global_position):
+		if ready_to_arrest:
+			p.notice.emit("Bound! Press E to ARREST the %s." % title)
+		elif ward and is_instance_valid(ward) and not ward.is_inside(p.global_position):
 			p.notice.emit("Hooked through the opening. Get inside the ward to wrap her.")
 		else:
-			p.notice.emit("Hooked! Press E to auto-wrap, or swing around it yourself.")
+			p.notice.emit("Hooked! Swing round it (E locks your view on it).")
 	return true
 
 
 func on_released(_p: Node) -> void:
 	_hooked_by = null
+	_lap_turn = 0.0                  # let go mid-lap: that lap is lost
 	_slip_t = SLIP_DELAY
 
 
@@ -313,7 +412,9 @@ func _angle_to(pos: Vector3) -> float:
 	return atan2(d.z, d.x)
 
 
-## Counts laps of the player around it (in the horizontal plane); reversing unwinds.
+## Counts laps of the player around it (in the horizontal plane), one at a time;
+## reversing unwinds the current lap. A finished lap adds a coil; a wizard then
+## burns the chain and throws you off until the last lap.
 func _track_wrap(player_pos: Vector3) -> void:
 	var a := _angle_to(player_pos)
 	if ward and is_instance_valid(ward) and not ward.is_inside(player_pos):
@@ -321,20 +422,42 @@ func _track_wrap(player_pos: Vector3) -> void:
 		return
 	var delta := wrapf(a - _last_angle, -PI, PI)
 	_last_angle = a
-	var before := floori(wraps)
-	_turn += delta
-	wraps = absf(_turn) / TAU
-	var after := floori(wraps)
-	if after > before and _hooked_by and _hooked_by.has_signal("notice") and after < wraps_needed:
-		_hooked_by.notice.emit("Wrap %d of %d" % [after, wraps_needed])
-	if wraps >= wraps_needed:
-		_turn = signf(_turn) * TAU * wraps_needed     # bound: extra laps don't pile up
-		wraps = wraps_needed
-		if not ready_to_arrest:
-			ready_to_arrest = true
-			if _hooked_by and _hooked_by.has_signal("notice"):
-				_hooked_by.notice.emit("Bound! Press E to ARREST the %s." % title)
+	if _laps < wraps_needed:
+		_lap_turn += delta
+		if absf(_lap_turn) >= TAU:
+			_lap_turn = 0.0
+			_laps += 1
+			wraps = _laps
+			_update_coils()
+			if _laps >= wraps_needed:
+				ready_to_arrest = true
+				if _hooked_by and _hooked_by.has_signal("notice"):
+					_hooked_by.notice.emit("Bound! Press E to ARREST the %s." % title)
+			elif cuts_chain:
+				_throw_off()
+				return
+			elif _hooked_by and _hooked_by.has_signal("notice"):
+				_hooked_by.notice.emit("Wrap %d of %d" % [_laps, wraps_needed])
+	wraps = _laps + absf(_lap_turn) / TAU
 	_update_coils()
+
+
+## Wizard, after a lap short of the last: he burns through the chain and flings you
+## back. The coil stays on him; hook him again for the next lap.
+func _throw_off() -> void:
+	var p := _hooked_by
+	_hooked_by = null
+	if p == null or not is_instance_valid(p):
+		return
+	if p.has_method("chain_snapped"):
+		p.chain_snapped(BREAK_SPEED)
+	var away: Vector3 = p.global_position - global_position
+	away.y = 0.0
+	away = away.normalized() if away.length_squared() > 0.01 else Vector3.BACK
+	if p.has_method("knockback"):
+		p.knockback(away * 14.0 + Vector3.UP * 8.0)
+	if p.has_signal("notice"):
+		p.notice.emit("Wrap %d of %d: the %s burns the chain and throws you back!" % [_laps, wraps_needed, title])
 
 
 ## Can this player start wrapping it right now? (In range, and inside her ward.)
@@ -362,7 +485,7 @@ func arrest() -> bool:
 
 
 func _update_coils() -> void:
-	var want := mini(floori(wraps), wraps_needed)
+	var want := mini(_laps, wraps_needed)
 	while _coils.size() < want:
 		var t := TorusMesh.new()
 		t.inner_radius = 1.05
@@ -389,6 +512,8 @@ func _subdue() -> void:
 	ready_to_arrest = false
 	engaged = false
 	_core.visible = false            # the casting glow goes out
+	_alert.visible = false
+	chasing = false
 	if ward and is_instance_valid(ward):
 		ward.queue_free()            # her ward goes with her
 	if _hooked_by and is_instance_valid(_hooked_by):
@@ -408,7 +533,7 @@ func _fall(dt: float) -> void:
 		return
 	_fall_v = minf(_fall_v + 20.0 * dt, 30.0)
 	var step := _fall_v * dt
-	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * (1.2 + step), 1)
+	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * (1.2 + step), 1 | 8)
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	if hit.is_empty():
 		global_position.y -= step

@@ -478,6 +478,27 @@ func _ready() -> void:
 	check(apps.size() == 5 and apps.all(func(x): return x.wraps_needed == 1 and x.title == "apprentice"),
 		"ascent: five apprentices along the climb, one wrap each")
 	var app = apps[0]
+	# patrol: a wide circle round its post, unaware of you on the ground far below
+	var pa: Vector3 = app.global_position
+	for i in 120:
+		await get_tree().physics_frame
+	check(not app.chasing and app.global_position.distance_to(pa) > 4.0 and app.global_position.distance_to(app.home) > 20.0,
+		"an apprentice patrols a wide circle (%d m round its post)" % roundi(app.global_position.distance_to(app.home)))
+	# spotted: it chases you, with a "!"
+	ap2.invuln = 999.0
+	ap2.global_position = app.global_position + Vector3(0, -2, 30)
+	ap2.velocity = Vector3.ZERO
+	await get_tree().physics_frame
+	var d_start: float = app.global_position.distance_to(ap2.global_position)
+	for i in 120:
+		ap2.velocity = Vector3.ZERO
+		await get_tree().physics_frame
+	var d_now: float = app.global_position.distance_to(ap2.global_position)
+	check(app.chasing and app._alert.visible and d_now < d_start - 5.0, "it spots you (!) and chases (%d m -> %d m)" % [roundi(d_start), roundi(d_now)])
+	ap2.global_position = app.global_position + Vector3(0, 0, 90)
+	for i in 5:
+		await get_tree().physics_frame
+	check(not app.chasing and not app._alert.visible, "get far enough away and it gives up")
 	ap2.global_position = app.global_position + Vector3(0, -2, 22)
 	ap2.velocity = Vector3.ZERO
 	ap2.invuln = 0.0
@@ -505,26 +526,28 @@ func _ready() -> void:
 	ap2.invuln = 999.0
 	ap2.global_position = app.global_position + Vector3(8, -1, 0)
 	ap2.velocity = Vector3.ZERO
-	check(app.on_hooked(ap2), "hooking an apprentice holds")
-	ap2.attached = true
-	ap2.hook_node = app
-	ap2.hook_offset = Vector3.ZERO
-	ap2.hook_state = 2
-	ap2.anchor = app.global_position
-	ap2.rope_len = 8.0
-	await get_tree().physics_frame
-	ap2.interact()
-	var fr := 0
-	while fr < 120 * 6 and not app.ready_to_arrest:
+	check(_hook_on(ap2, app), "hooking an apprentice holds")
+	var side0: Vector3 = app.global_position
+	var max_side := 0.0
+	for i in 90:
+		ap2.global_position = app.global_position + Vector3(8, -1, 0)    # hold the chain taut
+		ap2.velocity = Vector3.ZERO
 		await get_tree().physics_frame
-		fr += 1
-	check(app.ready_to_arrest, "one auto-wrap lap binds an apprentice (%.1f s)" % (fr / 120.0))
+		max_side = maxf(max_side, absf(app.global_position.z - side0.z))
+	check(max_side > 2.0, "hooked, it zigzags side to side (%.1f m)" % max_side)
+	var wc3: Vector3 = app.global_position
+	for k in 26:
+		app._track_wrap(wc3 + Vector3(cos(TAU * k / 24.0) * 8.0, -1.0, sin(TAU * k / 24.0) * 8.0))
+	check(app.ready_to_arrest and ap2.attached, "one lap binds an apprentice (no throw-back)")
 	ap2.interact()
 	check(app.is_subdued and not ap2.attached, "E arrests it, and the chain comes free")
 	ap2.respawn()
 	aw2.bullets.clear()
 	for i in 10:
 		await get_tree().physics_frame
+	for x in apps:
+		if is_instance_valid(x):
+			x.queue_free()                   # tested above; out of the bot's way for the climb
 	# the bot climbs: hook, let the rope pull you up, then aim at the next and swap
 	_aim(ap2, aw2.ascent[0].global_position)
 	Input.action_press("jump")
@@ -699,34 +722,63 @@ func _ready() -> void:
 
 	ep.global_position = s.global_position + Vector3(30, 0, 0)
 	check(not s.on_hooked(ep), "hooking from too far: it shakes the chain off")
+	# awareness: he spotted you earlier ("!" over his head); get far enough away and he gives up
+	ep.global_position = s.global_position + Vector3(0, -1, 25)
+	await get_tree().physics_frame
+	check(s.chasing and s._alert.visible, "spotted: the wizard follows you, with a ! over his head")
+	ep.global_position = s.global_position + Vector3(0, 0, 80)
+	for i in 5:
+		await get_tree().physics_frame
+	check(not s.chasing and not s._alert.visible, "get far enough away and he gives up the chase")
 	ep.global_position = s.global_position + Vector3(8, -1, 0)
-	check(s.on_hooked(ep), "hooking from close range holds")
-	ep.attached = true
-	ep.hook_node = s
-	ep.hook_offset = Vector3.ZERO
-	ep.hook_state = 2
-	ep.anchor = s.global_position
-	ep.rope_len = 8.0
+	check(_hook_on(ep, s), "hooking from close range holds")
 	ep.velocity = Vector3(0, 0, 6)
-	ep.rotation.y += 1.4                     # looking away: the auto-wrap should swing the view round
+	ep.rotation.y += 1.4                     # looking away: the lock should swing the view round
+	var p0: Vector3 = ep.global_position
 	await get_tree().physics_frame
 	ep.interact()
-	check(ep.auto_wrap, "E on a hooked caster starts the auto-wrap")
-	var frames := 0
-	var t_wrap := Time.get_ticks_msec()
-	while frames < 120 * 14 and not s.ready_to_arrest:
+	check(ep.wrap_lock, "E on a hooked caster locks your view on it")
+	for i in 60:
 		await get_tree().physics_frame
-		frames += 1
 	var to_s: Vector3 = s.global_position - ep.cam.global_position
 	var look_err: float = rad_to_deg((-ep.cam.global_basis.z).angle_to(to_s))
-	check(s.ready_to_arrest and not s.is_subdued and ep.attached,
-		"three automatic laps bind him (%.1f s of game time), and he waits for the arrest" % (frames / 120.0))
-	check(look_err < 12.0, "the camera keeps him in the reticle while wrapping (%.1f deg off)" % look_err)
+	check(look_err < 12.0, "the camera keeps him in the reticle (%.1f deg off)" % look_err)
+	check(s._laps == 0, "...but it doesn't fly you round him: you do the swinging")
+	# lap one, for real: locked on, hold D and swing round him
+	var lap_frames := 0
+	Input.action_press("move_right")
+	while lap_frames < 120 * 12 and s._laps < 1:
+		await get_tree().physics_frame
+		lap_frames += 1
+	Input.action_release("move_right")
+	print("  info lap by holding D: %.1f s" % (lap_frames / 120.0))
+	check(s._laps == 1, "locked on, holding D swings you right round him (%.1f s)" % (lap_frames / 120.0))
+	var wc2: Vector3 = s.global_position
+	var away: Vector3 = ep.global_position - s.global_position
+	away.y = 0.0
+	check(s._laps == 1 and not ep.attached and s._coils.size() == 1, "wrap 1 of 3: the wizard burns the chain (the coil stays on him)")
+	check(ep.velocity.dot(away.normalized()) > 8.0 and ep.velocity.y > 4.0, "...and throws you back (%.1f m/s away)" % ep.velocity.dot(away.normalized()))
+	await shot("14_thrown")
+	# lap two: hook him again
+	ep.global_position = s.global_position + Vector3(8, -1, 0)
+	check(_hook_on(ep, s), "hook him again for the next lap")
+	wc2 = s.global_position
+	for k in 26:
+		s._track_wrap(wc2 + Vector3(cos(TAU * k / 24.0) * 8.0, -1.0, sin(TAU * k / 24.0) * 8.0))
+	check(s._laps == 2 and not ep.attached, "wrap 2 of 3: thrown back again")
+	# lap three: bound
+	ep.global_position = s.global_position + Vector3(8, -1, 0)
+	_hook_on(ep, s)
+	wc2 = s.global_position
+	for k in 26:
+		s._track_wrap(wc2 + Vector3(cos(TAU * k / 24.0) * 8.0, -1.0, sin(TAU * k / 24.0) * 8.0))
+	check(s.ready_to_arrest and not s.is_subdued and ep.attached, "wrap 3 of 3: bound, and he waits for the arrest")
 	await shot("14_bound")
+	ep.velocity = Vector3(10, 2, 0)
 	var v_before: float = ep.velocity.length()
 	ep.interact()
 	check(s.is_subdued, "E again: ARREST")
-	check(not ep.attached and not ep.auto_wrap, "the chain comes free")
+	check(not ep.attached and not ep.wrap_lock, "the chain comes free")
 	check(ep.velocity.length() >= v_before * 0.95 and v_before > 8.0, "you keep your momentum (%.1f -> %.1f m/s)" % [v_before, ep.velocity.length()])
 	check(is_equal_approx(Engine.time_scale, 1.0), "no slow motion or freeze on the arrest")
 	var h = ew.hud
@@ -978,3 +1030,16 @@ func shot(name: String) -> void:
 		await RenderingServer.frame_post_draw
 	DirAccess.make_dir_recursive_absolute("user://shots")
 	get_viewport().get_texture().get_image().save_png("user://shots/%s.png" % name)
+
+
+## Put the player on the chain, hooked to a caster (as if the hook had just bitten).
+func _hook_on(pl: Node, en: Node) -> bool:
+	if not en.on_hooked(pl):
+		return false
+	pl.attached = true
+	pl.hook_node = en
+	pl.hook_offset = Vector3.ZERO
+	pl.hook_state = 2
+	pl.anchor = en.global_position
+	pl.rope_len = pl.global_position.distance_to(en.global_position)
+	return true

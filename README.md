@@ -27,7 +27,7 @@
 | **E** on a clue | Examine it and log it as evidence |
 | **Q** / **E** while hooked | **Q** reels in, **E** gives slack (right mouse and Ctrl still work) |
 | **Space** in the air | If the bottom of the screen shows **▼ LAND**, aim straight down, latch on and reel in fast. Doesn't count as a swing |
-| **E** while hooked to a caster | Auto-wrap round them; after 3 laps, **E** again to **arrest** |
+| **E** while hooked to a caster | Lock your view on them while you swing round (A / D circle you round fast); **E** again frees it. Once they're bound, **E** **arrests** |
 | **F2** | Dialogue editor |
 | **F3** | Performance readout: FPS, the slowest recent frame, and the last hitch with what had just happened |
 | **R** | Back to the start |
@@ -81,14 +81,21 @@ Touching **magic that isn't safe**, meaning any red orb, any projectile or the o
 ## Enemies: witches and wizards
 Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a broom, a glowing casting hand).
 
-- **Wizard (Enemy Test (Ground)):** blue robe and white beard; flies low over the island. Within **38 m** his casting hand glows red, he slows and faces you, and after a warning swell he fires a **spread-out line of five large dark red orbs** straight across, parallel to the ground (NieR-style). Alternate volleys shift by half a gap. Hook him from within **20 m** and swing around.
-- **Witch (Enemy Test (Air)):** she doesn't shoot. Her **tree** is a tall, wide cone of **40 large dark red orbs** (1.8 m radius, never clumped) and **10 blue orbs**, spaced far apart and slowly turning, high above the island: a platforming climb in its own right. The blue orbs spiral up the cone as the route (free grapples, and they keep riding the tree while you hang from them). At the top she hovers inside her **ward**, a large faceted forcefield (17 m radius) with one opening, its rim **traced in gold** so you can find it from across the sky. You can grapple the ward, but touching it stuns you. You can hook her through the opening from just outside (her hook range grows with the ward: 25 m), but **laps only count once you're inside**.
+**Awareness** is kept simple. Within its **spot range** a caster notices you, and a yellow **!** appears over its head. It then **follows** you until you get past its **leash range**, when it gives up and goes back to patrolling.
 
-**Arresting (both):** hook the caster from within range, then wrap the chain round them three times. Each lap adds a silver coil.
-- **Auto-wrap:** press **E** while hooked and you'll circle them automatically, with the camera holding them dead centre. It takes about 2 s a lap at roughly 85 km/h. For the witch, you have to be inside her ward first.
-- **By hand:** swinging round yourself works too.
-- **Arrest:** after the third lap the caster is **bound**. Press **E** again to **ARREST**. They drop to the ground and lie there with the chain coils still round them, your chain comes free with **your momentum untouched**, and a small "Arrested." line appears. There are no effects: no flash, burst, banner, sound or slow motion. (Effects come later; mechanics and performance first.)
-- A witch's ward breaks with her. Let go mid-wrap and the coils slip loose after a moment.
+- **Wizard** (Enemy Test (Ground)): blue robe, white beard, flies low over the island.
+  - **Hunting:** spots you within 38 m and follows slowly (3.5 m/s) to about 12 m away, giving up past 55 m. While he has you spotted, his casting hand glows red, swells as a warning, and fires a **spread-out line of five large dark red orbs** straight across, parallel to the ground. Alternate volleys shift by half a gap.
+  - **Arresting him takes 3 wraps**, but after each of the first two **he burns the chain and throws you back** about 14 m/s. The coils stay on him, so hook him again for the next lap. The third lap binds him.
+- **Apprentice** (The Ascent): a smaller broom-rider in green.
+  - **Hunting:** patrols a **wide circle** (25 m) round its post. It spots you within 35 m and **chases** at 9 m/s (slower than your 16, so you can get away), giving up past 60 m. It fires **single large, fast orbs straight at you**.
+  - **Resisting:** hooked, it **zigzags** side to side, about ±3 m every 0.6 s, to shake you.
+  - **Arresting:** **one lap** binds it.
+- **Witch:** retired for now, pending a redesign. Her level (the orb tree and ward) is off the level select, but the code stays, and the aim tests still use her blue orbs.
+
+**Arresting:** hook the caster from within range (20 m) and **swing round them yourself**.
+- **The lock:** press **E** to lock your view on them. Holding **A** or **D** then pushes you round them, building up to top speed: about **3.5 s a lap**. E again frees your view.
+- **Coils:** each full lap adds a silver coil. Let go mid-lap and that lap is lost; an apprentice's coil also slips off a moment after you let go.
+- **The arrest:** once they're **bound**, **E** **arrests**. They drop to the ground with the coils on, your chain comes free with your momentum untouched, and a small "Arrested." line appears. There are no effects.
 
 Code: `scripts/combat/sentry.gd` (casters, the wrap), `orb_tree.gd` (the witch's tree), `ward.gd` (the forcefield), `bullet_field.gd` (projectiles), `hook_orb.gd` (blue orbs).
 
@@ -222,7 +229,8 @@ A long ride.
 
 **Apprentices:** five of them hover just off the route, near anchors 8, 17, 26, 35 and 44. An apprentice is a weaker flying caster: a smaller broom-rider in a green robe.
 - **Its shots:** within 45 m it fires a **single large, fast orb** (24 m/s, about twice the wizard's orb size) **straight at you**, leading your movement a little, every 2.2 s. A hit stuns you like any red orb, so you drop, and below a rest ledge you're put back on it.
-- **Arresting it:** hook it and press **E**. **One lap** binds it (about 3 s of auto-wrap). Then **E** again to arrest, and it drops out of the sky.
+- **Arresting it:** hook it, lock on with **E**, and circle it once with **A** or **D**: **one lap** binds it, even while it zigzags. Then **E** again to arrest, and it drops out of the sky.
+- **Hunting:** each one patrols a wide circle round its spot and chases you (with a **!**) once you're within 35 m, until you're 60 m clear.
 
 **Aim rule:** for half a second after you let go of an anchor, the aim ignores it, and auto-aim never locks onto the anchor you're hanging from. Swapping to the next anchor never re-hooks the one you just left.
 

@@ -129,12 +129,10 @@ var aim_blocked := false         # the centre of the view is on something you ca
 signal landed_on(body: Node)
 signal fell                      # dropped into the void and respawned
 var fall_limit := -60.0     # touched down on something (the world uses it for checkpoints)
-var auto_wrap := false
+var wrap_lock := false
 var _hooked_body: Object = null  # what the current grapple bit
 var _skip_body: Object = null    # the anchor you just let go of: ignored by the aim for a moment
 var _skip_t := 0.0          # E on a hooked caster: circle them automatically
-var _wrap_sign := 1.0
-var _wrap_r := 6.0
 var _wrap_t := 0.0
 var lock_target: Node3D = null   # the grapple target auto-aim has locked onto
 var highlight_target: Node3D = null   # what the chain would bite right now, lit up (read by the HUD)
@@ -412,47 +410,46 @@ func interact() -> void:
 	var e := hook_node if attached and hook_node and is_instance_valid(hook_node) and hook_node.is_in_group("enemy") else null
 	if e:
 		if e.ready_to_arrest:
-			auto_wrap = false
+			wrap_lock = false
 			e.arrest()
-		elif not auto_wrap:
-			if e.can_wrap(self):
-				auto_wrap = true
-				var flat := global_position - e.global_position
-				flat.y = 0.0
-				var tangent := Vector3.UP.cross(flat.normalized())
-				_wrap_sign = -1.0 if velocity.dot(tangent) < 0.0 else 1.0
-				_wrap_t = 0.0
-				_wrap_r = clampf(flat.length(), 5.0, minf(10.0, maxf(5.0, e.wrap_radius_max())))
-				notice.emit("Wrapping...")
-			elif e.ward and is_instance_valid(e.ward) and not e.ward.is_inside(global_position):
-				notice.emit("Get inside her ward first: fly in through the gold opening.")
-			else:
-				notice.emit("Too far to wrap. Get within %d m." % int(e.subdue_range()))
+		elif wrap_lock:
+			wrap_lock = false                # E again: free your view
+		elif e.can_wrap(self):
+			wrap_lock = true
+			_wrap_t = 0.0
+			notice.emit("Locked on: swing round it (A / D to circle).")
+		elif e.ward and is_instance_valid(e.ward) and not e.ward.is_inside(global_position):
+			notice.emit("Get inside her ward first: fly in through the gold opening.")
+		else:
+			notice.emit("Too far to wrap. Get within %d m." % int(e.subdue_range()))
 		return
 	if look_npc:
 		talk_requested.emit(look_npc)
 
 
-## Auto-wrap: fly a circle round the caster at about the height of their broom,
-## blending in from your current motion so it never jerks.
-func _auto_wrap(dt: float) -> void:
-	var e := hook_node
-	var c := e.global_position
-	var flat := global_position - c
-	flat.y = 0.0
-	var out := flat.normalized() if flat.length() > 0.3 else global_basis.x
-	# steer for the next point on a fixed circle: exact, so it never drifts outward
-	var spd := minf(clampf(_wrap_r * 3.4, 12.0, 24.0), top_speed())   # never past top speed
-	var ang := atan2(out.z, out.x) - _wrap_sign * (spd / _wrap_r) * dt
-	var goal := c + Vector3(cos(ang), 0.0, sin(ang)) * _wrap_r
-	goal.y = c.y - 1.0
-	var want := (goal - global_position) / dt
-	want = want.limit_length(spd * 1.6)
-	velocity = velocity.lerp(want, 1.0 - exp(-8.0 * dt))
-	rope_len = maxf(MIN_ROPE, global_position.distance_to(anchor))
+## Locked on: A / D push you round the caster (sideways to your view, which is held
+## on them), building up to top speed. You steer; this just makes circling quick.
+const CIRCLE_ACCEL := 26.0
+
+func _circle_push(side: float, dt: float) -> void:
+	if absf(side) < 0.1:
+		return
+	var right := cam.global_basis.x
+	right.y = 0.0
+	if right.length_squared() < 0.01:
+		return
+	right = right.normalized() * signf(side)
+	var along := velocity.dot(right)
+	if along < top_speed():
+		velocity += right * minf(CIRCLE_ACCEL * dt, top_speed() - along)
 
 
-## Keep the caster in the reticle while auto-wrapping.
+## Thrown: a wizard burned the chain and flung you back.
+func knockback(v: Vector3) -> void:
+	velocity = v
+
+
+## Keep the hooked caster dead centre while the wrap lock is on (you still do the swinging).
 func _face_wrap_target(dt: float) -> void:
 	var d := hook_node.global_position - cam.global_position
 	# ease the view round over the first half-second, then hold them dead centre
@@ -599,7 +596,7 @@ func chain_snapped(max_speed: float) -> void:
 	attached = false
 	hook_state = Chain.RETURNING
 	velocity = velocity.limit_length(max_speed)
-	auto_wrap = false
+	wrap_lock = false
 	snapped.emit()
 
 
@@ -661,12 +658,12 @@ func _physics_process(dt: float) -> void:
 
 	velocity.y -= tune.gravity * (tune.rope_gravity if attached else 1.0) * dt
 
-	if auto_wrap and not (attached and hook_node and is_instance_valid(hook_node) and hook_node.is_in_group("enemy") and not hook_node.is_subdued):
-		auto_wrap = false
-	if auto_wrap:
-		_auto_wrap(dt)
+	if wrap_lock and not (attached and hook_node and is_instance_valid(hook_node) and hook_node.is_in_group("enemy") and not hook_node.is_subdued):
+		wrap_lock = false
+	if wrap_lock:
 		_face_wrap_target(dt)
-	elif attached:
+		_circle_push(input.x, dt)
+	if attached:
 		if is_on_floor():
 			_walk(wish, dt)
 		var look_wish := (cam.global_basis * Vector3(input.x, 0, input.y)).normalized()
@@ -682,7 +679,7 @@ func _physics_process(dt: float) -> void:
 		if wish != Vector3.ZERO and cur < tune.air_speed:
 			velocity += wish * minf(tune.air_accel * dt, tune.air_speed - cur)
 	if not is_on_floor() and Game.playing() and stunned <= 0.0 and not latching \
-			and Input.is_action_just_pressed("jump") and land_below >= 0.0 and not auto_wrap:
+			and Input.is_action_just_pressed("jump") and land_below >= 0.0 and not wrap_lock:
 		ground_latch()
 
 	# Dash: snap your momentum toward where you look
@@ -834,7 +831,7 @@ func _process(dt: float) -> void:
 	cam.position.y = lerpf(cam.position.y, -absf(cos(_bob_t)) * 0.035 * bob_amt, 0.25)
 	var side_speed := velocity.dot(global_basis.x)
 	var roll := 0.0 if is_on_floor() else clampf(-side_speed * CAM_ROLL, -CAM_ROLL_MAX, CAM_ROLL_MAX)
-	if auto_wrap:
+	if wrap_lock:
 		roll *= 0.4          # a gentle lean only: circling at speed shouldn't tip the horizon
 	cam.rotation.z = lerp_angle(cam.rotation.z, roll, 1.0 - exp(-5.0 * dt))
 

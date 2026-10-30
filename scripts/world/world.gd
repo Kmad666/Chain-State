@@ -1007,12 +1007,8 @@ func _build_ascent() -> void:
 		var p := ascent_point(k)
 		var out := Vector3(p.x, 0, p.z).normalized()
 		var c := p + out * 14.0 + Vector3(0, 4.0, 0)
-		var loop := PackedVector3Array()
-		for q in 6:
-			var a := TAU * q / 6.0
-			loop.append(c + Vector3(cos(a) * 5.0, sin(a * 2.0) * 1.5, sin(a) * 5.0))
-		var ap := _sentry("apprentice", loop)
-		ap.speed = 3.0
+		var ap := _sentry("apprentice", PackedVector3Array([c]))    # patrols a wide circle round c
+		ap.speed = 5.0
 
 	var first := ascent_point(0)
 	start_pos = Vector3(first.x + 14.0, 1.0, first.z + 10.0)

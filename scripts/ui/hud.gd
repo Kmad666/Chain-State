@@ -168,7 +168,7 @@ func _process(_dt: float) -> void:
 			_wraps.text = "[E]  ARREST"
 			_wraps.add_theme_color_override("font_color", GOLD)
 		else:
-			var hint := "auto-wrapping" if player.auto_wrap else ("[E] auto-wrap" if target.can_wrap(player) else ("get inside the ward" if target.ward else "get closer"))
+			var hint := "locked on · swing round" if player.wrap_lock else ("[E] lock on" if target.can_wrap(player) else ("get inside the ward" if target.ward else "get closer"))
 			_wraps.text = "WRAP  %s   ·  %s" % [pips, hint]
 			_wraps.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
 	else:
