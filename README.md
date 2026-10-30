@@ -4,6 +4,7 @@
 
 **Play the latest build in your browser:** https://kmad666.github.io/Chain-State/
 **Windows build:** open the latest run under the repo's **Actions** tab and download **ChainState-windows** from Artifacts.
+**Design files** (casebook, map, master to-do, level-grid template): https://kmad666.github.io/Chain-State/design/, from the [`design/`](design/) folder.
 
 ## What's in the test range
 - A 400 × 400 m flat plane with a 1 m grid, so you can read speed and distance

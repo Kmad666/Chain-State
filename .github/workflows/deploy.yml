@@ -69,6 +69,13 @@ jobs:
           sed -i "s/\"executable\":\"index\"/\"executable\":\"index\",\"mainPack\":\"index-$SHA.pck\"/; s/\"index.pck\":/\"index-$SHA.pck\":/" build/web/index.html
           grep -q "\"mainPack\":\"index-$SHA.pck\"" build/web/index.html && echo "game data renamed to index-$SHA.pck" || (echo "could not point index.html at the renamed pck" && exit 1)
 
+      - name: Add the design pages (casebook, map, to-do, level grid) at /design/
+        run: |
+          mkdir -p build/web/design
+          cp -r design/. build/web/design/
+          rm -f build/web/design/.gdignore
+          ls -la build/web/design
+
       - name: Smoke tests
         run: |
           ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 --headless res://tests/test_runner.tscn
