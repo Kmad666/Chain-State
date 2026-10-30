@@ -88,7 +88,7 @@ func _ready() -> void:
 		for i in 48:
 			var a0 := TAU * i / 48.0
 			var a1 := TAU * (i + 1) / 48.0
-			var y := half_h - CONE_LENGTH * ring
+			var y: float = half_h - CONE_LENGTH * ring
 			im.surface_add_vertex(Vector3(cos(a0) * mouth * ring, y, sin(a0) * mouth * ring))
 			im.surface_add_vertex(Vector3(cos(a1) * mouth * ring, y, sin(a1) * mouth * ring))
 	im.surface_end()
