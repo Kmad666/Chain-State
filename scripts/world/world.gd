@@ -21,6 +21,7 @@ const Clouds := preload("res://scripts/world/clouds.gd")
 const PerfOverlay := preload("res://scripts/ui/perf_overlay.gd")
 const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
+const Cherub := preload("res://scripts/combat/cherub.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
 const SKY_SAVE := "user://sky.txt"
@@ -93,6 +94,8 @@ func _ready() -> void:
 		tree.player = player
 	if ward:
 		ward.player = player
+	if cherub:
+		cherub.player = player
 
 	# sun glare sits between the 3D view and the HUD
 	var glare_layer := CanvasLayer.new()
@@ -218,6 +221,8 @@ func _build_world() -> void:
 			_build_ascent()
 		"tower":
 			_build_tower()
+		"cherub_test":
+			_build_cherub_test()
 		_:
 			_build_range()
 	if Game.level != "range" and (not islands.is_empty() or not pads.is_empty()):
@@ -873,6 +878,10 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if cherub:
+		if cherub.state == "spent":
+			return "THE CHERUB IS SPENT      FALLS %d" % falls
+		return "CHERUB      SAGES ARRESTED %d / %d      FALLS %d" % [cherub.arrested, cherub.SAGES_TO_WIN, falls]
 	if not ascent.is_empty():
 		var t := ascent_time
 		return "ANCHOR %d / %d      HEIGHT %d m      TIME %d:%04.1f      FALLS %d" % [ascent_reached + 1 if ascent_reached >= 0 else 0, ascent.size(),
@@ -882,6 +891,42 @@ func course_text() -> String:
 	return "SWINGS %d  ·  PAR %d      PAD %d / %d      FALLS %d" % [player.swings, par, checkpoint, pads.size() - 1, falls]
 
 
+
+# ---------------------------------------------------------------- Cherub Test
+var cherub: Node3D
+
+
+## Cherub Test: one plain grassy island (about 120 m across) and a Cherub hovering
+## high off its north edge. Walk toward it to wake it.
+func _build_cherub_test() -> void:
+	var isl = _island(Vector3.ZERO, 60.0, 3131)
+	isl.collision_layer = Player.LAYER_LAND
+	if bullets == null:
+		bullets = BulletField.new()
+		add_child(bullets)
+	cherub = Cherub.new()
+	cherub.position = Vector3(0, 70, -110)
+	add_child(cherub)
+	cherub.field = bullets
+	cherub.spawn_sage = _spawn_sage
+	cherub.spent.connect(func(): hud.toast("The Cherub is spent. Its eye closes.", 6.0))
+	start_pos = Vector3(0, 1.0, 50)
+	start_yaw = 0.0                     # facing north, toward it
+
+
+## A Sage released from the Cherub's eye, flying out to hover at `hover`.
+func _spawn_sage(from: Vector3, hover: Vector3) -> Node:
+	var s := Sentry.new()
+	s.kind = "sage"
+	s.path = PackedVector3Array([hover])
+	s.patrol_radius = 5.0
+	s.speed = 8.0
+	s.field = bullets
+	s.player = player
+	add_child(s)
+	s.global_position = from               # it flies out from the eye
+	sentries.append(s)
+	return s
 
 # ---------------------------------------------------------------- Tower
 var tower: Node3D

@@ -132,6 +132,9 @@ func _ready() -> void:
 ## purple robe, near-black hat. The glowing orb in the casting hand is _core,
 ## which swells as the warning before each volley.
 func _build_rider() -> void:
+	if kind == "sage":
+		_build_sage()
+		return
 	var wizard := kind == "ground"
 	var apprentice := kind == "apprentice"
 	title = "wizard" if wizard else ("apprentice" if apprentice else "witch")
@@ -185,6 +188,30 @@ func _build_rider() -> void:
 	_rig.add_child(_core)
 
 
+## Sage: a small winged eye released by a Cherub. Hovers in a small circle at the
+## spot it was sent to, fires aimed orbs, and is free to grapple (the fight's only
+## grapple points). One lap binds it. Its pupil is the casting telegraph.
+func _build_sage() -> void:
+	title = "sage"
+	wraps_needed = 1
+	engage_range = 60.0
+	volley_every = 2.8
+	_rig = Node3D.new()
+	add_child(_rig)
+	var parts: Dictionary = preload("res://scripts/combat/eye_model.gd").build(_rig, 1.0)
+	_core = parts.pupil
+	_core_mat = StandardMaterial3D.new()
+	_core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_core.material_override = _core_mat
+	_sage_wings = parts.wings
+	add_to_group("grapple_target")         # auto-aim can lock onto it
+	set_meta("grapple_name", "sage")
+
+
+var _sage_wings: Array = []
+var grapple_name := "sage"
+
+
 func _cyl(top: float, bottom: float, h: float, seg: int) -> CylinderMesh:
 	var m := CylinderMesh.new()
 	m.top_radius = top
@@ -221,17 +248,20 @@ func _physics_process(dt: float) -> void:
 		return
 	_rig.position.y = sin(_t * 1.6) * 0.12                    # hover bob
 	_rig.rotation.z = sin(_t * 0.9) * 0.08                    # lazy roll on the broom
+	if not _sage_wings.is_empty():
+		_sage_wings[0].rotation.z = -sin(_t * 7.0) * 0.5      # quick little wingbeats
+		_sage_wings[1].rotation.z = sin(_t * 7.0) * 0.5
 
 	var p_ok := player != null and is_instance_valid(player)
 	var dist: float = global_position.distance_to(player.global_position) if p_ok else INF
 	# awareness: spot within spot_range, give up past leash_range
-	if kind == "air":
+	if kind == "air" or kind == "sage":
 		chasing = p_ok and dist <= engage_range
 	elif not chasing and dist <= spot_range:
 		chasing = true
 	elif chasing and dist > leash_range:
 		chasing = false
-	_alert.visible = chasing and kind != "air"
+	_alert.visible = chasing and (kind == "ground" or kind == "apprentice")
 	engaged = chasing and dist <= engage_range
 	var hooked: bool = _hooked_by != null and is_instance_valid(_hooked_by) and _hooked_by.attached
 	if hooked:
@@ -243,7 +273,7 @@ func _physics_process(dt: float) -> void:
 			_lap_turn = 0.0          # let go mid-lap: that lap is lost
 		_hooked_by = null
 		ready_to_arrest = false
-		if chasing and kind != "air":
+		if chasing and (kind == "ground" or kind == "apprentice"):
 			_chase(dt)
 		else:
 			_patrol(dt)
@@ -279,7 +309,7 @@ func _physics_process(dt: float) -> void:
 	_core.scale = Vector3.ONE * (1.0 + wind * 0.9)
 	_core_mat.albedo_color = (Color(0.9, 0.15, 0.2) if engaged else Color(0.7, 0.45, 0.2)).lerp(Color(1.0, 0.85, 0.8), wind)
 	if _fire_t <= 0.0:
-		if kind == "apprentice":
+		if kind == "apprentice" or kind == "sage":
 			_fire_aimed()
 		else:
 			_fire_line()
@@ -360,10 +390,12 @@ func _fire_aimed() -> void:
 		return
 	var from := global_position + Vector3(0, 0.6, 0)
 	var target: Vector3 = player.global_position + Vector3(0, 0.6, 0)
-	var t := from.distance_to(target) / APPRENTICE_SHOT_SPEED
+	var spd := APPRENTICE_SHOT_SPEED if kind == "apprentice" else 15.0
+	var rad := APPRENTICE_SHOT_RADIUS if kind == "apprentice" else 0.7
+	var t := from.distance_to(target) / spd
 	target += player.velocity * t * 0.5
 	var dir := (target - from).normalized()
-	field.spawn(from + dir * 1.6, dir * APPRENTICE_SHOT_SPEED, 4.0, false, APPRENTICE_SHOT_RADIUS)
+	field.spawn(from + dir * 1.6, dir * spd, 6.0, false, rad)
 	Sfx.play_at("cast", global_position, -4.0, 1.25)
 	_volley += 1
 

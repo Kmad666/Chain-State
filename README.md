@@ -90,6 +90,7 @@ Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a bro
   - **Hunting:** patrols a **wide circle** (25 m) round its post. It spots you within 35 m and **chases** at 9 m/s (slower than your 16, so you can get away), giving up past 60 m. It fires **single large, fast orbs straight at you**.
   - **Resisting:** hooked, it **zigzags** side to side, about ±3 m every 0.6 s, to shake you.
   - **Arresting:** **one lap** binds it.
+- **Cherub** and **Sage** (Cherub Test): see below.
 - **Witch:** retired for now, pending a redesign. Her level (the orb tree and ward) is off the level select, but the code stays, and the aim tests still use her blue orbs.
 
 **Arresting:** hook the caster from within range (20 m) and **swing round them yourself**.
@@ -244,3 +245,21 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 - **Grappling:** stone and beams are solid but can't be grappled; only the crates can.
 - **Tested:** a bot climbs hook to hook to the top post in about 22 s, then lands on the crown.
 - **Reuse:** to drop one into any level, `var t = preload("res://scripts/world/grapple_tower.gd").new()`, set its position, `add_child(t)`. Exports cover sections, unit size, ledge spacing, hook reach, free hooks and the first hook's direction. `t.hooks` and `t.top_point()` give you its crates and summit.
+
+## Cherub (boss) and Sages
+
+**Cherub Test** is one plain grassy island with a **Cherub** hovering high off its north edge: a giant floating eye (8 m) with feathered angel wings.
+
+- **Waking:** come within about 135 m and it turns its eye on you. After a **2 s stare** it casts a **vast transparent cone** from its eye toward where you stood: 175 m long and about 270 m across at its mouth, big enough to swallow the island.
+- **The trap:** inside the cone you're **trapped**; its wall stops you dead.
+- **The barrage:** the eye fills the cone with **bullet-hell patterns**, cycling every 7 s with a short breather between. About 200 orbs are in flight at the peak.
+  - **Spiral:** two turning arms.
+  - **Rings:** double rings that open as they fly.
+  - **Aimed fan:** seven shots at you.
+- **Sages:** small winged eyes, caster-sized, released from the Cherub's eye, at most 3 at a time. Each flies out to a spot inside the cone, hovers there and **fires aimed orbs**.
+  - They're the **only things you can grapple** in the fight: free, and auto-aim locks onto them.
+  - **One lap** binds a Sage, then E arrests it.
+- **Winning:** arrest **5 Sages** and the Cherub is **spent**. The barrage stops, the cone fades and its eye closes.
+- **Performance:** all orbs share one bullet MultiMesh; the cone is one transparent mesh, pre-drawn at load so it never stalls; no lights.
+
+Code: `scripts/combat/cherub.gd`, `eye_model.gd` (the winged eye, shared), and kind `"sage"` in `sentry.gd`.

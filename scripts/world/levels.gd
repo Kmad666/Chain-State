@@ -11,6 +11,7 @@ const LIST := [
 	{"id": "city", "name": "City", "blurb": "A dense city island: five-storey stone terraces wall to wall, cobbled streets, alleys and a fountain plaza. Swing between the anchors over the crossroads."},
 	{"id": "ascent", "name": "The Ascent", "blurb": "A great forest island and 50 anchors spiralling up round its giant tree to a finish platform 400 m in the sky. Anchors are free: chain them all. Five apprentices shoot at you on the way; one wrap arrests each. Rest ledges every 10."},
 	{"id": "tower", "name": "Tower", "blurb": "A 130 m stone tower with grapple hooks jutting from every storey, a quarter-turn apart. Climb it hook to hook, rest on its ledges, stand on its crown."},
+	{"id": "cherub_test", "name": "Cherub Test", "blurb": "A giant winged eye. Get close and it traps you in a vast cone and fills it with bullets. Grapple and arrest its Sages (5) to bring it down."},
 	{"id": "enemy_test", "name": "Enemy Test (Ground)", "blurb": "A wizard on a broom, flying low. Get close and he fires lines of orbs across the ground. Hook him and swing around."},
 ]
 
