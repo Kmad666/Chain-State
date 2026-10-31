@@ -10,6 +10,7 @@ Everything made for Chain State that isn't the game itself (the Kenney assets li
 | `casebook/cast-agent.json` | The cast cards saved in the live casebook (only the Agent so far). |
 | `master-todo.md` / `todo.html` | **The Master To-Do**: mood boards, lore, cast, gameplay, enemies, levels, art, UI, release and the playtest checklist. `todo.html` renders it in a browser. |
 | `spire-town-reference.png` | The reference painting Spire Town is built from. |
+| `cloud-tree-reference.png` | The reference painting the Cloud Tree is built from. |
 | `level-grid/chain-state-level-grid.xlsx` | **The level-grid template**: 41 × 41 squares at 10 m each, with a legend, an example and a details sheet. |
 
 These are snapshots. The live, editable originals are in Claude:

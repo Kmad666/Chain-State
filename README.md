@@ -285,6 +285,20 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 - **Shift** goes 5× faster: 60 m/s normally, 300 m/s boosted.
 - The HUD shows your speed, your altitude and the nearest island, either "over DELOS" or "ARCADEN 2.4 km".
 
+## The Cloud Tree
+
+**The Cloud Tree** is built from a reference painting: a vast pale tree whose leaves are clouds, standing on a 480 m meadow island (`scripts/world/cloud_tree.gd`, a reusable node).
+
+- **Trunk and branches:** a smooth blue-white trunk with a flared root rises 150 m. It splits into six wide-spreading limbs and a straight central branch, and these fork twice more, about 140 pieces of wood in all. The crown reaches about 410 m.
+- **Clouds for leaves:** soft puffs in white, cream, sky blue, mint, pink and shadow blue sit at every branch tip and fork, and more drift below the crown.
+- **Scale cues:** leaning stone posts, a small ordinary tree and flowers in the grass.
+
+How the level plays:
+- The **wood** is solid and costs an air grapple like any surface.
+- The **big cloud puffs** are solid and magic: you can stand on them, and grappling them is free, so you climb the crown cloud to cloud.
+- The highest place you've stood is your checkpoint.
+- Above 250 m counts as reaching the clouds.
+
 ## Spire Town
 
 **Spire Town** is built from a reference painting: a fairy-tale town on two rock pillars rising out of a cloud sea under a lavender sky (`scripts/world/spire_town.gd`). It's a reusable node, so the same town also stands in the Nation draft, off Delos toward Daedalen and Arcaden.

@@ -23,6 +23,7 @@ const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
 const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const CloudTree := preload("res://scripts/world/cloud_tree.gd")
 const SpireTown := preload("res://scripts/world/spire_town.gd")
 const Nation := preload("res://scripts/world/nation.gd")
 
@@ -247,6 +248,8 @@ func _build_world() -> void:
 			nation.build(self)
 		"spire_town":
 			_build_spire_town()
+		"cloud_tree":
+			_build_cloud_tree()
 		_:
 			_build_range()
 	if Game.level != "range" and Game.level != "nation" and Game.level != "spire_town" and (not islands.is_empty() or not pads.is_empty()):
@@ -872,7 +875,7 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 
 ## Touched down: landing pads are checkpoints; the last one finishes the course.
 func _on_landed(body: Node) -> void:
-	if spire and body and body.get_parent() == spire:
+	if (spire and body and body.get_parent() == spire) or (cloud_tree and body and body.get_parent() == cloud_tree):
 		_spire_landed()
 		return
 	if body and body.has_meta("ascent_cp"):
@@ -905,6 +908,9 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if cloud_tree and not (player and player.flying):
+		return "THE CLOUD TREE      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
+			roundi(spire_best), roundi(cloud_tree.top_point().y), falls]
 	if spire and not (player and player.flying):
 		return "SPIRE TOWN      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
 			roundi(spire_best), roundi(spire.top_point().y), falls]
@@ -929,6 +935,7 @@ func course_text() -> String:
 
 # ---------------------------------------------------------------- Cherub Test
 var cherub: Node3D
+var cloud_tree: Node3D = null      # the Cloud Tree
 var spire: Node3D = null           # Spire Town
 var spire_best := 0.0
 var level_sky := ""                # a level's own sky, used instead of your saved one
@@ -1400,6 +1407,55 @@ func _spire_landed() -> void:
 		spire_best = y
 		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
 		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
-	if y > 200.0 and not finished:
+	var top_line := 250.0 if cloud_tree else 200.0
+	if y > top_line and not finished:
 		finished = true
-		hud.toast("THE HEIGHTS OF SPIRE TOWN: %d m, %d falls" % [roundi(y), falls], 6.0)
+		hud.toast("%s: %d m, %d falls" % ["IN THE CLOUDS" if cloud_tree else "THE HEIGHTS OF SPIRE TOWN", roundi(y), falls], 6.0)
+
+
+# ---------------------------------------------------------------- the Cloud Tree
+## The Cloud Tree: a vast pale tree whose leaves are clouds, on a wide meadow island
+## (after the reference painting). Climb the bark, then cloud to cloud: the big
+## puffs are solid and free to grapple. Leaning stone posts and a small ordinary
+## tree out on the grass give the scale. Highest place stood = checkpoint.
+func _build_cloud_tree() -> void:
+	_island(Vector3.ZERO, 240.0, 1717)
+	cloud_tree = CloudTree.new()
+	add_child(cloud_tree)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 88
+	# leaning stone posts, like old markers half sunk in the meadow
+	for i in 7:
+		var a := rng.randf() * TAU
+		var r := rng.randf_range(70.0, 200.0)
+		var h := rng.randf_range(14.0, 34.0)
+		var post := StaticBody3D.new()
+		post.collision_layer = 1
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(2.4, h, 2.4)
+		mi.mesh = bm
+		mi.material_override = Mats.lit(Color(0.66, 0.74, 0.70))
+		post.add_child(mi)
+		var cs := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = bm.size
+		cs.shape = bs
+		post.add_child(cs)
+		post.position = Vector3(cos(a) * r, h * 0.4, sin(a) * r)
+		post.rotation = Vector3(rng.randf_range(-0.35, 0.35), rng.randf() * TAU, rng.randf_range(-0.35, 0.35))
+		add_child(post)
+	# a small ordinary tree for scale, and flowers in the grass
+	_kit("tree", Vector3(-150, 0, 120), 6.0)
+	var flowers: Array = []
+	for i in 160:
+		var a := rng.randf() * TAU
+		var r := sqrt(rng.randf()) * 215.0
+		if r < 36.0:
+			continue
+		flowers.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(2.5, 4.0)), Vector3(cos(a) * r, 0, sin(a) * r)))
+	_multimesh(KIT % "flowers", flowers)
+	start_pos = Vector3(30, 1.0, 205)
+	start_yaw = atan2(30.0, 205.0)            # facing the tree
+	spire_best = start_pos.y
+	level_sky = "day"

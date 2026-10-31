@@ -18,9 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
+		elif OS.get_environment("ONLY") == "tree":
+			await _test_cloud_tree()
 		else:
 			await _test_spire()
 		print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))
@@ -186,6 +188,17 @@ func _ready() -> void:
 	check(menu._buttons.size() == Levels.LIST.size(), "menu lists every level")
 	check(menu._buttons.any(func(b): return "Platform Test" in b.text), "the Platform Test is on the menu")
 	check(menu.build_stamp().begins_with("BUILD "), "the menu shows a build number (%s)" % menu.build_stamp())
+	await get_tree().process_frame
+	check(menu.scroll != null and menu._buttons.all(func(b): return menu.scroll.is_ancestor_of(b)), "the level list sits in a scroll box")
+	var last: Button = menu._buttons[menu._buttons.size() - 1]
+	last.grab_focus()
+	for i in 4:
+		await get_tree().process_frame
+	check(menu.scroll.get_v_scroll_bar().max_value <= menu.scroll.size.y + 1.0 or menu.scroll.scroll_vertical > 0,
+		"the list scrolls to the last level (%d px down)" % menu.scroll.scroll_vertical)
+	await shot("10b_level_select_scrolled")
+	menu.scroll.scroll_vertical = 0
+	await get_tree().process_frame
 	await shot("10_level_select")
 	menu.queue_free()
 	await get_tree().process_frame
@@ -761,6 +774,7 @@ func _ready() -> void:
 
 	await _test_nation()
 	await _test_spire()
+	await _test_cloud_tree()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1327,4 +1341,57 @@ func _test_spire() -> void:
 		await get_tree().physics_frame
 	await shot("45_spire_crown")
 	sw.queue_free()
+	await get_tree().process_frame
+
+
+func _test_cloud_tree() -> void:
+	print("== The Cloud Tree")
+	Game.level = "cloud_tree"
+	var tw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(tw)
+	for i in 60:
+		await get_tree().physics_frame
+	var tp = tw.player
+	var tree_n = tw.cloud_tree
+	check(tree_n != null and tp.is_on_floor(), "cloud tree: you start on the meadow")
+	check(tree_n.branches >= 30, "cloud tree: trunk, limbs and forks (%d pieces of wood)" % tree_n.branches)
+	check(tree_n.puffs.size() >= 20, "cloud tree: a crown of cloud (%d solid puffs)" % tree_n.puffs.size())
+	check(tree_n.top_point().y > 250.0, "cloud tree: it towers %d m over the meadow" % roundi(tree_n.top_point().y))
+	var space = tw.get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(Vector3(0, 60, 40), Vector3(0, 60, -40), 1)
+	var hit: Dictionary = space.intersect_ray(q)
+	check(not hit.is_empty() and not tp.is_magic(hit.collider), "cloud tree: the trunk is solid wood (costs a grapple)")
+	var puff: Array = tree_n.puffs[tree_n.puffs.size() / 2]
+	q = PhysicsRayQueryParameters3D.create(puff[0] + Vector3(0, 40, 0), puff[0], 1)
+	hit = space.intersect_ray(q)
+	check(not hit.is_empty() and tp.is_magic(hit.collider), "cloud tree: the clouds are solid magic (free to grapple)")
+	# land on a high cloud: it's your checkpoint
+	var high: Array = tree_n.puffs[0]
+	for pf in tree_n.puffs:
+		if pf[0].y > high[0].y:
+			high = pf
+	tp.global_position = high[0] + Vector3(0, high[1] * 0.45 + 3.0, 0)
+	tp.velocity = Vector3.ZERO
+	for i in 150:
+		await get_tree().physics_frame
+	check(tp.is_on_floor() and tw.spire_best > 200.0, "cloud tree: you can stand on the clouds, and the highest is your checkpoint (%d m)" % roundi(tw.spire_best))
+	# the painting's view: from the meadow, looking up at the whole tree
+	tp.set_flying(true)
+	tp.global_position = Vector3(30, 3, 215)
+	tp.look_at(Vector3(0, 3, 0), Vector3.UP)
+	tp.rotation.x = 0.0
+	tp.rotation.z = 0.0
+	tp.head.rotation.x = deg_to_rad(40)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("47_cloud_tree")
+	tp.global_position = Vector3(-60, 190, 120)
+	tp.look_at(Vector3(0, 210, 0), Vector3.UP)
+	tp.rotation.x = 0.0
+	tp.rotation.z = 0.0
+	tp.head.rotation.x = deg_to_rad(5)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("48_cloud_tree_crown")
+	tw.queue_free()
 	await get_tree().process_frame

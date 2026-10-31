@@ -9,6 +9,7 @@ const SOFT := Color(0.95, 0.96, 0.98, 0.62)
 const STAMP := Color(0.94, 0.65, 0.60)
 
 var _buttons: Array[Button] = []
+var scroll: ScrollContainer          # the level list scrolls once it's taller than the screen
 
 
 func _ready() -> void:
@@ -68,6 +69,18 @@ func _ready() -> void:
 	rule.custom_minimum_size.y = 1
 	col.add_child(rule)
 
+	scroll = ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.follow_focus = true                 # arrow keys / Tab keep the picked level in view
+	col.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 4)
+	scroll.add_child(list)
+	_fit_scroll()
+	get_viewport().size_changed.connect(_fit_scroll)
+
 	for i in Levels.LIST.size():
 		var l: Dictionary = Levels.LIST[i]
 		var b := Button.new()
@@ -90,17 +103,26 @@ func _ready() -> void:
 		b.add_theme_stylebox_override("focus", hover)
 		b.add_theme_stylebox_override("pressed", hover)
 		b.pressed.connect(Game.play_level.bind(l.id))
-		col.add_child(b)
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		list.add_child(b)
 		_buttons.append(b)
 
 	var rule2 := ColorRect.new()
 	rule2.color = Color(PAPER, 0.25)
 	rule2.custom_minimum_size.y = 1
 	col.add_child(rule2)
-	col.add_child(_label("Click a level or press its number.   Esc in a level returns here through the pause menu.", 14, SOFT))
+	col.add_child(_label("Click a level (scroll for more) or press 1-9.   Esc in a level returns here through the pause menu.", 14, SOFT))
 	col.add_child(_label(build_stamp(), 13, Color(PAPER, 0.4)))
 	if _buttons.size() > 0:
 		_buttons[0].grab_focus.call_deferred()
+
+
+## The list gets whatever height the screen has left under the title and above the
+## footer, and scrolls (mouse wheel, drag the bar, or arrow keys) past that.
+func _fit_scroll() -> void:
+	if scroll:
+		scroll.custom_minimum_size = Vector2(0, maxf(get_viewport_rect().size.y - 400.0, 180.0))
 
 
 ## "BUILD 1c67fcd · 2026-10-29 18:11 UTC": written by CI into data/build.json,
