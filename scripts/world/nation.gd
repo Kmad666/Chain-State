@@ -13,6 +13,9 @@ extends RefCounted
 ## distant states read as silhouettes.
 
 const FloatingIsland := preload("res://scripts/world/floating_island.gd")
+const SpireTown := preload("res://scripts/world/spire_town.gd")
+const SPIRE_R := 115.0                      # Spire Town's footprint, for spacing
+const SPIRE_DROP := -165.0                  # its cloud line sits deep in the cloud sea
 const M_PER_UNIT := 10.73
 const MAP_ORIGIN := Vector2(997, 763)       # Delos, in casebook-map units
 const CLUSTER := 0.42                       # states sit at 42% of their 1:50 map distance
@@ -63,6 +66,7 @@ var _buffers: Array = []
 var _platforms: Array = []
 var _canopy: Array = []
 var _spots: Array = []                 # [centre, radius] of every island placed so far
+var spire: Node3D = null              # Spire Town, placed among the islands
 var landmarks: Array = []              # the towers: never culled, they're how you navigate
 var detail_nodes: Array = []           # every per-island detail batch (for tests)
 var fog_end := FOG_END
@@ -85,6 +89,12 @@ func build(world: Node3D) -> void:
 		var c := to_world(s.map, s.y)
 		capitals.append(c)
 		_spots.append([c, s.r])
+	# Spire Town, the twin-pillar town, off Delos toward Daedalen and Arcaden
+	var toward: Vector3 = (capitals[4] + capitals[5]) * 0.5 - capitals[0]
+	var spire_at := _free_spot(func():
+		var ang := atan2(toward.z, toward.x) + rng.randf_range(-0.5, 0.5)
+		var dist := rng.randf_range(STATES[0].r + SPIRE_R + GAP, STATES[0].r + SPIRE_R + 600.0)
+		return Vector3(cos(ang) * dist, SPIRE_DROP, sin(ang) * dist), SPIRE_R)
 	var sats: Array = []
 	for i in range(1, STATES.size()):
 		var s: Dictionary = STATES[i]
@@ -127,6 +137,12 @@ func build(world: Node3D) -> void:
 		places.append({"name": s.name, "pos": c, "r": s.r})
 	for it in sats + ords:
 		_isle(it[0], it[1], it[2], it[3])
+	if spire_at != Vector3.INF:
+		spire = SpireTown.new()
+		spire.position = spire_at
+		w.add_child(spire)
+		_label(spire_at + Vector3(0, 290, 0), "SPIRE TOWN", "twin pillars out of the cloud", Color(0.80, 0.92, 0.90), 1.0)
+		places.append({"name": "SPIRE TOWN", "pos": spire_at, "r": SPIRE_R})
 
 	# the capitals' towers, always drawn: landmarks to steer by through the haze
 	for t in landmarks:

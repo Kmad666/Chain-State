@@ -18,8 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") == "nation":     # quick run: just the Nation draft
-		await _test_nation()
+	if OS.get_environment("ONLY") in ["nation", "spire"]:     # quick runs
+		if OS.get_environment("ONLY") == "nation":
+			await _test_nation()
+		else:
+			await _test_spire()
 		print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))
 		get_tree().quit(1 if fails else 0)
 		return
@@ -757,6 +760,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	await _test_nation()
+	await _test_spire()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1150,6 +1154,8 @@ func _test_nation() -> void:
 			var gap: float = Vector2(ia.position.x - ib.position.x, ia.position.z - ib.position.z).length() - ia.radius - ib.radius
 			clear = clear and gap >= 60.0
 	check(clear, "nation: no two islands overlap (at least 60 m of air between rims)")
+	check(nw.nation.spire != null and Vector2(nw.nation.spire.position.x, nw.nation.spire.position.z).length() > 600.0,
+		"nation: Spire Town stands among the islands, clear of Delos")
 	check(nw.nation.rails.size() == nw.islands.size(), "nation: a railway across every island (%d)" % nw.nation.rails.size())
 	var on_isle := true
 	for k in nw.nation.rails.size():
@@ -1231,7 +1237,94 @@ func _test_nation() -> void:
 	for i in 10:
 		await get_tree().physics_frame
 	await shot("42_nation_station")
+	var spn: Vector3 = nw.nation.spire.position
+	var away: Vector3 = Vector3(spn.x, 0, spn.z).normalized()
+	np.global_position = spn + away * 330.0 + Vector3(0, 120, 0)
+	np.look_at(spn + Vector3(0, 110, 0), Vector3.UP)
+	np.rotation.x = 0.0
+	np.rotation.z = 0.0
+	np.head.rotation.x = 0.0
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("46_nation_spire")
 	np.set_flying(false)
 	check(not np.flying and np.collision_mask != 0, "fly: F4 again lands you with collision back on")
 	nw.queue_free()
+	await get_tree().process_frame
+
+
+
+func _test_spire() -> void:
+	print("== Spire Town")
+	Game.level = "spire_town"
+	var sw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(sw)
+	for i in 60:
+		await get_tree().physics_frame
+	var sp = sw.player
+	var town = sw.spire
+	check(town != null and sp.is_on_floor(), "spire: you start standing on the landing island")
+	check(town.top_point().y > 230.0, "spire: the main tower's finial is the top of the town (%d m)" % roundi(town.top_point().y))
+	check(town.shelves.size() >= 30, "spire: houses cling to both pillars (%d)" % town.shelves.size())
+	check(sw.env.fog_height_density > 0.0 and sw.sky_id == "alien", "spire: lavender sky and a cloud sea below")
+	var space = sw.get_world_3d().direct_space_state
+	var hits := 0
+	for probe in [Vector3(0, 70, 0), Vector3(-55, 200, 0), Vector3(50, 220, 0), Vector3(10, 180, 0)]:
+		var q := PhysicsRayQueryParameters3D.create(probe, probe + Vector3(0, -60, 0), 1)
+		if not space.intersect_ray(q).is_empty():
+			hits += 1
+	check(hits == 4, "spire: solid viaduct, palace, east tower and plank bridge (%d / 4)" % hits)
+	# the east pillar's spiral walkway is a ramp you can walk up
+	var a0 := PI + 0.4
+	var r0: float = town.radius_at(town.EAST_LEVELS, 60.0) + 2.6
+	sp.global_position = Vector3(town.EAST.x + cos(a0) * r0, 58.0, town.EAST.y + sin(a0) * r0)
+	sp.velocity = Vector3.ZERO
+	for i in 150:
+		await get_tree().physics_frame
+	var y_start: float = sp.global_position.y
+	check(sp.is_on_floor(), "spire: you can stand on the spiral walkway")
+	for i in 480:
+		var a: float = atan2(sp.global_position.z - town.EAST.y, sp.global_position.x - town.EAST.x)
+		var tangent := Vector3(-sin(a), 0, cos(a))
+		sp.look_at(sp.global_position + tangent, Vector3.UP)
+		sp.rotation.x = 0.0
+		sp.rotation.z = 0.0
+		Input.action_press("move_forward")
+		await get_tree().physics_frame
+	Input.action_release("move_forward")
+	check(sp.global_position.y > y_start + 3.0, "spire: walking the spiral climbs (%.1f m in 4 s)" % (sp.global_position.y - y_start))
+	# land somewhere high: a checkpoint
+	sp.global_position = Vector3(town.WEST.x + 6.0, 156.0, town.WEST.y + 20.0)
+	sp.velocity = Vector3.ZERO
+	for i in 150:
+		await get_tree().physics_frame
+	check(sw.spire_best > 140.0 and sp.spawn.origin.y > 140.0, "spire: the highest place you've stood is your checkpoint")
+	# the view from the landing island, like the painting
+	sp.global_position = Vector3(2, 20, 240)
+	sp.look_at(Vector3(-2, 130, 0), Vector3.UP)
+	var pitch: float = sp.rotation.x
+	sp.rotation.x = 0.0
+	sp.rotation.z = 0.0
+	sp.set_flying(true)
+	sp.head.rotation.x = pitch
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("43_spire_town")
+	sp.global_position = Vector3(-20, 130, 75)
+	sp.look_at(Vector3(10, 120, 0), Vector3.UP)
+	sp.rotation.x = 0.0
+	sp.rotation.z = 0.0
+	sp.head.rotation.x = deg_to_rad(4)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("44_spire_close")
+	sp.global_position = Vector3(-70, 175, 60)
+	sp.look_at(Vector3(20, 160, 0), Vector3.UP)
+	sp.rotation.x = 0.0
+	sp.rotation.z = 0.0
+	sp.head.rotation.x = deg_to_rad(-6)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("45_spire_crown")
+	sw.queue_free()
 	await get_tree().process_frame

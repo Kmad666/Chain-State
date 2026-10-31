@@ -285,6 +285,33 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 - **Shift** goes 5× faster: 60 m/s normally, 300 m/s boosted.
 - The HUD shows your speed, your altitude and the nearest island, either "over DELOS" or "ARCADEN 2.4 km".
 
+## Spire Town
+
+**Spire Town** is built from a reference painting: a fairy-tale town on two rock pillars rising out of a cloud sea under a lavender sky (`scripts/world/spire_town.gd`). It's a reusable node, so the same town also stands in the Nation draft, off Delos toward Daedalen and Arcaden.
+
+- **West pillar** (about 90 m across, 150 m tall):
+  - On top, a palace with a great window front and a teal hipped roof, with four corner turrets.
+  - The 96 m main tower, with a gallery near the top. Its gold finial, at 248 m, is the town's highest point.
+  - Two rings of pastel houses on stone shelves round its sides, with turrets standing out from them.
+- **East pillar** (slimmer, 160 m tall):
+  - Houses cling all the way round it.
+  - A timber walkway spirals up three turns between them. It's one continuous ramp, so you can walk it.
+  - A lone tower with a balcony stands on top.
+- **Three crossings** join the pillars:
+  - a stone viaduct on arches near the bottom
+  - a rock arch higher up
+  - a sagging plank bridge with rope rails, from a palace turret to the east tower
+- Everything is solid and grapple-able: rock, houses, towers and bridges.
+
+How the level plays:
+- You start on a small island off the viaduct.
+- The highest place you've stood is your checkpoint.
+- Standing anywhere above 200 m counts as reaching the heights.
+- Falling into the clouds sends you back to your checkpoint.
+- The HUD shows your height, your best and the top.
+
+The town is built from a handful of unit shapes in MultiMesh batches, one draw call per shape and colour.
+
 ## Cherub (boss) and Sages
 
 **Cherub Test** is one plain grassy island with a **Cherub** hovering high off its north edge: a giant floating eye (8 m) with feathered angel wings.

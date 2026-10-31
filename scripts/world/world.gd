@@ -23,6 +23,7 @@ const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
 const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const SpireTown := preload("res://scripts/world/spire_town.gd")
 const Nation := preload("res://scripts/world/nation.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
@@ -88,6 +89,8 @@ func _ready() -> void:
 	player.fell.connect(func(): falls += 1)
 	if not pads.is_empty():
 		player.fall_limit = -30.0
+	if spire:
+		player.fall_limit = -20.0
 	if nation:
 		player.fall_limit = -1200.0
 		player.cam.near = 0.1
@@ -110,7 +113,9 @@ func _ready() -> void:
 	glare = SunGlare.new()
 	glare.camera = player.cam
 	glare_layer.add_child(glare)
-	set_sky(sky_id)
+	if level_sky != "":
+		sky_id = level_sky
+	set_sky(sky_id, level_sky == "")     # a level's own sky isn't saved as your choice
 
 	var ui := CanvasLayer.new()
 	ui.layer = 10
@@ -188,7 +193,7 @@ func _build_environment() -> void:
 
 
 ## Swap the panorama and move the sun, its colour and the fog to match it.
-func set_sky(id: String) -> void:
+func set_sky(id: String, save := true) -> void:
 	if not SKIES.has(id):
 		return
 	sky_id = id
@@ -210,7 +215,7 @@ func set_sky(id: String) -> void:
 		glare.strength = s.glare
 	sun.light_color = s.light
 	sun.light_energy = s.energy
-	var f := FileAccess.open(SKY_SAVE, FileAccess.WRITE)
+	var f := FileAccess.open(SKY_SAVE, FileAccess.WRITE) if save else null
 	if f:
 		f.store_string(id)
 
@@ -240,9 +245,11 @@ func _build_world() -> void:
 		"nation":
 			nation = Nation.new()
 			nation.build(self)
+		"spire_town":
+			_build_spire_town()
 		_:
 			_build_range()
-	if Game.level != "range" and Game.level != "nation" and (not islands.is_empty() or not pads.is_empty()):
+	if Game.level != "range" and Game.level != "nation" and Game.level != "spire_town" and (not islands.is_empty() or not pads.is_empty()):
 		var c := Vector3.ZERO
 		var spots: Array = islands if not islands.is_empty() else pads
 		for isl in spots:
@@ -865,6 +872,9 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 
 ## Touched down: landing pads are checkpoints; the last one finishes the course.
 func _on_landed(body: Node) -> void:
+	if spire and body and body.get_parent() == spire:
+		_spire_landed()
+		return
 	if body and body.has_meta("ascent_cp"):
 		var cp_i: int = body.get_meta("ascent_cp")
 		if body.has_meta("finish"):
@@ -895,6 +905,9 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if spire and not (player and player.flying):
+		return "SPIRE TOWN      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
+			roundi(spire_best), roundi(spire.top_point().y), falls]
 	if player and player.flying:
 		var p: Vector3 = player.global_position
 		var here: String = nation.where(p) if nation else "x %d  z %d" % [roundi(p.x), roundi(p.z)]
@@ -916,6 +929,9 @@ func course_text() -> String:
 
 # ---------------------------------------------------------------- Cherub Test
 var cherub: Node3D
+var spire: Node3D = null           # Spire Town
+var spire_best := 0.0
+var level_sky := ""                # a level's own sky, used instead of your saved one
 var nation = null                  # the Nation draft's builder (place names for the fly readout)
 
 
@@ -1339,3 +1355,51 @@ func _process(_dt: float) -> void:
 	if OS.has_feature("web") and Game.playing() and _had_capture and not captured:
 		_set_paused(true)
 	_had_capture = captured and Game.playing()
+
+
+# ---------------------------------------------------------------- Spire Town
+## Spire Town: the twin-pillar town from the reference painting, rising out of a
+## cloud sea under a lavender sky. You start on a small island off the viaduct; climb
+## by swinging off the rock, the houses and the towers, or walk the east pillar's
+## spiral. The highest place you've stood is your checkpoint.
+func _build_spire_town() -> void:
+	spire = SpireTown.new()
+	add_child(spire)
+	var landing := _island(Vector3(4, 46, 38), 11.0, 515)
+	start_pos = landing.position + Vector3(0, 1.0, 5.0)
+	start_yaw = 0.0                                   # facing the town (north)
+	spire_best = start_pos.y
+	level_sky = "alien"                               # the painting's lavender
+	# the cloud sea the pillars rise from: a sheet of cloud with fog pooling on it
+	var sea := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(5000, 5000)
+	sea.mesh = pm
+	sea.material_override = Mats.lit(Color(0.88, 0.85, 0.95), 1.0)
+	sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	sea.position.y = 6.0
+	add_child(sea)
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_depth_begin = 220.0
+	env.fog_depth_end = 1800.0
+	env.fog_depth_curve = 1.2
+	env.fog_density = 1.0
+	env.fog_height = 34.0
+	env.fog_height_density = 0.045
+	var puffs := Clouds.new()
+	puffs.centre = Vector3.ZERO
+	puffs.y_low = 8.0
+	puffs.y_high = 40.0
+	puffs.spread = 260.0
+	add_child(puffs)
+
+
+func _spire_landed() -> void:
+	var y := player.global_position.y
+	if y > spire_best + 6.0:
+		spire_best = y
+		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
+		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
+	if y > 200.0 and not finished:
+		finished = true
+		hud.toast("THE HEIGHTS OF SPIRE TOWN: %d m, %d falls" % [roundi(y), falls], 6.0)
