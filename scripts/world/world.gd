@@ -23,6 +23,7 @@ const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
 const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const KeepIsles := preload("res://scripts/world/keep_isles.gd")
 const WhiteCitadel := preload("res://scripts/world/white_citadel.gd")
 const CloudTree := preload("res://scripts/world/cloud_tree.gd")
 const SpireTown := preload("res://scripts/world/spire_town.gd")
@@ -253,6 +254,8 @@ func _build_world() -> void:
 			_build_cloud_tree()
 		"white_citadel":
 			_build_white_citadel()
+		"keep_isles":
+			_build_keep_isles()
 		_:
 			_build_range()
 	if not Game.level in ["range", "nation", "spire_town", "white_citadel"] and (not islands.is_empty() or not pads.is_empty()):
@@ -879,7 +882,7 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 ## Touched down: landing pads are checkpoints; the last one finishes the course.
 func _on_landed(body: Node) -> void:
 	if body and ((spire and body.get_parent() == spire) or (cloud_tree and body.get_parent() == cloud_tree) \
-			or (citadel and body.get_parent() == citadel)):
+			or (citadel and body.get_parent() == citadel) or (keep and (body.get_parent() == keep or body == keep))):
 		_spire_landed()
 		return
 	if body and body.has_meta("ascent_cp"):
@@ -912,6 +915,9 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if keep and not (player and player.flying):
+		return "THE KEEP ISLES      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
+			roundi(spire_best), roundi(keep.top_point().y), falls]
 	if citadel and not (player and player.flying):
 		return "THE WHITE CITADEL      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
 			roundi(spire_best), roundi(citadel.top_point().y), falls]
@@ -944,6 +950,7 @@ func course_text() -> String:
 var cherub: Node3D
 var cloud_tree: Node3D = null      # the Cloud Tree
 var citadel: Node3D = null         # the White Citadel
+var keep: Node3D = null            # the Keep Isles
 var spire: Node3D = null           # Spire Town
 var spire_best := 0.0
 var level_sky := ""                # a level's own sky, used instead of your saved one
@@ -1415,10 +1422,10 @@ func _spire_landed() -> void:
 		spire_best = y
 		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
 		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
-	var top_line := 250.0 if cloud_tree else (140.0 if citadel else 200.0)
+	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else 200.0)
 	if y > top_line and not finished:
 		finished = true
-		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else "THE HEIGHTS OF SPIRE TOWN")
+		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else "THE HEIGHTS OF SPIRE TOWN"))
 		hud.toast("%s: %d m, %d falls" % [what, roundi(y), falls], 6.0)
 
 
@@ -1528,3 +1535,23 @@ func _build_white_citadel() -> void:
 	env.fog_depth_begin = 300.0
 	env.fog_depth_end = 2200.0
 	env.fog_density = 1.0
+
+
+# ---------------------------------------------------------------- the Keep Isles
+## The Keep Isles: a castle on a forested hill island with three little isles of
+## houses floating round it (after a reference drawing). You start on the left isle;
+## cross its plank bridge to the hillside town, then climb the hill and the keep.
+func _build_keep_isles() -> void:
+	keep = KeepIsles.new()
+	add_child(keep)
+	start_pos = Vector3(-200, 27.5, 50)        # in front of the isle's terrace
+	start_yaw = -PI * 0.5                         # facing east, toward the keep
+	spire_best = start_pos.y
+	level_sky = "day"
+	env.fog_density = 0.0009                      # thinner haze: the isles read from each other
+	var puffs := Clouds.new()
+	puffs.centre = Vector3(0, 0, 0)
+	puffs.y_low = -120.0
+	puffs.y_high = 140.0
+	puffs.spread = 320.0
+	add_child(puffs)

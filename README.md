@@ -285,6 +285,26 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 - **Shift** goes 5× faster: 60 m/s normally, 300 m/s boosted.
 - The HUD shows your speed, your altitude and the nearest island, either "over DELOS" or "ARCADEN 2.4 km".
 
+## The Keep Isles
+
+**The Keep Isles** is built from a reference drawing Daniel shared (`scripts/world/keep_isles.gd`, on the same Blockout base as the White Citadel).
+
+- **The main island:** a round forested hill, a 210 m dome you can walk on, covered in about 300 pines. It sits on a floating rock base with roots and rock spikes hanging underneath.
+- **The keep on the summit:**
+  - a lavender-grey wall-block with buttresses, banners and crenellations
+  - red-roofed white halls on top
+  - a round tower with a jutting gallery, a little bay, a red cone roof, and a banner turret at 188 m
+- **The hillside towns:** two rows of red-roofed houses sit on timber-propped ledges down the slopes, each with a small round tower.
+- **Three little isles** float round it, each with houses on a stone terrace, a crenellated watchtower and pines.
+  - Plank bridges with a gentle sag join the left and right isles to the hillside towns.
+  - The little isle below has no bridge, so you swing to it.
+- Birds wheel round the tower.
+
+How the level plays:
+- You start on the left isle. Walk the bridge, then climb.
+- The highest place you've stood is your checkpoint.
+- Above 140 m counts as reaching the keep's walls.
+
 ## The White Citadel
 
 **The White Citadel** is built from a reference painting by [snowskadi](http://snowskadi.deviantart.com/): a pale city-castle rising in tiers out of a still lake (`scripts/world/white_citadel.gd`). It's built on `scripts/world/blockout.gd`, a reusable base that batches unit shapes into one draw call per shape and colour.

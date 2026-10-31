@@ -18,9 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
+		elif OS.get_environment("ONLY") == "keep":
+			await _test_keep()
 		elif OS.get_environment("ONLY") == "citadel":
 			await _test_citadel()
 		elif OS.get_environment("ONLY") == "tree":
@@ -778,6 +780,7 @@ func _ready() -> void:
 	await _test_spire()
 	await _test_cloud_tree()
 	await _test_citadel()
+	await _test_keep()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1449,4 +1452,61 @@ func _test_citadel() -> void:
 		await get_tree().physics_frame
 	await shot("50_white_citadel_close")
 	cw.queue_free()
+	await get_tree().process_frame
+
+
+func _test_keep() -> void:
+	print("== The Keep Isles")
+	Game.level = "keep_isles"
+	var kw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(kw)
+	for i in 60:
+		await get_tree().physics_frame
+	var kp = kw.player
+	var kk = kw.keep
+	check(kk != null and kp.is_on_floor(), "keep: you start on the left isle")
+	check(kk.isles.size() == 3 and kk.bridges.size() == 2, "keep: three little isles, two joined by plank bridges")
+	check(kk.top_point().y > 160.0, "keep: the tower's banner tops the keep (%d m)" % roundi(kk.top_point().y))
+	var space = kw.get_world_3d().direct_space_state
+	var probe := Vector3(-50, 120, 40)
+	var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(probe, probe + Vector3(0, -140, 0), 1))
+	var want: float = kk.hill_y(-50.0, 40.0)
+	check(not hit.is_empty() and absf(hit.position.y - want) < 4.0, "keep: the hill is a solid dome you can walk on (%.0f m, expected %.0f)" % [hit.get("position", Vector3.ZERO).y, want])
+	# walk the left bridge to the hillside town
+	var br: Array = kk.bridges[0]
+	var a: Vector3 = br[0]
+	var b: Vector3 = br[1]
+	kp.global_position = a + Vector3(0, 1.5, 0) + (b - a).normalized() * 2.0
+	kp.velocity = Vector3.ZERO
+	kp.look_at(kp.global_position + Vector3(b.x - a.x, 0, b.z - a.z), Vector3.UP)
+	kp.rotation.x = 0.0
+	kp.rotation.z = 0.0
+	for i in 60:
+		await get_tree().physics_frame
+	Input.action_press("move_forward")
+	for i in 1500:
+		await get_tree().physics_frame
+		if Vector2(kp.global_position.x - b.x, kp.global_position.z - b.z).length() < 6.0:
+			break
+	Input.action_release("move_forward")
+	check(Vector2(kp.global_position.x - b.x, kp.global_position.z - b.z).length() < 8.0 and kp.global_position.y > a.y,
+		"keep: you can walk the plank bridge up to the hillside town")
+	kp.set_flying(true)
+	kp.global_position = Vector3(10, 60, 380)
+	kp.look_at(Vector3(0, 55, 0), Vector3.UP)
+	kp.rotation.x = 0.0
+	kp.rotation.z = 0.0
+	kp.head.rotation.x = deg_to_rad(6)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("51_keep_isles")
+	kp.global_position = Vector3(-130, 95, 110)
+	kp.look_at(Vector3(0, 110, 0), Vector3.UP)
+	kp.rotation.x = 0.0
+	kp.rotation.z = 0.0
+	kp.head.rotation.x = deg_to_rad(3)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("52_keep_close")
+	kw.queue_free()
 	await get_tree().process_frame
