@@ -279,6 +279,19 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
   - **-** and **=** thin or thicken the cloud sea.
   - The HUD shows the current values, so you can tell me the numbers you like.
 
+**The layout lives in `data/nation_layout.json`.** It has one entry per island:
+- its id, name and kind (`capital` with its `state`, `satellite`, `isle`, `spire_town`)
+- `x` / `y` / `z` in metres: x is east, z is south (north is −z), y is the island's top
+- its radius `r`
+
+The level reads this file every time it loads, so moving, resizing, adding or removing an island is a one-line edit. The railways re-aim at each island's nearest neighbour on their own. If the file is missing, the original generated draft is laid out instead (`generate_layout()` in `nation.gd`).
+
+**The Nation Layout Map** (a Claude artifact, linked from `design/`) is a to-scale, top-down chart of the same layout:
+- **Moving and resizing:** drag an island's box to move it (Shift snaps to 50 m), or drag its brass corner to resize it.
+- **Exact values:** type exact coordinates, height or radius in the side panel, and add or delete islands.
+- **Warnings:** islands closer than 60 m are flagged.
+- **Saving:** edits save in the map. Ask Claude to "apply the Nation map" and they're written into the layout file for the next build.
+
 **Dev fly** works in every level:
 - **F4** or **V** toggles noclip flight.
 - **WASD** flies where you look, **Space** rises and **Ctrl** or **C** sinks.

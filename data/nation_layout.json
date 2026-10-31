@@ -1,0 +1,367 @@
+{
+	"about": "Chain State: the Nation draft's island layout. Metres: x east, z south (north is -z), y is the island's top surface (for Spire Town, its cloud line). r is the island's radius. kind: capital (state = which state), satellite, isle, spire_town. Edit freely: the level reads this file every time it loads.",
+	"islands": [
+		{
+			"id": "delos",
+			"kind": "capital",
+			"name": "DELOS",
+			"r": 500.0,
+			"seed": 700,
+			"state": "delos",
+			"x": 0.0,
+			"y": 0.0,
+			"z": 0.0
+		},
+		{
+			"id": "gordia",
+			"kind": "capital",
+			"name": "GORDIA",
+			"r": 320.0,
+			"seed": 701,
+			"state": "gordia",
+			"x": 1370.0,
+			"y": 40.0,
+			"z": -1793.6
+		},
+		{
+			"id": "rhenish-gordia",
+			"kind": "capital",
+			"name": "RHENISH GORDIA",
+			"r": 260.0,
+			"seed": 702,
+			"state": "rhenish-gordia",
+			"x": -2415.5,
+			"y": -30.0,
+			"z": -869.8
+		},
+		{
+			"id": "delosen",
+			"kind": "capital",
+			"name": "DELOSEN",
+			"r": 280.0,
+			"seed": 703,
+			"state": "delosen",
+			"x": 2068.5,
+			"y": 20.0,
+			"z": -148.7
+		},
+		{
+			"id": "arcaden",
+			"kind": "capital",
+			"name": "ARCADEN",
+			"r": 300.0,
+			"seed": 704,
+			"state": "arcaden",
+			"x": 1757.6,
+			"y": 60.0,
+			"z": 2194.7
+		},
+		{
+			"id": "daedalen",
+			"kind": "capital",
+			"name": "DAEDALEN",
+			"r": 260.0,
+			"seed": 705,
+			"state": "daedalen",
+			"x": -860.8,
+			"y": -50.0,
+			"z": 1270.9
+		},
+		{
+			"id": "gordia-isle-1",
+			"kind": "satellite",
+			"name": "Gordia isle",
+			"r": 92.1,
+			"seed": 810,
+			"state": "gordia",
+			"x": 1638.9,
+			"y": 56.7,
+			"z": -2636.7
+		},
+		{
+			"id": "gordia-isle-2",
+			"kind": "satellite",
+			"name": "Gordia isle",
+			"r": 87.1,
+			"seed": 811,
+			"state": "gordia",
+			"x": 2348.7,
+			"y": 68.8,
+			"z": -1979.1
+		},
+		{
+			"id": "gordia-isle-3",
+			"kind": "satellite",
+			"name": "Gordia isle",
+			"r": 71.2,
+			"seed": 812,
+			"state": "gordia",
+			"x": 1773.1,
+			"y": 72.3,
+			"z": -1462.8
+		},
+		{
+			"id": "rhenish-gordia-isle-1",
+			"kind": "satellite",
+			"name": "Rhenish Gordia isle",
+			"r": 139.6,
+			"seed": 820,
+			"state": "rhenish-gordia",
+			"x": -3230.2,
+			"y": -31.2,
+			"z": -1066.7
+		},
+		{
+			"id": "rhenish-gordia-isle-2",
+			"kind": "satellite",
+			"name": "Rhenish Gordia isle",
+			"r": 89.5,
+			"seed": 821,
+			"state": "rhenish-gordia",
+			"x": -2273.2,
+			"y": -20.0,
+			"z": -160.3
+		},
+		{
+			"id": "rhenish-gordia-isle-3",
+			"kind": "satellite",
+			"name": "Rhenish Gordia isle",
+			"r": 62.9,
+			"seed": 822,
+			"state": "rhenish-gordia",
+			"x": -2772.5,
+			"y": -26.6,
+			"z": -112.3
+		},
+		{
+			"id": "delosen-isle-1",
+			"kind": "satellite",
+			"name": "Delosen isle",
+			"r": 71.8,
+			"seed": 830,
+			"state": "delosen",
+			"x": 1813.3,
+			"y": 16.1,
+			"z": -774.4
+		},
+		{
+			"id": "delosen-isle-2",
+			"kind": "satellite",
+			"name": "Delosen isle",
+			"r": 83.4,
+			"seed": 831,
+			"state": "delosen",
+			"x": 2932.2,
+			"y": 11.2,
+			"z": -125.4
+		},
+		{
+			"id": "delosen-isle-3",
+			"kind": "satellite",
+			"name": "Delosen isle",
+			"r": 121.8,
+			"seed": 832,
+			"state": "delosen",
+			"x": 2279.4,
+			"y": 37.7,
+			"z": -888.2
+		},
+		{
+			"id": "arcaden-isle-1",
+			"kind": "satellite",
+			"name": "Arcaden isle",
+			"r": 106.3,
+			"seed": 840,
+			"state": "arcaden",
+			"x": 2453.7,
+			"y": 70.0,
+			"z": 2380.5
+		},
+		{
+			"id": "arcaden-isle-2",
+			"kind": "satellite",
+			"name": "Arcaden isle",
+			"r": 104.6,
+			"seed": 841,
+			"state": "arcaden",
+			"x": 1593.5,
+			"y": 71.1,
+			"z": 1340.2
+		},
+		{
+			"id": "arcaden-isle-3",
+			"kind": "satellite",
+			"name": "Arcaden isle",
+			"r": 68.2,
+			"seed": 842,
+			"state": "arcaden",
+			"x": 2095.7,
+			"y": 118.4,
+			"z": 2693.4
+		},
+		{
+			"id": "daedalen-isle-1",
+			"kind": "satellite",
+			"name": "Daedalen isle",
+			"r": 85.5,
+			"seed": 850,
+			"state": "daedalen",
+			"x": -685.4,
+			"y": 3.2,
+			"z": 2238.7
+		},
+		{
+			"id": "daedalen-isle-2",
+			"kind": "satellite",
+			"name": "Daedalen isle",
+			"r": 121.5,
+			"seed": 851,
+			"state": "daedalen",
+			"x": -108.0,
+			"y": -27.5,
+			"z": 1227.1
+		},
+		{
+			"id": "daedalen-isle-3",
+			"kind": "satellite",
+			"name": "Daedalen isle",
+			"r": 81.8,
+			"seed": 852,
+			"state": "daedalen",
+			"x": -1232.8,
+			"y": -18.2,
+			"z": 1975.3
+		},
+		{
+			"id": "isle-1",
+			"kind": "isle",
+			"name": "Isle 1",
+			"r": 86.4,
+			"seed": 900,
+			"x": 974.2,
+			"y": 13.7,
+			"z": -740.4
+		},
+		{
+			"id": "isle-2",
+			"kind": "isle",
+			"name": "Isle 2",
+			"r": 186.3,
+			"seed": 901,
+			"x": -1361.5,
+			"y": -42.1,
+			"z": -406.8
+		},
+		{
+			"id": "isle-3",
+			"kind": "isle",
+			"name": "Isle 3",
+			"r": 148.2,
+			"seed": 902,
+			"x": 905.5,
+			"y": 62.9,
+			"z": -210.4
+		},
+		{
+			"id": "isle-4",
+			"kind": "isle",
+			"name": "Isle 4",
+			"r": 61.3,
+			"seed": 903,
+			"x": 1065.5,
+			"y": 3.5,
+			"z": 1240.4
+		},
+		{
+			"id": "isle-5",
+			"kind": "isle",
+			"name": "Isle 5",
+			"r": 95.9,
+			"seed": 904,
+			"x": -410.3,
+			"y": -8.7,
+			"z": 823.0
+		},
+		{
+			"id": "isle-6",
+			"kind": "isle",
+			"name": "Isle 6",
+			"r": 95.2,
+			"seed": 905,
+			"x": 1524.0,
+			"y": 4.1,
+			"z": -1018.1
+		},
+		{
+			"id": "isle-7",
+			"kind": "isle",
+			"name": "Isle 7",
+			"r": 190.4,
+			"seed": 906,
+			"x": 1709.4,
+			"y": -24.6,
+			"z": 950.5
+		},
+		{
+			"id": "isle-8",
+			"kind": "isle",
+			"name": "Isle 8",
+			"r": 70.4,
+			"seed": 907,
+			"x": 683.4,
+			"y": 105.5,
+			"z": 1976.2
+		},
+		{
+			"id": "isle-9",
+			"kind": "isle",
+			"name": "Isle 9",
+			"r": 162.8,
+			"seed": 908,
+			"x": -1542.8,
+			"y": -27.9,
+			"z": 242.2
+		},
+		{
+			"id": "isle-10",
+			"kind": "isle",
+			"name": "Isle 10",
+			"r": 119.8,
+			"seed": 909,
+			"x": -524.9,
+			"y": -20.5,
+			"z": -1356.2
+		},
+		{
+			"id": "isle-11",
+			"kind": "isle",
+			"name": "Isle 11",
+			"r": 148.4,
+			"seed": 910,
+			"x": 854.6,
+			"y": -33.7,
+			"z": -1213.9
+		},
+		{
+			"id": "isle-12",
+			"kind": "isle",
+			"name": "Isle 12",
+			"r": 126.4,
+			"seed": 911,
+			"x": 1331.3,
+			"y": 120.6,
+			"z": 1657.0
+		},
+		{
+			"id": "spire-town",
+			"kind": "spire_town",
+			"name": "SPIRE TOWN",
+			"r": 115.0,
+			"seed": 0,
+			"x": 400.0,
+			"y": -165.0,
+			"z": 613.3
+		}
+	],
+	"version": 1
+}

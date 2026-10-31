@@ -1159,23 +1159,25 @@ func _test_nation() -> void:
 	for i in 60:
 		await get_tree().physics_frame
 	var np = nw.player
-	check(nw.islands.size() == 6 + 15 + 12, "nation: 6 state islands, 15 satellites, 12 ordinary islands (%d)" % nw.islands.size())
-	check(nw.islands[0].radius * 2.0 >= 1000.0, "nation: Delos is the 1 km hero island")
-	var far_ok := true
-	for i in range(1, 6):
-		var d: float = Vector2(nw.islands[i].position.x, nw.islands[i].position.z).length()
-		far_ok = far_ok and d > 1400.0 and d < 3200.0
-	check(far_ok, "nation: the state capitals sit 1.4-3.2 km from Delos, clustered from the 1:50 map")
-	var clear := true
+	var lay: Array = nat_layout()
+	var n_isl := lay.filter(func(e): return e.kind != "spire_town").size()
+	check(nw.islands.size() == n_isl, "nation: every island in data/nation_layout.json is built (%d)" % nw.islands.size())
+	var placed := true
+	for k in n_isl:
+		var e: Dictionary = lay.filter(func(x): return x.kind != "spire_town")[k]
+		placed = placed and nw.islands[k].position.distance_to(Vector3(e.x, e.y, e.z)) < 0.5 and absf(nw.islands[k].radius - float(e.r)) < 0.1
+	check(placed, "nation: each island sits exactly where the layout file says")
+	check(lay.filter(func(e): return e.kind == "capital").size() == 6, "nation: Delos and the five state capitals")
+	# overlaps aren't failures (the layout is a draft you're free to edit), just a heads-up
 	for a in nw.islands.size():
 		for b in range(a + 1, nw.islands.size()):
 			var ia = nw.islands[a]
 			var ib = nw.islands[b]
 			var gap: float = Vector2(ia.position.x - ib.position.x, ia.position.z - ib.position.z).length() - ia.radius - ib.radius
-			clear = clear and gap >= 60.0
-	check(clear, "nation: no two islands overlap (at least 60 m of air between rims)")
-	check(nw.nation.spire != null and Vector2(nw.nation.spire.position.x, nw.nation.spire.position.z).length() > 600.0,
-		"nation: Spire Town stands among the islands, clear of Delos")
+			if gap < 0.0:
+				print("  note: islands %d and %d overlap by %d m" % [a, b, roundi(-gap)])
+	if lay.any(func(e): return e.kind == "spire_town"):
+		check(nw.nation.spire != null, "nation: Spire Town stands where the layout puts it")
 	check(nw.nation.rails.size() == nw.islands.size(), "nation: a railway across every island (%d)" % nw.nation.rails.size())
 	var on_isle := true
 	for k in nw.nation.rails.size():
@@ -1185,10 +1187,6 @@ func _test_nation() -> void:
 			var q := PhysicsRayQueryParameters3D.create(tip + Vector3(0, 5, 0), tip + Vector3(0, -5, 0), 1)
 			on_isle = on_isle and not nw.get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 	check(on_isle, "nation: every line ends on its island, not in the air")
-	var ord_ok := true
-	for i in range(21, 33):
-		ord_ok = ord_ok and nw.islands[i].radius >= 50.0 and nw.islands[i].radius <= 200.0
-	check(ord_ok, "nation: ordinary islands are 100-400 m across")
 	check(np.is_on_floor() and nw.nation.where(np.global_position) == "over DELOS", "nation: you start standing on Delos's station platform")
 	var nat = nw.nation
 	check(nw.env.fog_mode == Environment.FOG_MODE_DEPTH and nw.env.fog_depth_end == nat.fog_end and nw.env.fog_height_density > 0.0,
@@ -1510,3 +1508,7 @@ func _test_keep() -> void:
 	await shot("52_keep_close")
 	kw.queue_free()
 	await get_tree().process_frame
+
+
+func nat_layout() -> Array:
+	return JSON.parse_string(FileAccess.get_file_as_string("res://data/nation_layout.json")).islands

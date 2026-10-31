@@ -80,22 +80,40 @@ static func to_world(map: Vector2, y := 0.0) -> Vector3:
 	return Vector3(d.x, y, d.y)
 
 
-func build(world: Node3D) -> void:
-	w = world
+const LAYOUT := "res://data/nation_layout.json"
+const STATE_IDS := ["delos", "gordia", "rhenish-gordia", "delosen", "arcaden", "daedalen"]
+
+
+## Where every island goes. This comes from data/nation_layout.json (edit it by hand
+## or with the Nation map in design/): one entry per island with its id, name,
+## kind, x / y / z (metres: x east, z south, y the island's top) and radius r.
+## Without the file, the original generated draft is laid out instead.
+func load_layout() -> Array:
+	if FileAccess.file_exists(LAYOUT):
+		var d = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT))
+		if d is Dictionary and d.get("islands") is Array:
+			return d.islands
+		push_warning("nation: %s is unreadable; using the generated draft" % LAYOUT)
+	return generate_layout()
+
+
+## The original draft: capitals from the casebook map, three satellites per state,
+## twelve ordinary islands along the spokes and round the ring, and Spire Town.
+func generate_layout() -> Array:
 	rng.seed = 1871
-	# 1. where everything goes: the states, their satellites, the ordinary islands
+	var out: Array = []
 	var capitals: Array[Vector3] = []
-	for s in STATES:
+	for i in STATES.size():
+		var s: Dictionary = STATES[i]
 		var c := to_world(s.map, s.y)
 		capitals.append(c)
 		_spots.append([c, s.r])
-	# Spire Town, the twin-pillar town, off Delos toward Daedalen and Arcaden
+		out.append(_entry(STATE_IDS[i], s.name, "capital", c, s.r, 700 + i, i))
 	var toward: Vector3 = (capitals[4] + capitals[5]) * 0.5 - capitals[0]
 	var spire_at := _free_spot(func():
 		var ang := atan2(toward.z, toward.x) + rng.randf_range(-0.5, 0.5)
 		var dist := rng.randf_range(STATES[0].r + SPIRE_R + GAP, STATES[0].r + SPIRE_R + 600.0)
 		return Vector3(cos(ang) * dist, SPIRE_DROP, sin(ang) * dist), SPIRE_R)
-	var sats: Array = []
 	for i in range(1, STATES.size()):
 		var s: Dictionary = STATES[i]
 		for k in 3:
@@ -105,9 +123,7 @@ func build(world: Node3D) -> void:
 				var dist: float = rng.randf_range(s.r + r + GAP, s.r + r + 650.0)
 				return capitals[i] + Vector3(cos(ang) * dist, rng.randf_range(-60.0, 60.0), sin(ang) * dist), r)
 			if p != Vector3.INF:
-				sats.append([p, r, 800 + i * 10 + k, "%s isle" % s.name.capitalize()])
-	# twelve ordinary islands, 100-400 m across: along each spoke from Delos, round
-	# the ring of neighbours, and two more
+				out.append(_entry("%s-isle-%d" % [STATE_IDS[i], k + 1], "%s isle" % s.name.capitalize(), "satellite", p, r, 800 + i * 10 + k, i))
 	var mids: Array[Vector3] = []
 	for i in range(1, 6):
 		mids.append(capitals[0].lerp(capitals[i], rng.randf_range(0.45, 0.6)))
@@ -115,34 +131,65 @@ func build(world: Node3D) -> void:
 		mids.append(capitals[pair[0]].lerp(capitals[pair[1]], rng.randf_range(0.4, 0.6)))
 	mids.append(capitals[0].lerp(capitals[1], 0.8))
 	mids.append(capitals[0].lerp(capitals[4], 0.8))
-	var ords: Array = []
 	for n in mids.size():
 		var r := rng.randf_range(50.0, 200.0)
 		var m: Vector3 = mids[n]
 		var p := _free_spot(func():
 			return m + Vector3(rng.randf_range(-260, 260), rng.randf_range(-80, 100), rng.randf_range(-260, 260)), r)
 		if p != Vector3.INF:
-			ords.append([p, r, 900 + n, "Isle %d" % (n + 1)])
-
-	# 2. build them; every island's railway points at its nearest neighbour
-	for i in STATES.size():
-		var s: Dictionary = STATES[i]
-		var c: Vector3 = capitals[i]
-		_make_island(c, s.r, s.r * 0.7, 700 + i)
-		var line := _railway(c, s.r, 45.0 if i == 0 else 30.0, true)
-		_city(c, s.city, s.col, i == 0, line)
-		_trees_ring(c, s.city + 20.0, s.r * 0.85, int(s.r * 0.5), line)
-		_flush(c, s.r)
-		_label(c + Vector3(0, 180 if i == 0 else 120, 0), s.name, "%s\n%d m across" % [s.sub, roundi(s.r * 2.0)], s.col.lightened(0.35), 1.0)
-		places.append({"name": s.name, "pos": c, "r": s.r})
-	for it in sats + ords:
-		_isle(it[0], it[1], it[2], it[3])
+			out.append(_entry("isle-%d" % (n + 1), "Isle %d" % (n + 1), "isle", p, r, 900 + n, -1))
 	if spire_at != Vector3.INF:
-		spire = SpireTown.new()
-		spire.position = spire_at
-		w.add_child(spire)
-		_label(spire_at + Vector3(0, 290, 0), "SPIRE TOWN", "twin pillars out of the cloud", Color(0.80, 0.92, 0.90), 1.0)
-		places.append({"name": "SPIRE TOWN", "pos": spire_at, "r": SPIRE_R})
+		out.append(_entry("spire-town", "SPIRE TOWN", "spire_town", spire_at, SPIRE_R, 0, -1))
+	_spots.clear()
+	return out
+
+
+func _entry(id: String, nm: String, kind: String, p: Vector3, r: float, seed_: int, state: int) -> Dictionary:
+	var e := {"id": id, "name": nm, "kind": kind, "x": snappedf(p.x, 0.1), "y": snappedf(p.y, 0.1),
+		"z": snappedf(p.z, 0.1), "r": snappedf(r, 0.1), "seed": seed_}
+	if state >= 0:
+		e["state"] = STATE_IDS[state]
+	return e
+
+
+## Write a layout to JSON in the shape load_layout() reads.
+static func layout_json(islands: Array) -> String:
+	return JSON.stringify({
+		"about": "Chain State: the Nation draft's island layout. Metres: x east, z south (north is -z), y is the island's top surface (for Spire Town, its cloud line). r is the island's radius. kind: capital (state = which state), satellite, isle, spire_town. Edit freely: the level reads this file every time it loads.",
+		"version": 1,
+		"islands": islands}, "\t")
+
+
+func build(world: Node3D) -> void:
+	w = world
+	var layout := load_layout()
+	# every island's footprint first, so each railway can point at its nearest neighbour
+	for e in layout:
+		_spots.append([Vector3(e.x, e.y, e.z), float(e.r)])
+	rng.seed = 1872                      # dressing (trees, cities) stays the same whatever the layout
+	for e in layout:
+		var c := Vector3(e.x, e.y, e.z)
+		var r := float(e.r)
+		match String(e.kind):
+			"capital":
+				var si: int = maxi(STATE_IDS.find(String(e.get("state", e.id))), 0)
+				var s: Dictionary = STATES[si]
+				var city: float = r * float(s.city) / float(s.r)
+				_make_island(c, r, r * 0.7, int(e.get("seed", 700 + si)))
+				var line := _railway(c, r, 45.0 if si == 0 else 30.0, true)
+				_city(c, city, s.col, si == 0, line)
+				_trees_ring(c, city + 20.0, r * 0.85, int(r * 0.5), line)
+				_flush(c, r)
+				_label(c + Vector3(0, 180 if si == 0 else 120, 0), String(e.name), "%s\n%d m across" % [s.sub, roundi(r * 2.0)], s.col.lightened(0.35), 1.0)
+				places.append({"name": String(e.name), "pos": c, "r": r})
+			"spire_town":
+				spire = SpireTown.new()
+				spire.position = c
+				w.add_child(spire)
+				_label(c + Vector3(0, 290, 0), String(e.name), "twin pillars out of the cloud", Color(0.80, 0.92, 0.90), 1.0)
+				places.append({"name": String(e.name), "pos": c, "r": r})
+			_:
+				_isle(c, r, int(e.get("seed", 900)), String(e.name))
 
 	# the capitals' towers, always drawn: landmarks to steer by through the haze
 	for t in landmarks:
