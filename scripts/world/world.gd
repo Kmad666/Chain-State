@@ -23,6 +23,7 @@ const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
 const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const WhiteCitadel := preload("res://scripts/world/white_citadel.gd")
 const CloudTree := preload("res://scripts/world/cloud_tree.gd")
 const SpireTown := preload("res://scripts/world/spire_town.gd")
 const Nation := preload("res://scripts/world/nation.gd")
@@ -250,9 +251,11 @@ func _build_world() -> void:
 			_build_spire_town()
 		"cloud_tree":
 			_build_cloud_tree()
+		"white_citadel":
+			_build_white_citadel()
 		_:
 			_build_range()
-	if Game.level != "range" and Game.level != "nation" and Game.level != "spire_town" and (not islands.is_empty() or not pads.is_empty()):
+	if not Game.level in ["range", "nation", "spire_town", "white_citadel"] and (not islands.is_empty() or not pads.is_empty()):
 		var c := Vector3.ZERO
 		var spots: Array = islands if not islands.is_empty() else pads
 		for isl in spots:
@@ -875,7 +878,8 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 
 ## Touched down: landing pads are checkpoints; the last one finishes the course.
 func _on_landed(body: Node) -> void:
-	if (spire and body and body.get_parent() == spire) or (cloud_tree and body and body.get_parent() == cloud_tree):
+	if body and ((spire and body.get_parent() == spire) or (cloud_tree and body.get_parent() == cloud_tree) \
+			or (citadel and body.get_parent() == citadel)):
 		_spire_landed()
 		return
 	if body and body.has_meta("ascent_cp"):
@@ -908,6 +912,9 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if citadel and not (player and player.flying):
+		return "THE WHITE CITADEL      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
+			roundi(spire_best), roundi(citadel.top_point().y), falls]
 	if cloud_tree and not (player and player.flying):
 		return "THE CLOUD TREE      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
 			roundi(spire_best), roundi(cloud_tree.top_point().y), falls]
@@ -936,6 +943,7 @@ func course_text() -> String:
 # ---------------------------------------------------------------- Cherub Test
 var cherub: Node3D
 var cloud_tree: Node3D = null      # the Cloud Tree
+var citadel: Node3D = null         # the White Citadel
 var spire: Node3D = null           # Spire Town
 var spire_best := 0.0
 var level_sky := ""                # a level's own sky, used instead of your saved one
@@ -1407,10 +1415,11 @@ func _spire_landed() -> void:
 		spire_best = y
 		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
 		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
-	var top_line := 250.0 if cloud_tree else 200.0
+	var top_line := 250.0 if cloud_tree else (140.0 if citadel else 200.0)
 	if y > top_line and not finished:
 		finished = true
-		hud.toast("%s: %d m, %d falls" % ["IN THE CLOUDS" if cloud_tree else "THE HEIGHTS OF SPIRE TOWN", roundi(y), falls], 6.0)
+		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else "THE HEIGHTS OF SPIRE TOWN")
+		hud.toast("%s: %d m, %d falls" % [what, roundi(y), falls], 6.0)
 
 
 # ---------------------------------------------------------------- the Cloud Tree
@@ -1459,3 +1468,63 @@ func _build_cloud_tree() -> void:
 	start_yaw = atan2(30.0, 205.0)            # facing the tree
 	spire_best = start_pos.y
 	level_sky = "day"
+
+
+# ---------------------------------------------------------------- the White Citadel
+## The White Citadel: a pale city-castle rising in tiers from a still lake that fills
+## a wide floating island (after a reference painting by snowskadi). You start on a
+## stone jetty out in the shallows; walk up the grand stairs, then climb the tiers,
+## towers and gateway by grapple. Highest place stood = checkpoint.
+func _build_white_citadel() -> void:
+	var isl := FloatingIsland.new()
+	isl.radius = 230.0
+	isl.island_seed = 2112
+	isl.grass = false
+	isl.position = Vector3(0, -1.2, 0)          # the lake bed, 1.2 m under the water
+	add_child(isl)
+	islands.append(isl)
+	isl.top_mesh.material_override = Mats.lit(Color(0.36, 0.52, 0.62))
+	# the lake: a still, glassy sheet that mirrors the sky
+	var lake := MeshInstance3D.new()
+	var lm := CylinderMesh.new()
+	lm.top_radius = 222.0
+	lm.bottom_radius = 222.0
+	lm.height = 0.2
+	lm.radial_segments = 64
+	lake.mesh = lm
+	var wm := StandardMaterial3D.new()
+	wm.albedo_color = Color(0.50, 0.74, 0.90, 0.80)
+	wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wm.metallic = 0.55
+	wm.roughness = 0.06
+	lake.material_override = wm
+	lake.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	lake.position.y = -0.1
+	add_child(lake)
+	citadel = WhiteCitadel.new()
+	citadel.position = Vector3(0, 0, -20)
+	add_child(citadel)
+	# a jetty out in front, where you arrive
+	var jetty := StaticBody3D.new()
+	jetty.collision_layer = 1
+	var jm := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(10, 1.6, 50)
+	jm.mesh = bm
+	jm.material_override = Mats.lit(Color(0.88, 0.90, 0.92))
+	jetty.add_child(jm)
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = bm.size
+	cs.shape = bs
+	jetty.add_child(cs)
+	jetty.position = Vector3(-62, 0.4, 112)
+	add_child(jetty)
+	start_pos = Vector3(-62, 2.2, 132)
+	start_yaw = 0.0                               # facing the citadel
+	spire_best = start_pos.y
+	level_sky = "day"
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_depth_begin = 300.0
+	env.fog_depth_end = 2200.0
+	env.fog_density = 1.0

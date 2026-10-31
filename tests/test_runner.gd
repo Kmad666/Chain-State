@@ -18,9 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
+		elif OS.get_environment("ONLY") == "citadel":
+			await _test_citadel()
 		elif OS.get_environment("ONLY") == "tree":
 			await _test_cloud_tree()
 		else:
@@ -775,6 +777,7 @@ func _ready() -> void:
 	await _test_nation()
 	await _test_spire()
 	await _test_cloud_tree()
+	await _test_citadel()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1394,4 +1397,56 @@ func _test_cloud_tree() -> void:
 		await get_tree().physics_frame
 	await shot("48_cloud_tree_crown")
 	tw.queue_free()
+	await get_tree().process_frame
+
+
+func _test_citadel() -> void:
+	print("== The White Citadel")
+	Game.level = "white_citadel"
+	var cw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(cw)
+	for i in 60:
+		await get_tree().physics_frame
+	var cp = cw.player
+	var cit = cw.citadel
+	check(cit != null and cp.is_on_floor(), "citadel: you start on the jetty")
+	check(cit.top_point().y > 180.0, "citadel: the clock tower's crown-spire tops the city (%d m)" % roundi(cit.top_point().y))
+	check(cit.stairs.size() == 2, "citadel: two grand stairs climb out of the lake")
+	# walk up a grand stair from the water to the plinth
+	var st: Array = cit.stairs[1]
+	var foot: Vector3 = cit.global_position + st[0] + Vector3(0, 1.5, -2)
+	cp.global_position = foot
+	cp.velocity = Vector3.ZERO
+	cp.rotation = Vector3.ZERO                   # facing -z: up the stair
+	cp.head.rotation.x = 0.0
+	for i in 60:
+		await get_tree().physics_frame
+	Input.action_press("move_forward")
+	for i in 900:
+		await get_tree().physics_frame
+		if cp.global_position.y > 14.0:
+			break
+	Input.action_release("move_forward")
+	check(cp.global_position.y > 14.0, "citadel: you can walk up the grand stair to the plinth (%d m)" % roundi(cp.global_position.y))
+	var space = cw.get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(Vector3(48, 200, -34), Vector3(48, 100, -34), 1)
+	check(not space.intersect_ray(q).is_empty(), "citadel: the sky bridge is solid")
+	cp.set_flying(true)
+	cp.global_position = Vector3(10, 30, 330)
+	cp.look_at(Vector3(5, 30, 0), Vector3.UP)
+	cp.rotation.x = 0.0
+	cp.rotation.z = 0.0
+	cp.head.rotation.x = deg_to_rad(16)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("49_white_citadel")
+	cp.global_position = Vector3(-70, 110, 120)
+	cp.look_at(Vector3(20, 120, -20), Vector3.UP)
+	cp.rotation.x = 0.0
+	cp.rotation.z = 0.0
+	cp.head.rotation.x = deg_to_rad(4)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("50_white_citadel_close")
+	cw.queue_free()
 	await get_tree().process_frame

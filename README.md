@@ -285,6 +285,23 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 - **Shift** goes 5× faster: 60 m/s normally, 300 m/s boosted.
 - The HUD shows your speed, your altitude and the nearest island, either "over DELOS" or "ARCADEN 2.4 km".
 
+## The White Citadel
+
+**The White Citadel** is built from a reference painting by [snowskadi](http://snowskadi.deviantart.com/): a pale city-castle rising in tiers out of a still lake (`scripts/world/white_citadel.gd`). It's built on `scripts/world/blockout.gd`, a reusable base that batches unit shapes into one draw call per shape and colour.
+
+- **Setting:** the lake fills a 460 m floating island. It's a glassy, sky-blue sheet over a shallow bed, so you can wade it.
+- **Base:** a broad white plinth with an arcade along its front.
+- **Front:** two grand stairs climb out of the water at the front left. A waterfront quay of small houses with slate-blue roofs lines the front right.
+- **The city:** two stepped tiers of white town rise above the plinth. Tan-roofed houses line their edges, and more sit on the rooftops.
+- **Left:** a cathedral with lancet windows and a rose window, and a cluster of slender towers with warm tan spires.
+- **The clock tower:** in the middle, about 200 m tall, with a clock face, a gallery, a ring of upper windows and a gold crown-spire.
+- **Right:** a great double-arched gateway with houses on top, and a tall gabled tower. A sky bridge joins it to the clock tower, and thin watchtowers stand at the edge.
+
+How the level plays:
+- You start on a jetty and can walk up the stairs. Everything else is climbed by grapple.
+- The highest place you've stood is your checkpoint.
+- Above 140 m counts as reaching the top.
+
 ## The Cloud Tree
 
 **The Cloud Tree** is built from a reference painting: a vast pale tree whose leaves are clouds, standing on a 480 m meadow island (`scripts/world/cloud_tree.gd`, a reusable node).
