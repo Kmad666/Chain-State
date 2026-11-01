@@ -12,17 +12,18 @@ extends "res://scripts/world/blockout.gd"
 ##   - a second tower, front right, with a little bartizan on its flank
 ##   - the tallest tower, back left, with a band course half way up, a
 ##     three-light window near its top and a cornice under a low hipped cap
-## - **The masonry** is rough pale beige stone flecked with grit. Small arched
+## - **The surfaces** are clean, untextured white, like Mirror's Edge, so they
+##   contrast sharply with the vibrant blue sky and sea. Small arched
 ##   windows and putlog holes pepper every face.
 ##
 ## Everything is solid and grapple-able. Cornices, the band course, the loggia
 ## balconies and the corbelled ledges are the rest stops on the way up. The origin
 ## is the ground at the tower's foot, and the main tower's cap tops out near 250 m.
 
-const BRICK := Color(0.78, 0.67, 0.50)        # pale beige stone (warm enough to stay beige in hard sun)
-const BRICK_DK := Color(0.66, 0.55, 0.40)
-const BRICK_LT := Color(0.84, 0.74, 0.57)
-const HOLE := Color(0.12, 0.10, 0.08)
+const BRICK := Color(0.94, 0.95, 0.96)        # clean white, Mirror's Edge style, against the blues
+const BRICK_DK := Color(0.84, 0.86, 0.89)      # buttresses and corbels: a cool step down
+const BRICK_LT := Color(0.98, 0.98, 0.98)      # cornices and caps: the brightest edges
+const HOLE := Color(0.10, 0.15, 0.26)         # openings: deep blue-grey, like glass in shade
 
 var top := Vector3.ZERO
 var ledges: Array = []            # [centre, size] of every walkable rest ledge
@@ -241,17 +242,15 @@ func _main_tower() -> void:
 # ---------------------------------------------------------------- the masonry
 ## Rough pale stone: courses of uneven blocks flecked with light grit and dark
 ## pits, laid in world space so it reads the same size everywhere.
+## Clean, untextured white (Mirror's Edge): smooth surfaces with a crisp highlight,
+## so the faces read by light and shadow alone against the blue sky and sea.
 func material_for(col: Color) -> Material:
 	if col.r < 0.2:
 		return Mats.lit(col)                            # openings stay plain and dark
 	var m := StandardMaterial3D.new()
-	m.albedo_texture = _speckle(col)
-	m.uv1_triplanar = true
-	m.uv1_world_triplanar = true
-	m.uv1_scale = Vector3.ONE / 4.0                     # one tile = 4 m
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	m.roughness = 1.0
-	m.metallic_specular = 0.15
+	m.albedo_color = col
+	m.roughness = 0.55
+	m.metallic_specular = 0.5
 	return m
 
 

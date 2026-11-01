@@ -48,7 +48,8 @@ func _process(_dt: float) -> bool:
 		if not groups.has(gname):
 			var st := SurfaceTool.new()
 			st.begin(Mesh.PRIMITIVE_TRIANGLES)
-			groups[gname] = [st, col]
+			var textured := mat is StandardMaterial3D and (mat as StandardMaterial3D).albedo_texture != null
+			groups[gname] = [st, col, textured]
 		var st: SurfaceTool = groups[gname][0]
 		for xf in xfs:
 			_append_box_uv(st, src_mesh, xf)
@@ -60,9 +61,11 @@ func _process(_dt: float) -> bool:
 		m.resource_name = gname
 		m.albedo_color = col
 		m.roughness = 1.0
-		if gname != "Openings":
+		m.roughness = 0.55
+		if groups[gname][2]:                     # the game's material is textured: carry it over
 			m.albedo_color = Color.WHITE
 			m.albedo_texture = tower._speckle(col)
+			m.roughness = 1.0
 		var mesh := st.commit()
 		mesh.surface_set_material(0, m)
 		var mi := MeshInstance3D.new()

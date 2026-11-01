@@ -14,8 +14,8 @@ The Brick Spire level's tower, exported straight from the game's geometry, so it
 - **Pivot:** the tower's foot. In the level that's 30 m under the sea; the `.blend` has a "Waterline" marker at Z = 30.
 - **Mesh:** about 8,000 polygons in four meshes, one per material, all parented to the `BrickSpire` empty.
 - **Materials:**
-  - `Stone`, `Stone_Dark` and `Stone_Light`: pale beige stone, each with the game's speckled stone texture. The UVs are box-projected at 4 m per tile.
-  - `Openings`: flat dark brown.
+  - `Stone`, `Stone_Dark` and `Stone_Light`: clean white (Mirror's Edge style), untextured, with a soft highlight. The UVs are still box-projected at 4 m per tile, so you can add a texture later.
+  - `Openings`: deep blue-grey.
 - **Welding:** the faces are welded and converted to quads where possible, so it edits cleanly. It's still a blockout built from boxes, cylinders and pyramids, so expect overlapping pieces rather than one sealed shell.
 
 ## Re-exporting

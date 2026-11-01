@@ -317,7 +317,7 @@ The level reads this file every time it loads, so moving, resizing, adding or re
   - a rear block under a hipped cap
   - a second tower with a bartizan on its flank and a cornice and cap at 156 m
   - the main tower, with a band course at 111 m, a corbelled side ledge, three-light windows near the top, and its cornice and low hipped cap at 246 m
-- **The masonry:** rough pale beige stone flecked with grit, peppered with putlog holes and small arched windows.
+- **The surfaces:** clean, untextured white like Mirror's Edge, with cool white buttresses and corbels and the brightest white on the cornices and caps, so the tower contrasts sharply with the blue sky and sea. Openings are a deep blue-grey, like glass in shade.
 
 How the level plays:
 - You start on a stone landing in front of the tower, just above the water.
