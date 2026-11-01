@@ -23,6 +23,8 @@ var _links: MultiMeshInstance3D
 var arrow: Node3D
 var _t := 0.0
 var _tension := 0.0            # 0 = slack, 1 = pulled taut
+var first_link := Transform3D()   # the links at each end, as last laid (the renderer
+var last_link := Transform3D()    # can't be read back in headless runs, so tests use these)
 
 
 func _ready() -> void:
@@ -127,7 +129,11 @@ func _place_links(pts: PackedVector3Array, fist: Vector3) -> void:
 			var into := clampf(p.distance_to(fist) / SLIP, 0.0, 1.0)
 			if into < 1.0:
 				basis = basis.scaled(Vector3.ONE * maxf(into, 0.05))
-			_mm.set_instance_transform(n, Transform3D(basis, p))
+			var xf := Transform3D(basis, p)
+			_mm.set_instance_transform(n, xf)
+			if n == 0:
+				first_link = xf
+			last_link = xf
 			n += 1
 			next_at += LINK_SPACING
 		carried += seg_len

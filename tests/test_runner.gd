@@ -1588,10 +1588,10 @@ func _test_arm() -> void:
 	var out_tip: Vector3 = vm.fist_point() + vm.forward() * 12.0
 	ch.update(0.016, ch.FLYING, out_tip)
 	var n_out: int = ch._mm.visible_instance_count
-	var first: Vector3 = ch._mm.get_instance_transform(0).origin
-	var last_x: Transform3D = ch._mm.get_instance_transform(n_out - 1)
+	var first: Vector3 = ch.first_link.origin
+	var last_x: Transform3D = ch.last_link
 	check(n_out > 150 and first.distance_to(out_tip) < 0.5 and last_x.origin.distance_to(vm.fist_point()) < 0.1,
-		"chain: fired, it runs from the arrowhead back into the fist (%d links)" % n_out)
+		"chain: fired, it runs from the arrowhead back into the fist (%d links; first %.2f m from the tip, last %.3f m from the fist)" % [n_out, first.distance_to(out_tip), last_x.origin.distance_to(vm.fist_point())])
 	check(last_x.basis.get_scale().x < 0.9, "chain: the last links shrink as they slip into the glove")
 	# reeling in: half as far out, fewer links, laid from the arrow end
 	ch.update(0.016, ch.RETURNING, vm.fist_point() + vm.forward() * 6.0)
