@@ -78,7 +78,7 @@ func _ready() -> void:
 	left.add_child(st)
 	var skies := HBoxContainer.new()
 	left.add_child(skies)
-	for id in ["day", "morning", "night", "space", "alien"]:
+	for id in ["ultramarine", "day", "morning", "night", "space", "alien"]:
 		var sb := Button.new()
 		sb.text = id.capitalize()
 		sb.pressed.connect(func(): sky_selected.emit(id))

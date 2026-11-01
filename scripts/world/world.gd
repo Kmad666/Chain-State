@@ -31,11 +31,17 @@ const SpireTown := preload("res://scripts/world/spire_town.gd")
 const Nation := preload("res://scripts/world/nation.gd")
 
 const START_POS := Vector3(0, 1.0, 14)
-const SKY_SAVE := "user://sky.txt"
+const SKY_SAVE := "user://sky_v2.txt"      # v2: the Ultramarine look became everyone's default
+const DEFAULT_SKY := "ultramarine"
 
 ## Kenney "Skyboxes" (CC0): 360-degree panoramas. `u` and `elev` locate the painted
 ## sun in the image so the real light comes from the same place.
 const SKIES := {
+	## The Sea Wall's look, used everywhere by default: a procedural deep-blue sky
+	## (no panorama), hard bright sun, filmic tonemap with colours pushed up.
+	"ultramarine": {"name": "Ultramarine", "procedural": true, "top": Color(0.02, 0.07, 0.36), "horizon": Color(0.36, 0.50, 0.82),
+		"glare": 0.5, "u": 1.0 / 6.0, "elev": 52.0, "light": Color(1.0, 0.97, 0.90), "energy": 1.1,
+		"ambient": 0.55, "ambient_col": Color(0.62, 0.70, 0.92), "fog": Color(0.40, 0.54, 0.84)},
 	"day": {"name": "Day", "top": Color(0.548, 0.718, 0.942), "glare": 1.0, "u": 0.916, "elev": 49.9, "light": Color(1.0, 0.97, 0.90), "energy": 0.8,
 		"ambient": 0.45, "fog": Color(0.685, 0.766, 0.949)},
 	"morning": {"name": "Morning", "top": Color(0.992, 0.929, 0.84), "glare": 1.0, "u": 0.912, "elev": 51.3, "light": Color(1.0, 0.84, 0.66), "energy": 0.75,
@@ -72,7 +78,7 @@ var bullets: Node3D
 var start_pos := START_POS
 var start_yaw := 0.0
 var glare: Control
-var sky_id := "day"
+var sky_id := DEFAULT_SKY
 var _talking_to: Node = null
 var _had_capture := false
 
@@ -181,7 +187,7 @@ func _build_environment() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_white = 6.0
 	env.fog_enabled = true
-	env.fog_density = 0.0025
+	env.fog_density = 0.0012
 	env.fog_sky_affect = 0.0
 	var we := WorldEnvironment.new()
 	we.environment = env
@@ -192,10 +198,10 @@ func _build_environment() -> void:
 	sun.directional_shadow_max_distance = 150.0
 	add_child(sun)
 
-	var saved := "day"
+	var saved := DEFAULT_SKY
 	if FileAccess.file_exists(SKY_SAVE):
 		saved = FileAccess.get_file_as_string(SKY_SAVE).strip_edges()
-	set_sky(saved if SKIES.has(saved) else "day")
+	set_sky(saved if SKIES.has(saved) else DEFAULT_SKY)
 
 
 ## Swap the panorama and move the sun, its colour and the fog to match it.
@@ -204,10 +210,28 @@ func set_sky(id: String, save := true) -> void:
 		return
 	sky_id = id
 	var s: Dictionary = SKIES[id]
-	var mat := PanoramaSkyMaterial.new()
-	mat.panorama = load("res://assets/skyboxes/skybox-%s.png" % id)
-	env.sky.sky_material = mat
-	env.ambient_light_color = s.fog
+	if s.get("procedural", false):
+		var sky := ProceduralSkyMaterial.new()
+		sky.sky_top_color = s.top
+		sky.sky_horizon_color = s.horizon
+		sky.sky_curve = 0.18
+		sky.ground_horizon_color = s.horizon
+		sky.ground_bottom_color = s.top
+		sky.sun_angle_max = 8.0
+		env.sky.sky_material = sky
+		env.tonemap_mode = Environment.TONE_MAPPER_FILMIC     # keeps sunlit stone from blowing out to flat white
+		env.tonemap_exposure = 1.05
+		env.adjustment_enabled = true
+		env.adjustment_saturation = 1.15
+		env.adjustment_contrast = 1.1
+	else:
+		var mat := PanoramaSkyMaterial.new()
+		mat.panorama = load("res://assets/skyboxes/skybox-%s.png" % id)
+		env.sky.sky_material = mat
+		env.tonemap_mode = Environment.TONE_MAPPER_ACES
+		env.tonemap_exposure = 1.0
+		env.adjustment_enabled = false
+	env.ambient_light_color = s.get("ambient_col", s.fog)
 	env.ambient_light_energy = s.ambient
 	env.fog_light_color = s.fog
 	# Godot's panorama yaw is the negative of the image's horizontal position
@@ -1402,7 +1426,6 @@ func _build_spire_town() -> void:
 	start_pos = landing.position + Vector3(0, 1.0, 5.0)
 	start_yaw = 0.0                                   # facing the town (north)
 	spire_best = start_pos.y
-	level_sky = "alien"                               # the painting's lavender
 	# the cloud sea the pillars rise from: a sheet of cloud with fog pooling on it
 	var sea := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -1485,7 +1508,6 @@ func _build_cloud_tree() -> void:
 	start_pos = Vector3(30, 1.0, 205)
 	start_yaw = atan2(30.0, 205.0)            # facing the tree
 	spire_best = start_pos.y
-	level_sky = "day"
 
 
 # ---------------------------------------------------------------- the White Citadel
@@ -1541,7 +1563,6 @@ func _build_white_citadel() -> void:
 	start_pos = Vector3(-62, 2.2, 132)
 	start_yaw = 0.0                               # facing the citadel
 	spire_best = start_pos.y
-	level_sky = "day"
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_depth_begin = 300.0
 	env.fog_depth_end = 2200.0
@@ -1558,7 +1579,6 @@ func _build_keep_isles() -> void:
 	start_pos = Vector3(-200, 27.5, 50)        # in front of the isle's terrace
 	start_yaw = -PI * 0.5                         # facing east, toward the keep
 	spire_best = start_pos.y
-	level_sky = "day"
 	env.fog_density = 0.0009                      # thinner haze: the isles read from each other
 	var puffs := Clouds.new()
 	puffs.centre = Vector3(0, 0, 0)
@@ -1591,42 +1611,22 @@ func _build_sea_wall() -> void:
 	start_pos = sea_wall.walk_start
 	start_yaw = 0.0                               # facing north along the wall
 	spire_best = start_pos.y
+	level_sky = "ultramarine"
 	level_look = _sea_wall_look
 
 
 ## The painting's look: a deep ultramarine sky over a deep blue sea, hard bright sun,
 ## colours pushed up, a light haze only far out toward the horizon.
 func _sea_wall_look() -> void:
-	var sky := ProceduralSkyMaterial.new()
-	sky.sky_top_color = Color(0.02, 0.07, 0.36)
-	sky.sky_horizon_color = Color(0.36, 0.50, 0.82)
-	sky.sky_curve = 0.18
-	sky.ground_horizon_color = Color(0.36, 0.50, 0.82)
-	sky.ground_bottom_color = Color(0.03, 0.08, 0.36)
-	sky.sun_angle_max = 8.0
-	env.sky.sky_material = sky
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC     # keeps sunlit stone from blowing out to flat white
-	env.tonemap_exposure = 1.05
-	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.15
-	env.adjustment_contrast = 1.1
-	env.ambient_light_color = Color(0.62, 0.70, 0.92)
-	env.ambient_light_energy = 0.55
+	# the sky, sun and grade come from the Ultramarine sky (the level asks for it);
+	# here just the far haze and the long view
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_density = 1.0
 	env.fog_depth_begin = 1400.0
 	env.fog_depth_end = 7000.0
 	env.fog_depth_curve = 1.6
-	env.fog_light_color = Color(0.40, 0.54, 0.84)
 	env.fog_height_density = 0.0
-	sun.light_color = Color(1.0, 0.97, 0.90)
-	sun.light_energy = 1.1
 	sun.directional_shadow_max_distance = 400.0
-	var sun_dir := Basis.from_euler(Vector3(deg_to_rad(52), deg_to_rad(-60), 0)) * Vector3.FORWARD
-	sun.basis = Basis.looking_at(-sun_dir, Vector3.UP)
-	if glare:
-		glare.sun_dir = sun_dir
-		glare.strength = 0.5
 	if player:
 		player.cam.far = 7600.0
 		player.fall_limit = 2.0                   # into the sea: back to your checkpoint

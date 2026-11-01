@@ -103,7 +103,16 @@ Spellcasters on brooms (placeholder low-poly models: a robe, a pointy hat, a bro
 Code: `scripts/combat/sentry.gd` (casters, the wrap), `orb_tree.gd` (the witch's tree), `ward.gd` (the forcefield), `bullet_field.gd` (projectiles), `hook_orb.gd` (blue orbs).
 
 ## Skies
-The range uses Kenney's free CC0 skybox pack: **Day** (default), **Morning**, **Night**, **Space** and **Alien**. Switch between them in the pause menu (Esc → Sky); your choice is remembered. Each sky moves the sun light to where the painted sun sits, and matches the light colour, ambient light and fog to that sky.
+Every level uses the **Ultramarine** look by default. It's taken from the Sea Wall:
+- a procedural deep-blue sky with a pale horizon band
+- a hard, bright sun
+- a filmic tonemap with saturation and contrast pushed up, so stone stays white without glaring and greens and reds stand out
+- haze in the horizon's blue
+
+Kenney's free CC0 skyboxes are still there as alternatives: **Day**, **Morning**, **Night**, **Space** and **Alien**.
+- Switch skies in the pause menu (Esc → Sky). Your choice is remembered (the save moved to `sky_v2.txt`, so everyone starts on Ultramarine once).
+- Each panorama sky moves the sun to where its painted sun sits and matches the light, ambient and fog colours to it, with the plain ACES tonemap.
+- Levels keep their own fog and haze distances.
 
 ## Look
 - **Sun glare:** looking toward the sun brings up a lens glare: a bright core, slowly turning rays and faint coloured ghosts toward the screen centre. It fades when you look away or when anything blocks the sun, and it's dimmer for the moon and the space sky. See `scripts/ui/sun_glare.gd`.

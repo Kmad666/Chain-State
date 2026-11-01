@@ -54,9 +54,12 @@ func _ready() -> void:
 	print("== Skies")
 	for id in range_scene.SKIES:
 		range_scene.set_sky(id)
-		check(range_scene.env.sky.sky_material is PanoramaSkyMaterial and range_scene.env.sky.sky_material.panorama != null, "%s sky loads" % id)
+		if range_scene.SKIES[id].get("procedural", false):
+			check(range_scene.env.sky.sky_material is ProceduralSkyMaterial and range_scene.env.adjustment_enabled, "%s sky loads (procedural, with its colour grade)" % id)
+		else:
+			check(range_scene.env.sky.sky_material is PanoramaSkyMaterial and range_scene.env.sky.sky_material.panorama != null and not range_scene.env.adjustment_enabled, "%s sky loads" % id)
 		await shot("sky_" + id)
-	range_scene.set_sky("day")
+	range_scene.set_sky(range_scene.DEFAULT_SKY)     # every level after this uses the default look
 	print("== Sun glare")
 	var g = range_scene.glare
 	p.global_position = Vector3(0, 1, 30)
@@ -1290,7 +1293,7 @@ func _test_spire() -> void:
 	check(town != null and sp.is_on_floor(), "spire: you start standing on the landing island")
 	check(town.top_point().y > 230.0, "spire: the main tower's finial is the top of the town (%d m)" % roundi(town.top_point().y))
 	check(town.shelves.size() >= 30, "spire: houses cling to both pillars (%d)" % town.shelves.size())
-	check(sw.env.fog_height_density > 0.0 and sw.sky_id == "alien", "spire: lavender sky and a cloud sea below")
+	check(sw.env.fog_height_density > 0.0 and sw.sky_id == sw.DEFAULT_SKY, "spire: the default sky (%s) and a cloud sea below (%.3f)" % [sw.sky_id, sw.env.fog_height_density])
 	var space = sw.get_world_3d().direct_space_state
 	var hits := 0
 	for probe in [Vector3(0, 70, 0), Vector3(-55, 200, 0), Vector3(50, 220, 0), Vector3(10, 180, 0)]:
