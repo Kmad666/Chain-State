@@ -6,8 +6,8 @@ extends Node3D
 ## fingers of three phalanges each (index to little, real proportions, knuckles
 ## in an arc), and a thumb of metacarpal and two phalanges wrapping across the
 ## front of the fist. The glove has three stitched points on its back and a strap
-## at the wrist; the chain is fastened to a steel ring on the strap, coils round
-## the forearm, and its arrowhead rests in the fist.
+## at the wrist. The chain lives inside the hand: it spools out of the fist when
+## fired and reels back into it (chain.gd); at rest only the arrowhead's point shows.
 ##
 ## Lives under the camera. The player calls `animate()` every frame; the chain
 ## asks for `cuff_ring()`, `fist_point()` and `forward()` to know where to draw.
@@ -77,8 +77,6 @@ func _ready() -> void:
 	var strap := _zcyl(0.0345, 0.0345, 0.012, WRIST_Z, stitch, 16)
 	strap.scale = Vector3(1.14, 1.0, 0.84)
 	_box(Vector3(0.012, 0.004, 0.014), Vector3(0.0, 0.029, WRIST_Z), steel)            # buckle
-	var ring := _torus(0.008, 0.0022, Vector3(0, 0.036, WRIST_Z), steel)
-	ring.rotation.z = PI * 0.5                    # stood up along the arm
 
 	# --- the hand
 	# palm: the back of the hand is broad and flat, the heel and the thumb's
@@ -168,7 +166,7 @@ func _apply(walk: float) -> void:
 	pivot.basis = Basis.looking_at(_dir, up).rotated(_dir, -0.35 * (1.0 - _reach))  # knuckles tilt in at rest
 
 
-## World-space ring on the glove's wrist strap the chain is fastened to.
+## World-space point on top of the glove's wrist strap (the buckle).
 func cuff_ring() -> Vector3:
 	return pivot.to_global(Vector3(0, 0.036, WRIST_Z))
 

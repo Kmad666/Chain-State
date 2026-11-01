@@ -1581,10 +1581,44 @@ func _test_arm() -> void:
 	var vm = ap.viewmodel
 	check(vm.bones == 4 * 3 + 3, "arm: an anatomical hand, three phalanges per finger and a three-bone thumb (%d bones)" % vm.bones)
 	var wrist: Vector3 = vm.pivot.to_global(Vector3(0, 0, vm.WRIST_Z))
-	check(vm.cuff_ring().distance_to(wrist) < 0.06, "arm: the chain is fastened to a ring on the glove's wrist strap")
+	var ch = ap.chain
+	check(ch._mm.visible_instance_count == 0 and ch.arrow.global_position.distance_to(vm.fist_point()) < ch.ARROW_LEN,
+		"chain: at rest it's all inside the hand, only the arrowhead's point showing")
+	# fire it 12 m out: the links spool out of the fist behind the arrowhead
+	var out_tip: Vector3 = vm.fist_point() + vm.forward() * 12.0
+	ch.update(0.016, ch.FLYING, out_tip)
+	var n_out: int = ch._mm.visible_instance_count
+	var first: Vector3 = ch._mm.get_instance_transform(0).origin
+	var last_x: Transform3D = ch._mm.get_instance_transform(n_out - 1)
+	check(n_out > 150 and first.distance_to(out_tip) < 0.5 and last_x.origin.distance_to(vm.fist_point()) < 0.1,
+		"chain: fired, it runs from the arrowhead back into the fist (%d links)" % n_out)
+	check(last_x.basis.get_scale().x < 0.9, "chain: the last links shrink as they slip into the glove")
+	# reeling in: half as far out, fewer links, laid from the arrow end
+	ch.update(0.016, ch.RETURNING, vm.fist_point() + vm.forward() * 6.0)
+	check(ch._mm.visible_instance_count < n_out * 0.6, "chain: reeling in, the links disappear into the hand (%d left)" % ch._mm.visible_instance_count)
+	ch.update(0.016, ch.STOWED, Vector3.ZERO)
 	check((vm.fist_point() - wrist).dot(vm.forward()) > 0.1, "arm: the fist is ahead of the wrist, where the arrowhead rests")
 	ap.cam.fov = 70.0
 	await shot("56_arm_view")
+	# the chain in flight, spooling out of the fist toward the cube
+	ap.global_position = Vector3(0, 1, -10)
+	ap.rotation = Vector3.ZERO
+	ap.head.rotation.x = deg_to_rad(40)
+	for i in 6:
+		await get_tree().physics_frame
+		await get_tree().process_frame
+	ap.try_grapple()
+	for i in 5:
+		await get_tree().physics_frame
+	await shot("59_chain_out")
+	for i in 60:
+		await get_tree().physics_frame
+	ap.release()
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("60_chain_reeling")
+	for i in 240:
+		await get_tree().physics_frame
 	# a close look from the side, with a second camera beside the arm
 	var c := Camera3D.new()
 	c.near = 0.005

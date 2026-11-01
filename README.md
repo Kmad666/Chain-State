@@ -156,8 +156,8 @@ To add a new NPC, place `scripts/world/npc.gd` in a scene (or add one in `world.
 - `scripts/world/levels.gd`: the list of levels
 - `scripts/world/floating_island.gd`: a procedurally shaped floating island (grass top, rock cone below)
 - `scripts/player/player.gd`: first-person controller, grapple, rope physics, feel tuning, talk targeting
-- `scripts/player/viewmodel.gd`: your right arm: a black suit sleeve with cuff buttons, and a black leather glove on an anatomically built fist (palm with thenar and hypothenar pads, four fingers of three phalanges each, a three-bone thumb wrapped across the front, stitched points on the back), with the chain fastened to a steel ring on the glove's wrist strap; punches out on fire, reaches up while hooked
-- `scripts/player/chain.gd`: the silver chain, coiled around the forearm and paying out to the arrowhead
+- `scripts/player/viewmodel.gd`: your right arm: a black suit sleeve with cuff buttons, and a black leather glove on an anatomically built fist (palm with thenar and hypothenar pads, four fingers of three phalanges each, a three-bone thumb wrapped across the front, stitched points on the back), and a strap and buckle at the wrist; punches out on fire, reaches up while hooked
+- `scripts/player/chain.gd`: the silver chain. It lives inside the gloved hand: fire and it spools out of the fist behind the arrowhead; let go and it reels back in, each link shrinking as it slips into the glove. Links are laid from the arrow end, so they ride out with it
 - `scripts/world/npc.gd`: talkable NPC (collision layer 2: solid and talkable, but can't be grappled)
 - `scripts/autoload/game.gd`: input map and UI mode (play, pause, dialogue, editor)
 - `scripts/autoload/dialogue_db.gd`: loads and saves dialogue trees (the file format is documented at the top)
