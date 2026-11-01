@@ -23,6 +23,7 @@ const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
 const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const SeaWall := preload("res://scripts/world/sea_wall.gd")
 const KeepIsles := preload("res://scripts/world/keep_isles.gd")
 const WhiteCitadel := preload("res://scripts/world/white_citadel.gd")
 const CloudTree := preload("res://scripts/world/cloud_tree.gd")
@@ -119,6 +120,8 @@ func _ready() -> void:
 	if level_sky != "":
 		sky_id = level_sky
 	set_sky(sky_id, level_sky == "")     # a level's own sky isn't saved as your choice
+	if level_look.is_valid():
+		level_look.call()
 
 	var ui := CanvasLayer.new()
 	ui.layer = 10
@@ -256,9 +259,11 @@ func _build_world() -> void:
 			_build_white_citadel()
 		"keep_isles":
 			_build_keep_isles()
+		"sea_wall":
+			_build_sea_wall()
 		_:
 			_build_range()
-	if not Game.level in ["range", "nation", "spire_town", "white_citadel"] and (not islands.is_empty() or not pads.is_empty()):
+	if not Game.level in ["range", "nation", "spire_town", "white_citadel", "sea_wall"] and (not islands.is_empty() or not pads.is_empty()):
 		var c := Vector3.ZERO
 		var spots: Array = islands if not islands.is_empty() else pads
 		for isl in spots:
@@ -882,7 +887,8 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 ## Touched down: landing pads are checkpoints; the last one finishes the course.
 func _on_landed(body: Node) -> void:
 	if body and ((spire and body.get_parent() == spire) or (cloud_tree and body.get_parent() == cloud_tree) \
-			or (citadel and body.get_parent() == citadel) or (keep and (body.get_parent() == keep or body == keep))):
+			or (citadel and body.get_parent() == citadel) or (keep and (body.get_parent() == keep or body == keep)) \
+			or (sea_wall and body.get_parent() == sea_wall)):
 		_spire_landed()
 		return
 	if body and body.has_meta("ascent_cp"):
@@ -915,6 +921,9 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if sea_wall and not (player and player.flying):
+		return "THE SEA WALL      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
+			roundi(spire_best), roundi(sea_wall.top_point().y), falls]
 	if keep and not (player and player.flying):
 		return "THE KEEP ISLES      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
 			roundi(spire_best), roundi(keep.top_point().y), falls]
@@ -951,6 +960,8 @@ var cherub: Node3D
 var cloud_tree: Node3D = null      # the Cloud Tree
 var citadel: Node3D = null         # the White Citadel
 var keep: Node3D = null            # the Keep Isles
+var sea_wall: Node3D = null        # the Sea Wall
+var level_look := Callable()       # a level's own sky and grade, applied after the saved sky
 var spire: Node3D = null           # Spire Town
 var spire_best := 0.0
 var level_sky := ""                # a level's own sky, used instead of your saved one
@@ -1422,10 +1433,10 @@ func _spire_landed() -> void:
 		spire_best = y
 		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
 		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
-	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else 200.0)
+	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else (330.0 if sea_wall else 200.0))
 	if y > top_line and not finished:
 		finished = true
-		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else "THE HEIGHTS OF SPIRE TOWN"))
+		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else ("ATOP THE SEA TOWER" if sea_wall else "THE HEIGHTS OF SPIRE TOWN")))
 		hud.toast("%s: %d m, %d falls" % [what, roundi(y), falls], 6.0)
 
 
@@ -1555,3 +1566,67 @@ func _build_keep_isles() -> void:
 	puffs.y_high = 140.0
 	puffs.spread = 320.0
 	add_child(puffs)
+
+
+# ---------------------------------------------------------------- the Sea Wall
+## The Sea Wall: a white limestone fortress on a sheer cliff over a deep blue sea
+## (after a painting Daniel shared, for its colour and style). Walk the wall from
+## the palace's arcades, climb its stairs to the gatehouse, and scale the sea tower.
+## Fall and you land on the plain far below, among the army; fall into the sea and
+## you're back at your checkpoint.
+func _build_sea_wall() -> void:
+	sea_wall = SeaWall.new()
+	add_child(sea_wall)
+	var sea := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(16000, 16000)
+	sea.mesh = pm
+	var wm := StandardMaterial3D.new()
+	wm.albedo_color = Color(0.03, 0.08, 0.36)
+	wm.roughness = 0.35
+	wm.metallic_specular = 0.6
+	sea.material_override = wm
+	sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(sea)
+	start_pos = sea_wall.walk_start
+	start_yaw = 0.0                               # facing north along the wall
+	spire_best = start_pos.y
+	level_look = _sea_wall_look
+
+
+## The painting's look: a deep ultramarine sky over a deep blue sea, hard bright sun,
+## colours pushed up, a light haze only far out toward the horizon.
+func _sea_wall_look() -> void:
+	var sky := ProceduralSkyMaterial.new()
+	sky.sky_top_color = Color(0.02, 0.07, 0.36)
+	sky.sky_horizon_color = Color(0.36, 0.50, 0.82)
+	sky.sky_curve = 0.18
+	sky.ground_horizon_color = Color(0.36, 0.50, 0.82)
+	sky.ground_bottom_color = Color(0.03, 0.08, 0.36)
+	sky.sun_angle_max = 8.0
+	env.sky.sky_material = sky
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC     # keeps sunlit stone from blowing out to flat white
+	env.tonemap_exposure = 1.05
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.15
+	env.adjustment_contrast = 1.1
+	env.ambient_light_color = Color(0.62, 0.70, 0.92)
+	env.ambient_light_energy = 0.55
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_density = 1.0
+	env.fog_depth_begin = 1400.0
+	env.fog_depth_end = 7000.0
+	env.fog_depth_curve = 1.6
+	env.fog_light_color = Color(0.40, 0.54, 0.84)
+	env.fog_height_density = 0.0
+	sun.light_color = Color(1.0, 0.97, 0.90)
+	sun.light_energy = 1.1
+	sun.directional_shadow_max_distance = 400.0
+	var sun_dir := Basis.from_euler(Vector3(deg_to_rad(52), deg_to_rad(-60), 0)) * Vector3.FORWARD
+	sun.basis = Basis.looking_at(-sun_dir, Vector3.UP)
+	if glare:
+		glare.sun_dir = sun_dir
+		glare.strength = 0.5
+	if player:
+		player.cam.far = 7600.0
+		player.fall_limit = 2.0                   # into the sea: back to your checkpoint

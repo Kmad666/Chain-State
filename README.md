@@ -298,6 +298,25 @@ The level reads this file every time it loads, so moving, resizing, adding or re
 - **Shift** goes 5× faster: 60 m/s normally, 300 m/s boosted.
 - The HUD shows your speed, your altitude and the nearest island, either "over DELOS" or "ARCADEN 2.4 km".
 
+## The Sea Wall
+
+**The Sea Wall** takes its colour and style from a painting Daniel shared (`scripts/world/sea_wall.gd`, on the Blockout base). It's a deep ultramarine sky and sea, chalk-white stone in hard sunlight, vivid greens and red roofs. The level has its own sky and colour grade: a procedural deep-blue sky, a filmic tonemap with boosted saturation and contrast, and haze only far out at the horizon.
+
+- **The wall:**
+  - A sheer limestone cliff, 220 m tall, broken into crags with scrub clinging to its ledges.
+  - Along its lip runs a paved wall-walk behind a crenellated sea-side parapet, in coursed ashlar stone.
+- **The palace:** on the landward side, three tiers of columned arcades over a carved meander band.
+- **The climb:** stairs lead up to a raised wall section with a square wall-house, then more stairs to a gatehouse with a columned arched window. Beyond it stands a 96 m square sea tower with battlements; it's the top, at 353 m, and its face has ledges to climb.
+- **Below:** an army drawn up in dark blocks with red banners on green plains, a red-roofed villa among cypresses, a town on a peninsula and four galleons at anchor.
+- **The horizon:** a low far coast under a great cumulus.
+- **The watchman:** a cloaked knight keeps watch on the walk.
+
+How the level plays:
+- Walk the wall and climb its stairs.
+- Grapple anything: the cliff, the columns, the tower.
+- The highest place you've stood is your checkpoint. Above 330 m counts as reaching the top.
+- Fall and you land on the plain, so you can grapple back up the cliff. Fall into the sea and you're returned to your checkpoint.
+
 ## The Keep Isles
 
 **The Keep Isles** is built from a reference drawing Daniel shared (`scripts/world/keep_isles.gd`, on the same Blockout base as the White Citadel).

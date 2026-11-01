@@ -18,9 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
+		elif OS.get_environment("ONLY") == "seawall":
+			await _test_sea_wall()
 		elif OS.get_environment("ONLY") == "keep":
 			await _test_keep()
 		elif OS.get_environment("ONLY") == "citadel":
@@ -781,6 +783,7 @@ func _ready() -> void:
 	await _test_cloud_tree()
 	await _test_citadel()
 	await _test_keep()
+	await _test_sea_wall()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1512,3 +1515,50 @@ func _test_keep() -> void:
 
 func nat_layout() -> Array:
 	return JSON.parse_string(FileAccess.get_file_as_string("res://data/nation_layout.json")).islands
+
+
+func _test_sea_wall() -> void:
+	print("== The Sea Wall")
+	Game.level = "sea_wall"
+	var ww = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(ww)
+	for i in 60:
+		await get_tree().physics_frame
+	var wp = ww.player
+	var sw = ww.sea_wall
+	check(sw != null and wp.is_on_floor() and wp.global_position.y > 215.0, "sea wall: you start on the wall-walk, 220 m up")
+	check(ww.env.sky.sky_material is ProceduralSkyMaterial and ww.env.adjustment_saturation > 1.0, "sea wall: deep blue sky and the painting's saturated grade")
+	check(sw.top_point().y > 340.0, "sea wall: the sea tower is the top (%d m)" % roundi(sw.top_point().y))
+	# walk north along the wall and up the first stairs onto the raised section
+	Input.action_press("move_forward")
+	for i in 6000:
+		await get_tree().physics_frame
+		if wp.global_position.z < -140.0:
+			break
+	Input.action_release("move_forward")
+	check(wp.global_position.y > 232.0 and wp.global_position.z < -130.0, "sea wall: you can walk the wall and climb its stairs (%d m up, z %d)" % [roundi(wp.global_position.y), roundi(wp.global_position.z)])
+	wp.set_flying(true)
+	wp.global_position = Vector3(-5, 223, 110)
+	wp.rotation = Vector3.ZERO
+	wp.head.rotation.x = deg_to_rad(-4)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("53_sea_wall_walk")
+	wp.global_position = Vector3(-6, 228, 60)
+	wp.look_at(Vector3(300, 60, -250), Vector3.UP)
+	wp.rotation.x = 0.0
+	wp.rotation.z = 0.0
+	wp.head.rotation.x = deg_to_rad(-22)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("54_sea_wall_view")
+	wp.global_position = Vector3(260, 160, 160)
+	wp.look_at(Vector3(-20, 250, -150), Vector3.UP)
+	wp.rotation.x = 0.0
+	wp.rotation.z = 0.0
+	wp.head.rotation.x = deg_to_rad(10)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("55_sea_wall_cliff")
+	ww.queue_free()
+	await get_tree().process_frame
