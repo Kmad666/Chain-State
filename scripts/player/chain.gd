@@ -83,8 +83,7 @@ func update(dt: float, state: int, tip: Vector3, _aim_dir := Vector3.ZERO) -> vo
 	var pts := PackedVector3Array()
 	var xf: Transform3D = viewmodel.arm_xform()
 	var turns := lerpf(0.6, COIL_TURNS, _wound)
-	var ring_local := Vector3(0, 0.074, -0.25)
-	pts.append(xf * ring_local)
+	pts.append(viewmodel.cuff_ring())
 	# helix around the forearm, running back from the cuff toward the sleeve and
 	# then forward along the underside into the fist
 	var z0 := -0.22

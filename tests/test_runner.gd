@@ -18,9 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
+		elif OS.get_environment("ONLY") == "arm":
+			await _test_arm()
 		elif OS.get_environment("ONLY") == "seawall":
 			await _test_sea_wall()
 		elif OS.get_environment("ONLY") == "keep":
@@ -784,6 +786,7 @@ func _ready() -> void:
 	await _test_citadel()
 	await _test_keep()
 	await _test_sea_wall()
+	await _test_arm()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1561,4 +1564,37 @@ func _test_sea_wall() -> void:
 		await get_tree().physics_frame
 	await shot("55_sea_wall_cliff")
 	ww.queue_free()
+	await get_tree().process_frame
+
+
+func _test_arm() -> void:
+	print("== The arm")
+	Game.level = "range"
+	var aw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(aw)
+	for i in 30:
+		await get_tree().physics_frame
+	var ap = aw.player
+	var vm = ap.viewmodel
+	check(vm.bones == 4 * 3 + 3, "arm: an anatomical hand, three phalanges per finger and a three-bone thumb (%d bones)" % vm.bones)
+	var wrist: Vector3 = vm.pivot.to_global(Vector3(0, 0, vm.WRIST_Z))
+	check(vm.cuff_ring().distance_to(wrist) < 0.06, "arm: the chain is fastened to a ring on the glove's wrist strap")
+	check((vm.fist_point() - wrist).dot(vm.forward()) > 0.1, "arm: the fist is ahead of the wrist, where the arrowhead rests")
+	ap.cam.fov = 70.0
+	await shot("56_arm_view")
+	# a close look from the side, with a second camera beside the arm
+	var c := Camera3D.new()
+	c.near = 0.005
+	c.fov = 40.0
+	aw.add_child(c)
+	var hand: Vector3 = vm.pivot.to_global(Vector3(0, 0, -0.30))
+	c.global_position = hand + ap.cam.global_basis * Vector3(0.28, 0.10, 0.02)
+	c.look_at(hand, ap.cam.global_basis.y)
+	c.make_current()
+	await shot("57_arm_side")
+	c.global_position = hand + ap.cam.global_basis * Vector3(-0.05, -0.20, -0.22)
+	c.look_at(hand + ap.cam.global_basis * Vector3(0, 0, -0.03), ap.cam.global_basis.y)
+	await shot("58_arm_front")
+	c.queue_free()
+	aw.queue_free()
 	await get_tree().process_frame
