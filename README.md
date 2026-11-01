@@ -307,6 +307,23 @@ The level reads this file every time it loads, so moving, resizing, adding or re
 - **Shift** goes 5× faster: 60 m/s normally, 300 m/s boosted.
 - The HUD shows your speed, your altitude and the nearest island, either "over DELOS" or "ARCADEN 2.4 km".
 
+## The Brick Spire
+
+**The Brick Spire** is built from a reference sculpture Daniel shared: a cluster of medieval brick tower houses grown into one mass (`scripts/world/brick_tower.gd`, on the Blockout base, which now has a four-sided `pyramid` shape for hipped caps). It stands on a grassy floating island, turned so its front faces the default sun.
+
+- **The base:** a battered plinth, 70 m tall, flaring wider toward the ground and ribbed with leaning buttresses. Its front has a tall arched door, paired arched windows and a three-bay loggia on a corbelled balcony.
+- **The blocks on the base:**
+  - a front block with a four-arch loggia, under a stepped gable
+  - a rear block under a hipped cap
+  - a second tower with a bartizan on its flank and a cornice and cap at 186 m
+  - the main tower, with a band course at 141 m, a corbelled side ledge, three-light windows near the top, and its cornice and low hipped cap at 246 m
+- **The masonry:** rough terracotta stone flecked with grit, peppered with putlog holes and small arched windows.
+
+How the level plays:
+- Everything is solid and grapple-able.
+- Ten cornices, balconies and ledges are the rest stops on the way up.
+- The highest place you've stood is your checkpoint. Above 230 m counts as reaching the cornice.
+
 ## The Sea Wall
 
 **The Sea Wall** takes its colour and style from a painting Daniel shared (`scripts/world/sea_wall.gd`, on the Blockout base). It's a deep ultramarine sky and sea, chalk-white stone in hard sunlight, vivid greens and red roofs. The level has its own sky and colour grade: a procedural deep-blue sky, a filmic tonemap with boosted saturation and contrast, and haze only far out at the horizon.

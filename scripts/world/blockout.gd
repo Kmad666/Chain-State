@@ -20,7 +20,13 @@ func _ready() -> void:
 	body.collision_mask = 0
 	add_child(body)
 	_unit = {"box": BoxMesh.new(), "prism": PrismMesh.new(), "cyl": CylinderMesh.new(),
-		"cone": CylinderMesh.new(), "ball": SphereMesh.new()}
+		"cone": CylinderMesh.new(), "ball": SphereMesh.new(), "pyramid": CylinderMesh.new()}
+	# a four-sided pyramid with a 1 x 1 base once turned 45 degrees (pass yaw = PI / 4)
+	_unit.pyramid.top_radius = 0.0
+	_unit.pyramid.bottom_radius = 0.70711
+	_unit.pyramid.height = 1.0
+	_unit.pyramid.radial_segments = 4
+	_unit.pyramid.rings = 1
 	_unit.cyl.top_radius = 0.5
 	_unit.cyl.bottom_radius = 0.5
 	_unit.cyl.height = 1.0
@@ -33,7 +39,7 @@ func _ready() -> void:
 	_unit.ball.height = 1.0
 	_unit.ball.radial_segments = 16
 	_unit.ball.rings = 8
-	for k in ["prism", "cone"]:
+	for k in ["prism", "cone", "pyramid"]:
 		_hull[k] = (_unit[k] as Mesh).create_convex_shape().points
 	build()
 	flush()

@@ -23,6 +23,7 @@ const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
 const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const BrickTower := preload("res://scripts/world/brick_tower.gd")
 const SeaWall := preload("res://scripts/world/sea_wall.gd")
 const KeepIsles := preload("res://scripts/world/keep_isles.gd")
 const WhiteCitadel := preload("res://scripts/world/white_citadel.gd")
@@ -285,6 +286,8 @@ func _build_world() -> void:
 			_build_keep_isles()
 		"sea_wall":
 			_build_sea_wall()
+		"brick_spire":
+			_build_brick_spire()
 		_:
 			_build_range()
 	if not Game.level in ["range", "nation", "spire_town", "white_citadel", "sea_wall"] and (not islands.is_empty() or not pads.is_empty()):
@@ -912,7 +915,7 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 func _on_landed(body: Node) -> void:
 	if body and ((spire and body.get_parent() == spire) or (cloud_tree and body.get_parent() == cloud_tree) \
 			or (citadel and body.get_parent() == citadel) or (keep and (body.get_parent() == keep or body == keep)) \
-			or (sea_wall and body.get_parent() == sea_wall)):
+			or (sea_wall and body.get_parent() == sea_wall) or (brick and body.get_parent() == brick)):
 		_spire_landed()
 		return
 	if body and body.has_meta("ascent_cp"):
@@ -945,6 +948,9 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if brick and not (player and player.flying):
+		return "THE BRICK SPIRE      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
+			roundi(spire_best), roundi(brick.top_point().y), falls]
 	if sea_wall and not (player and player.flying):
 		return "THE SEA WALL      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
 			roundi(spire_best), roundi(sea_wall.top_point().y), falls]
@@ -985,6 +991,7 @@ var cloud_tree: Node3D = null      # the Cloud Tree
 var citadel: Node3D = null         # the White Citadel
 var keep: Node3D = null            # the Keep Isles
 var sea_wall: Node3D = null        # the Sea Wall
+var brick: Node3D = null           # the Brick Spire
 var level_look := Callable()       # a level's own sky and grade, applied after the saved sky
 var spire: Node3D = null           # Spire Town
 var spire_best := 0.0
@@ -1456,10 +1463,10 @@ func _spire_landed() -> void:
 		spire_best = y
 		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
 		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
-	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else (330.0 if sea_wall else 200.0))
+	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else (330.0 if sea_wall else (230.0 if brick else 200.0)))
 	if y > top_line and not finished:
 		finished = true
-		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else ("ATOP THE SEA TOWER" if sea_wall else "THE HEIGHTS OF SPIRE TOWN")))
+		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else ("ATOP THE SEA TOWER" if sea_wall else ("ON THE SPIRE'S CORNICE" if brick else "THE HEIGHTS OF SPIRE TOWN"))))
 		hud.toast("%s: %d m, %d falls" % [what, roundi(y), falls], 6.0)
 
 
@@ -1630,3 +1637,21 @@ func _sea_wall_look() -> void:
 	if player:
 		player.cam.far = 7600.0
 		player.fall_limit = 2.0                   # into the sea: back to your checkpoint
+
+
+# ---------------------------------------------------------------- the Brick Spire
+## The Brick Spire: a cluster of medieval brick towers on a grassy floating island
+## (after a reference sculpture). Climb from the loggias and cornices to the main
+## tower's cap. Highest place stood = checkpoint.
+func _build_brick_spire() -> void:
+	var isl := _island(Vector3.ZERO, 75.0, 1188)
+	isl.depth = 70.0
+	brick = BrickTower.new()
+	# turn the tower's front (its loggias and door) to face the default sun
+	var sky: Dictionary = SKIES[DEFAULT_SKY]
+	var sun_to := Basis.from_euler(Vector3(deg_to_rad(sky.elev), -sky.u * TAU, 0)) * Vector3.FORWARD
+	brick.rotation.y = atan2(sun_to.x, sun_to.z)
+	add_child(brick)
+	start_pos = brick.transform * Vector3(10, 1.0, 62)
+	start_yaw = brick.rotation.y                  # facing the tower's front
+	spire_best = start_pos.y

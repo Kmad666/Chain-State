@@ -18,9 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
+		elif OS.get_environment("ONLY") == "brick":
+			await _test_brick()
 		elif OS.get_environment("ONLY") == "arm":
 			await _test_arm()
 		elif OS.get_environment("ONLY") == "seawall":
@@ -790,6 +792,7 @@ func _ready() -> void:
 	await _test_keep()
 	await _test_sea_wall()
 	await _test_arm()
+	await _test_brick()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1634,4 +1637,48 @@ func _test_arm() -> void:
 	await shot("58_arm_front")
 	c.queue_free()
 	aw.queue_free()
+	await get_tree().process_frame
+
+
+func _test_brick() -> void:
+	print("== The Brick Spire")
+	Game.level = "brick_spire"
+	var bw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(bw)
+	for i in 60:
+		await get_tree().physics_frame
+	var bp = bw.player
+	var bt = bw.brick
+	check(bt != null and bp.is_on_floor(), "brick spire: you start on the island at its foot")
+	check(bt.top_point().y > 230.0, "brick spire: the main tower's cap is the top (%d m)" % roundi(bt.top_point().y))
+	check(bt.ledges.size() >= 8, "brick spire: cornices, balconies and corbelled ledges to rest on (%d)" % bt.ledges.size())
+	# every ledge can be stood on
+	var space = bw.get_world_3d().direct_space_state
+	var standable := 0
+	for l in bt.ledges:
+		var c: Vector3 = l[0]
+		var sz: Vector3 = l[1]
+		var probe: Vector3 = bt.transform * (c + Vector3(sz.x * 0.45, 3, 0))
+		var hit: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(probe, probe + Vector3(0, -4, 0), 1))
+		if not hit.is_empty():
+			standable += 1
+	check(standable == bt.ledges.size(), "brick spire: every ledge is solid underfoot (%d / %d)" % [standable, bt.ledges.size()])
+	bp.set_flying(true)
+	bp.global_position = bt.transform * Vector3(30, 40, 170)
+	bp.look_at(bt.transform * Vector3(0, 110, 0), Vector3.UP)
+	bp.rotation.x = 0.0
+	bp.rotation.z = 0.0
+	bp.head.rotation.x = deg_to_rad(18)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("61_brick_spire")
+	bp.global_position = bt.transform * Vector3(-60, 120, 70)
+	bp.look_at(bt.transform * Vector3(-5, 120, 0), Vector3.UP)
+	bp.rotation.x = 0.0
+	bp.rotation.z = 0.0
+	bp.head.rotation.x = deg_to_rad(6)
+	for i in 10:
+		await get_tree().physics_frame
+	await shot("62_brick_close")
+	bw.queue_free()
 	await get_tree().process_frame
