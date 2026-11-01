@@ -309,20 +309,22 @@ The level reads this file every time it loads, so moving, resizing, adding or re
 
 ## The Brick Spire
 
-**The Brick Spire** is built from a reference sculpture Daniel shared: a cluster of medieval brick tower houses grown into one mass (`scripts/world/brick_tower.gd`, on the Blockout base, which now has a four-sided `pyramid` shape for hipped caps). It stands on a grassy floating island, turned so its front faces the default sun.
+**The Brick Spire** is built from a reference sculpture Daniel shared: a cluster of medieval brick tower houses grown into one mass (`scripts/world/brick_tower.gd`, on the Blockout base, which now has a four-sided `pyramid` shape for hipped caps). It stands half drowned in a still sea, its foot 30 m under clear water over a deep blue floor, turned so its front faces the default sun.
 
-- **The base:** a battered plinth, 70 m tall, flaring wider toward the ground and ribbed with leaning buttresses. Its front has a tall arched door, paired arched windows and a three-bay loggia on a corbelled balcony.
+- **The base:** a battered plinth, 70 m tall (40 m of it above the water), flaring wider toward the sea floor and ribbed with leaning buttresses. Its door and paired windows are under the water; a three-bay loggia on a corbelled balcony stands just above it.
 - **The blocks on the base:**
   - a front block with a four-arch loggia, under a stepped gable
   - a rear block under a hipped cap
-  - a second tower with a bartizan on its flank and a cornice and cap at 186 m
-  - the main tower, with a band course at 141 m, a corbelled side ledge, three-light windows near the top, and its cornice and low hipped cap at 246 m
-- **The masonry:** rough terracotta stone flecked with grit, peppered with putlog holes and small arched windows.
+  - a second tower with a bartizan on its flank and a cornice and cap at 156 m
+  - the main tower, with a band course at 111 m, a corbelled side ledge, three-light windows near the top, and its cornice and low hipped cap at 246 m
+- **The masonry:** rough pale beige stone flecked with grit, peppered with putlog holes and small arched windows.
 
 How the level plays:
+- You start on a stone landing in front of the tower, just above the water.
 - Everything is solid and grapple-able.
+- Fall into the sea and you're returned to your checkpoint.
 - Ten cornices, balconies and ledges are the rest stops on the way up.
-- The highest place you've stood is your checkpoint. Above 230 m counts as reaching the cornice.
+- The highest place you've stood is your checkpoint. Above 200 m counts as reaching the cornice.
 
 ## The Sea Wall
 

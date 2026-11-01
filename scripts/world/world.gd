@@ -1463,7 +1463,7 @@ func _spire_landed() -> void:
 		spire_best = y
 		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
 		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
-	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else (330.0 if sea_wall else (230.0 if brick else 200.0)))
+	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else (330.0 if sea_wall else (200.0 if brick else 200.0)))
 	if y > top_line and not finished:
 		finished = true
 		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else ("ATOP THE SEA TOWER" if sea_wall else ("ON THE SPIRE'S CORNICE" if brick else "THE HEIGHTS OF SPIRE TOWN"))))
@@ -1640,18 +1640,60 @@ func _sea_wall_look() -> void:
 
 
 # ---------------------------------------------------------------- the Brick Spire
-## The Brick Spire: a cluster of medieval brick towers on a grassy floating island
-## (after a reference sculpture). Climb from the loggias and cornices to the main
-## tower's cap. Highest place stood = checkpoint.
+## The Brick Spire: a cluster of pale stone towers standing half drowned in a still
+## sea (after a reference sculpture). The base and its door are under the water; you
+## start on a stone landing in front and climb from the loggias and cornices to the
+## main tower's cap. Fall into the sea and you're back at your checkpoint.
+const BRICK_SINK := 30.0              # how deep the tower's foot stands in the water
+
 func _build_brick_spire() -> void:
-	var isl := _island(Vector3.ZERO, 75.0, 1188)
-	isl.depth = 70.0
 	brick = BrickTower.new()
 	# turn the tower's front (its loggias and door) to face the default sun
 	var sky: Dictionary = SKIES[DEFAULT_SKY]
 	var sun_to := Basis.from_euler(Vector3(deg_to_rad(sky.elev), -sky.u * TAU, 0)) * Vector3.FORWARD
 	brick.rotation.y = atan2(sun_to.x, sun_to.z)
+	brick.position.y = -BRICK_SINK
 	add_child(brick)
-	start_pos = brick.transform * Vector3(10, 1.0, 62)
+	# the sea: a clear, slightly see-through surface over a deep blue floor, so the
+	# drowned base shows through
+	var sea := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(9000, 9000)
+	sea.mesh = pm
+	var wm := StandardMaterial3D.new()
+	wm.albedo_color = Color(0.10, 0.26, 0.52, 0.72)
+	wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wm.roughness = 0.12
+	wm.metallic = 0.3
+	wm.metallic_specular = 0.7
+	sea.material_override = wm
+	sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(sea)
+	var floor_ := MeshInstance3D.new()
+	var fm := PlaneMesh.new()
+	fm.size = Vector2(9000, 9000)
+	floor_.mesh = fm
+	floor_.material_override = Mats.lit(Color(0.02, 0.07, 0.22))
+	floor_.position.y = -BRICK_SINK - 4.0
+	add_child(floor_)
+	# a stone landing in front of the tower, just above the water, where you arrive
+	var landing := StaticBody3D.new()
+	landing.collision_layer = 1
+	var lm := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(20, 3.0, 14)
+	lm.mesh = bm
+	lm.material_override = brick.material_for(brick.BRICK_LT)
+	landing.add_child(lm)
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = bm.size
+	cs.shape = bs
+	landing.add_child(cs)
+	landing.transform = brick.transform * Transform3D(Basis(), Vector3(4, BRICK_SINK + 0.5, 46))
+	add_child(landing)
+	start_pos = landing.position + Vector3(0, 3.0, 0) + brick.transform.basis * Vector3(0, 0, 4)
 	start_yaw = brick.rotation.y                  # facing the tower's front
 	spire_best = start_pos.y
+	level_look = func():
+		player.fall_limit = -1.0                  # into the sea: back to your checkpoint

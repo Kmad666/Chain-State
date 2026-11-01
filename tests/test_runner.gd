@@ -1649,8 +1649,9 @@ func _test_brick() -> void:
 		await get_tree().physics_frame
 	var bp = bw.player
 	var bt = bw.brick
-	check(bt != null and bp.is_on_floor(), "brick spire: you start on the island at its foot")
-	check(bt.top_point().y > 230.0, "brick spire: the main tower's cap is the top (%d m)" % roundi(bt.top_point().y))
+	check(bt != null and bp.is_on_floor() and bp.global_position.y > 0.0, "brick spire: you start on the stone landing above the water")
+	check(bt.global_position.y < -20.0, "brick spire: its foot stands deep in the sea (%d m)" % roundi(bt.global_position.y))
+	check(bt.top_point().y > 200.0, "brick spire: the main tower's cap is the top (%d m above the water)" % roundi(bt.top_point().y))
 	check(bt.ledges.size() >= 8, "brick spire: cornices, balconies and corbelled ledges to rest on (%d)" % bt.ledges.size())
 	# every ledge can be stood on
 	var space = bw.get_world_3d().direct_space_state
@@ -1664,8 +1665,8 @@ func _test_brick() -> void:
 			standable += 1
 	check(standable == bt.ledges.size(), "brick spire: every ledge is solid underfoot (%d / %d)" % [standable, bt.ledges.size()])
 	bp.set_flying(true)
-	bp.global_position = bt.transform * Vector3(30, 40, 170)
-	bp.look_at(bt.transform * Vector3(0, 110, 0), Vector3.UP)
+	bp.global_position = bt.transform * Vector3(30, 50, 170)
+	bp.look_at(bt.transform * Vector3(0, 120, 0), Vector3.UP)
 	bp.rotation.x = 0.0
 	bp.rotation.z = 0.0
 	bp.head.rotation.x = deg_to_rad(18)

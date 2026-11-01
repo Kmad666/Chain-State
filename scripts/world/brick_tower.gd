@@ -12,17 +12,17 @@ extends "res://scripts/world/blockout.gd"
 ##   - a second tower, front right, with a little bartizan on its flank
 ##   - the tallest tower, back left, with a band course half way up, a
 ##     three-light window near its top and a cornice under a low hipped cap
-## - **The masonry** is rough terracotta stone flecked with grit. Small arched
+## - **The masonry** is rough pale beige stone flecked with grit. Small arched
 ##   windows and putlog holes pepper every face.
 ##
 ## Everything is solid and grapple-able. Cornices, the band course, the loggia
 ## balconies and the corbelled ledges are the rest stops on the way up. The origin
 ## is the ground at the tower's foot, and the main tower's cap tops out near 250 m.
 
-const BRICK := Color(0.52, 0.27, 0.17)
-const BRICK_DK := Color(0.40, 0.20, 0.13)
-const BRICK_LT := Color(0.60, 0.34, 0.22)
-const HOLE := Color(0.07, 0.045, 0.035)
+const BRICK := Color(0.78, 0.67, 0.50)        # pale beige stone (warm enough to stay beige in hard sun)
+const BRICK_DK := Color(0.66, 0.55, 0.40)
+const BRICK_LT := Color(0.84, 0.74, 0.57)
+const HOLE := Color(0.12, 0.10, 0.08)
 
 var top := Vector3.ZERO
 var ledges: Array = []            # [centre, size] of every walkable rest ledge
@@ -239,7 +239,7 @@ func _main_tower() -> void:
 
 
 # ---------------------------------------------------------------- the masonry
-## Rough terracotta stone: courses of uneven blocks flecked with light grit and dark
+## Rough pale stone: courses of uneven blocks flecked with light grit and dark
 ## pits, laid in world space so it reads the same size everywhere.
 func material_for(col: Color) -> Material:
 	if col.r < 0.2:
