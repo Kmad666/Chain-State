@@ -18,9 +18,11 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick", "editor"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
+		elif OS.get_environment("ONLY") == "editor":
+			await _test_editor()
 		elif OS.get_environment("ONLY") == "brick":
 			await _test_brick()
 		elif OS.get_environment("ONLY") == "arm":
@@ -793,6 +795,7 @@ func _ready() -> void:
 	await _test_sea_wall()
 	await _test_arm()
 	await _test_brick()
+	await _test_editor()
 
 	print("== Enemy test (ground)")
 	Game.level = "enemy_test"
@@ -1682,4 +1685,111 @@ func _test_brick() -> void:
 		await get_tree().physics_frame
 	await shot("62_brick_close")
 	bw.queue_free()
+	await get_tree().process_frame
+
+
+func _test_editor() -> void:
+	print("== Level editor")
+	var CL = load("res://scripts/world/custom_level.gd")
+	Game.custom = {}
+	var ed = load("res://scenes/level_editor.tscn").instantiate()
+	get_tree().root.add_child(ed)
+	for i in 10:
+		await get_tree().process_frame
+	check(ed.data.pieces.size() == 2 and ed.nodes.size() == 2, "editor: a new level starts with an island and a start")
+	# add one of everything
+	ed.cam.position = Vector3(0, 30, 60)
+	ed.cam.look_at(Vector3(0, 0, 0))
+	var before: int = ed.data.pieces.size()
+	ed.add_piece("island")
+	for s in CL.SHAPES:
+		ed.add_piece("shape", s)
+	ed.add_piece("anchor", "")
+	ed.add_piece("anchor", "free")
+	ed.add_piece("checkpoint")
+	ed.add_piece("finish")
+	for k in CL.ENEMIES:
+		ed.add_piece("enemy", k)
+	for i in 6:
+		await get_tree().process_frame
+	check(ed.data.pieces.size() == before + 1 + CL.SHAPES.size() + 2 + 2 + CL.ENEMIES.size(), "editor: every kind of piece can be added (%d pieces)" % ed.data.pieces.size())
+	check(ed.nodes.size() == ed.data.pieces.size(), "editor: each piece is built in the view")
+	# select, move, turn, resize, undo
+	var box_id := ""
+	for p in ed.data.pieces:
+		if p.type == "shape" and p.shape == "box":
+			box_id = p.id
+	ed.select(box_id)
+	var p0: Vector3 = CL.v3(ed.piece(box_id).pos)
+	ed.move_selected(Vector3(5, 2, 0))
+	ed.turn_selected(15.0)
+	ed.set_fields({"size": [10, 2, 3]})
+	check(CL.v3(ed.piece(box_id).pos).is_equal_approx(p0 + Vector3(5, 2, 0)) and is_equal_approx(CL.v3(ed.piece(box_id).rot).y, 15.0),
+		"editor: a piece moves, turns and resizes")
+	ed.undo()
+	ed.undo()
+	ed.undo()
+	check(CL.v3(ed.piece(box_id).pos).is_equal_approx(p0), "editor: undo puts it back")
+	# picking with the mouse: put the box somewhere clear, aim at it and click
+	ed.select(box_id)
+	ed.set_fields({"pos": [120, 20, 0]})
+	for i in 4:
+		await get_tree().physics_frame
+	var at: Vector3 = ed.nodes[box_id].global_position
+	ed.cam.look_at(at)
+	await get_tree().physics_frame
+	ed.select("")
+	ed._press(ed.cam.unproject_position(at))
+	ed._release()
+	check(ed.sel == box_id, "editor: clicking a piece selects it")
+	ed.duplicate_selected()
+	check(ed.sel != box_id and ed.piece(ed.sel).shape == "box", "editor: Ctrl+D duplicates the selection")
+	ed.delete_selected()
+	check(ed.sel == "" and ed.piece(box_id).size() > 0, "editor: Delete removes it")
+	# save, list, copy and paste
+	ed.name_edit.text = "Test course"
+	ed.save()
+	var saved := FileAccess.file_exists("user://levels/test-course.json")
+	check(saved and CL.list_levels().any(func(l): return l[0] == "Test course"), "editor: Ctrl+S saves the level to your levels")
+	var json := JSON.stringify(ed.data)
+	var round_trip: Dictionary = CL.parse(json)
+	check(round_trip.pieces.size() == ed.data.pieces.size(), "editor: a level's JSON pastes back in whole")
+	ed.cam.position = Vector3(30, 40, 70)
+	ed.cam.look_at(Vector3(0, 5, 0))
+	ed.select(box_id)
+	for i in 4:
+		await get_tree().process_frame
+	await shot("63_level_editor")
+	var level: Dictionary = ed.data.duplicate(true)
+	ed.queue_free()
+	await get_tree().process_frame
+
+	print("== Custom level (play-test)")
+	# lay out a small course: start on the island, a checkpoint pad, then the finish
+	level.pieces = level.pieces.filter(func(p): return p.type in ["island", "start", "anchor", "enemy"])
+	level.pieces.append({"id": "cp", "type": "checkpoint", "pos": [0, 0.3, -10]})
+	level.pieces.append({"id": "fin", "type": "finish", "pos": [10, 0.3, -10]})
+	# (Game.play_custom would swap scenes and end this test run, so build the world by hand)
+	Game.custom = level
+	Game.from_editor = true
+	Game.level = "custom"
+	var cw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(cw)
+	for i in 90:
+		await get_tree().physics_frame
+	var cp = cw.player
+	check(cw.custom_name == "Test course" and cp.is_on_floor(), "custom: the level builds and you start on it")
+	check(cw.anchors.size() == 2 and cw.sentries.size() >= 3 and cw.cherub != null, "custom: anchors, wizard, apprentice, sage and Cherub are all live (%d enemies)" % cw.sentries.size())
+	check(cw.pause_menu.find_children("*", "Button", true, false).any(func(b): return b.text == "Back to editor"), "custom: the pause menu leads back to the editor")
+	cp.invuln = 999.0
+	cp.global_position = Vector3(0, 3, -10)
+	for i in 90:
+		await get_tree().physics_frame
+	check(cw.custom_cp == 1, "custom: landing on a checkpoint pad makes it your respawn")
+	cp.global_position = Vector3(10, 3, -10)
+	for i in 90:
+		await get_tree().physics_frame
+	check(cw.finished, "custom: landing on the finish pad finishes the level")
+	Game.from_editor = false
+	cw.queue_free()
 	await get_tree().process_frame

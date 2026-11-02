@@ -89,6 +89,11 @@ func _ready() -> void:
 	resume.text = "Resume"
 	resume.pressed.connect(func(): Game.set_ui_mode("play"))
 	br.add_child(resume)
+	if Game.from_editor:
+		var back := Button.new()
+		back.text = "Back to editor"
+		back.pressed.connect(Game.open_editor)
+		br.add_child(back)
 	var levels := Button.new()
 	levels.text = "Level select"
 	levels.pressed.connect(Game.to_level_select)

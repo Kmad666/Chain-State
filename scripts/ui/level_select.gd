@@ -8,7 +8,10 @@ const PAPER := Color(0.95, 0.96, 0.98)
 const SOFT := Color(0.95, 0.96, 0.98, 0.62)
 const STAMP := Color(0.94, 0.65, 0.60)
 
+const CustomLevel := preload("res://scripts/world/custom_level.gd")
+
 var _buttons: Array[Button] = []
+var _buttons_custom: Array[Button] = []
 var scroll: ScrollContainer          # the level list scrolls once it's taller than the screen
 
 
@@ -83,30 +86,22 @@ func _ready() -> void:
 
 	for i in Levels.LIST.size():
 		var l: Dictionary = Levels.LIST[i]
-		var b := Button.new()
-		b.flat = true
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size.y = 64
-		b.text = "%d   %s\n     %s" % [i + 1, l.name, l.blurb]
-		b.add_theme_font_size_override("font_size", 20)
-		b.add_theme_color_override("font_color", PAPER)
-		b.add_theme_color_override("font_hover_color", STAMP)
-		b.add_theme_color_override("font_focus_color", STAMP)
-		var hover := StyleBoxFlat.new()
-		hover.bg_color = Color(NAVY_2, 1.0)
-		hover.set_corner_radius_all(6)
-		hover.set_content_margin_all(10)
-		var normal := StyleBoxEmpty.new()
-		normal.set_content_margin_all(10)
-		b.add_theme_stylebox_override("normal", normal)
-		b.add_theme_stylebox_override("hover", hover)
-		b.add_theme_stylebox_override("focus", hover)
-		b.add_theme_stylebox_override("pressed", hover)
+		var b := _level_button("%d   %s\n     %s" % [i + 1, l.name, l.blurb])
 		b.pressed.connect(Game.play_level.bind(l.id))
-		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		list.add_child(b)
 		_buttons.append(b)
+
+	# your own levels, from the Level Editor
+	for l in CustomLevel.list_levels():
+		var d := CustomLevel.load_file(String(l[1]))
+		var b := _level_button("★   %s\n     Your level · %d pieces" % [l[0], d.get("pieces", []).size()])
+		b.pressed.connect(Game.play_custom.bind(d, false))
+		list.add_child(b)
+		_buttons_custom.append(b)
+	var ed := _level_button("✎   Level Editor\n     Build your own level, then play-test it with the real grapple and enemies.")
+	ed.pressed.connect(Game.open_editor)
+	list.add_child(ed)
+	_buttons_custom.append(ed)
 
 	var rule2 := ColorRect.new()
 	rule2.color = Color(PAPER, 0.25)
@@ -116,6 +111,32 @@ func _ready() -> void:
 	col.add_child(_label(build_stamp(), 13, Color(PAPER, 0.4)))
 	if _buttons.size() > 0:
 		_buttons[0].grab_focus.call_deferred()
+
+
+## One entry in the case-folder list: number and name, blurb underneath.
+func _level_button(text: String) -> Button:
+	var b := Button.new()
+	b.flat = true
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.custom_minimum_size.y = 64
+	b.text = text
+	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_color_override("font_color", PAPER)
+	b.add_theme_color_override("font_hover_color", STAMP)
+	b.add_theme_color_override("font_focus_color", STAMP)
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color(NAVY_2, 1.0)
+	hover.set_corner_radius_all(6)
+	hover.set_content_margin_all(10)
+	var normal := StyleBoxEmpty.new()
+	normal.set_content_margin_all(10)
+	b.add_theme_stylebox_override("normal", normal)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("focus", hover)
+	b.add_theme_stylebox_override("pressed", hover)
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return b
 
 
 ## The list gets whatever height the screen has left under the title and above the

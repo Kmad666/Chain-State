@@ -23,6 +23,7 @@ const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 const Tower := preload("res://scripts/world/grapple_tower.gd")
 const Cherub := preload("res://scripts/combat/cherub.gd")
 const PlaceLabels := preload("res://scripts/ui/place_labels.gd")
+const CustomLevel := preload("res://scripts/world/custom_level.gd")
 const BrickTower := preload("res://scripts/world/brick_tower.gd")
 const SeaWall := preload("res://scripts/world/sea_wall.gd")
 const KeepIsles := preload("res://scripts/world/keep_isles.gd")
@@ -116,6 +117,10 @@ func _ready() -> void:
 		ward.player = player
 	if cherub:
 		cherub.player = player
+	for c in custom_cherubs:
+		c.player = player
+	if custom_name != "":
+		player.fall_limit = custom_floor
 
 	# sun glare sits between the 3D view and the HUD
 	var glare_layer := CanvasLayer.new()
@@ -288,6 +293,8 @@ func _build_world() -> void:
 			_build_sea_wall()
 		"brick_spire":
 			_build_brick_spire()
+		"custom":
+			_build_custom(Game.custom)
 		_:
 			_build_range()
 	if not Game.level in ["range", "nation", "spire_town", "white_citadel", "sea_wall"] and (not islands.is_empty() or not pads.is_empty()):
@@ -913,6 +920,9 @@ func _multimesh(path: String, transforms: Array) -> MultiMeshInstance3D:
 
 ## Touched down: landing pads are checkpoints; the last one finishes the course.
 func _on_landed(body: Node) -> void:
+	if custom_name != "" and body:
+		_custom_landed(body)
+		return
 	if body and ((spire and body.get_parent() == spire) or (cloud_tree and body.get_parent() == cloud_tree) \
 			or (citadel and body.get_parent() == citadel) or (keep and (body.get_parent() == keep or body == keep)) \
 			or (sea_wall and body.get_parent() == sea_wall) or (brick and body.get_parent() == brick)):
@@ -948,6 +958,10 @@ func _on_landed(body: Node) -> void:
 
 ## The Platform Test's running tally (read by the HUD each frame).
 func course_text() -> String:
+	if custom_name != "" and not (player and player.flying):
+		var t := custom_time
+		return "%s      CHECKPOINT %d / %d      TIME %d:%04.1f      FALLS %d" % [custom_name.to_upper(), custom_cp, custom_cps,
+			int(t / 60.0), fmod(t, 60.0), falls]
 	if brick and not (player and player.flying):
 		return "THE BRICK SPIRE      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
 			roundi(spire_best), roundi(brick.top_point().y), falls]
@@ -992,6 +1006,13 @@ var citadel: Node3D = null         # the White Citadel
 var keep: Node3D = null            # the Keep Isles
 var sea_wall: Node3D = null        # the Sea Wall
 var brick: Node3D = null           # the Brick Spire
+# a custom level from the Level Editor
+var custom_name := ""
+var custom_cherubs: Array = []
+var custom_floor := -60.0
+var custom_time := 0.0
+var custom_cp := 0
+var custom_cps := 0
 var level_look := Callable()       # a level's own sky and grade, applied after the saved sky
 var spire: Node3D = null           # Spire Town
 var spire_best := 0.0
@@ -1412,6 +1433,8 @@ func _set_paused(on: bool) -> void:
 
 func _process(_dt: float) -> void:
 	_ascent_tick(_dt)
+	if custom_name != "" and not finished and Game.playing():
+		custom_time += _dt
 	if nation and player:
 		nation.follow(player.global_position)
 	# In a browser, Esc releases the mouse before the game sees the key: treat that as pause.
@@ -1697,3 +1720,83 @@ func _build_brick_spire() -> void:
 	spire_best = start_pos.y
 	level_look = func():
 		player.fall_limit = -1.0                  # into the sea: back to your checkpoint
+
+
+# ---------------------------------------------------------------- custom levels
+## A level made in the Level Editor (scripts/editor/level_editor.gd). The pieces
+## are built by scripts/world/custom_level.gd; the start, checkpoints, finish and
+## enemies are wired up here. Land on a checkpoint pad and it's where you respawn;
+## land on the finish pad and your time is shown.
+func _build_custom(d: Dictionary) -> void:
+	custom_name = String(d.get("name", "Custom level"))
+	var lowest := INF
+	var cp_index := 0
+	start_pos = Vector3(0, 2, 0)
+	for p in d.get("pieces", []):
+		var pos := CustomLevel.v3(p.get("pos", [0, 0, 0]))
+		lowest = minf(lowest, pos.y - (float(p.get("r", 0.0)) if p.get("type") == "island" else 5.0))
+		match String(p.get("type", "")):
+			"start":
+				start_pos = pos + Vector3(0, 1.0, 0)
+				start_yaw = deg_to_rad(float(p.get("yaw", 0.0)))
+			"enemy":
+				_custom_enemy(p, pos)
+			_:
+				var n := CustomLevel.make(p, false)
+				if n == null:
+					continue
+				if n.has_meta("checkpoint"):
+					cp_index += 1
+					n.set_meta("checkpoint", cp_index)
+				add_child(n)
+				if p.get("type") == "island":
+					islands.append(n)
+				elif p.get("type") == "anchor":
+					anchors.append(n)
+	custom_cps = cp_index
+	custom_floor = (lowest if lowest < INF else 0.0) - 60.0
+
+
+func _custom_enemy(p: Dictionary, pos: Vector3) -> void:
+	var kind := String(p.get("enemy", "wizard"))
+	var r := float(p.get("radius", 10.0))
+	match kind:
+		"wizard":
+			var loop := PackedVector3Array()
+			for i in 8:
+				var a := TAU * i / 8.0
+				loop.append(pos + Vector3(cos(a), 0, sin(a)) * maxf(r, 2.0))
+			_sentry("ground", loop)
+		"apprentice":
+			var ap := _sentry("apprentice", PackedVector3Array([pos]))
+			ap.patrol_radius = maxf(r, 4.0)
+		"sage":
+			var sg := _sentry("sage", PackedVector3Array([pos]))
+			sg.patrol_radius = maxf(r, 1.0)
+			sg.speed = 8.0
+		"cherub":
+			if bullets == null:
+				bullets = BulletField.new()
+				add_child(bullets)
+			var c := Cherub.new()
+			c.position = pos
+			add_child(c)
+			c.field = bullets
+			c.spawn_sage = _spawn_sage
+			c.spent.connect(func(): hud.toast("The Cherub is spent. Its eye closes.", 6.0))
+			if cherub == null:
+				cherub = c
+			else:
+				custom_cherubs.append(c)
+
+
+func _custom_landed(body: Node) -> void:
+	if body.has_meta("checkpoint"):
+		var i := int(body.get_meta("checkpoint"))
+		if i > custom_cp:
+			custom_cp = i
+			player.spawn = Transform3D(player.global_basis.orthonormalized(), body.global_position + Vector3(0, 1.5, 0))
+			hud.toast("Checkpoint %d of %d" % [i, custom_cps], 1.8)
+	elif body.has_meta("finish") and not finished:
+		finished = true
+		hud.toast("FINISHED  ·  %d:%04.1f  ·  %d falls" % [int(custom_time / 60.0), fmod(custom_time, 60.0), falls], 8.0)

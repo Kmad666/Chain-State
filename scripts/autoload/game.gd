@@ -11,6 +11,12 @@ var level := "range"
 
 const WORLD_SCENE := "res://scenes/world.tscn"
 const MENU_SCENE := "res://scenes/level_select.tscn"
+const EDITOR_SCENE := "res://scenes/level_editor.tscn"
+
+## A custom level (scripts/world/custom_level.gd format) being played or edited
+var custom: Dictionary = {}
+## true while play-testing from the Level Editor: the pause menu offers the way back
+var from_editor := false
 
 
 func play_level(id: String) -> void:
@@ -20,7 +26,24 @@ func play_level(id: String) -> void:
 	get_tree().change_scene_to_file(WORLD_SCENE)
 
 
+## Play a custom level. From the editor, the pause menu leads back to it.
+func play_custom(data: Dictionary, editing := false) -> void:
+	custom = data
+	from_editor = editing
+	play_level("custom")
+
+
+## Open the Level Editor (on `custom` if there is one).
+func open_editor() -> void:
+	Engine.time_scale = 1.0
+	get_tree().paused = false
+	from_editor = false
+	set_ui_mode("menu")
+	get_tree().change_scene_to_file(EDITOR_SCENE)
+
+
 func to_level_select() -> void:
+	from_editor = false
 	Engine.time_scale = 1.0
 	get_tree().paused = false
 	set_ui_mode("menu")

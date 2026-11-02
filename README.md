@@ -257,6 +257,36 @@ A reusable building piece, `scripts/world/grapple_tower.gd`, shown off on its ow
 - **Tested:** a bot climbs hook to hook to the top post in about 22 s, then lands on the crown.
 - **Reuse:** to drop one into any level, `var t = preload("res://scripts/world/grapple_tower.gd").new()`, set its position, `add_child(t)`. Exports cover sections, unit size, ledge spacing, hook reach, free hooks and the first hook's direction. `t.hooks` and `t.top_point()` give you its crates and summit.
 
+## Level Editor
+
+Build your own levels in the game: **Level Editor** is at the bottom of the level select. It runs anywhere the game runs, browser included (`scripts/editor/level_editor.gd`, scene `scenes/level_editor.tscn`).
+
+**Pieces** (the palette on the left drops each one where you're looking):
+- **Terrain:** floating islands, with their radius, shape seed and grass.
+- **Shapes:** box, cylinder, cone, ramp, pyramid and ball, each with its own size, pitch / yaw / roll and colour. All of them are solid and grapple-able.
+- **Grapple:** anchors (crates), and free anchors that cost no air grapple.
+- **Course:**
+  - the **start**: one per level, with the way you face
+  - **checkpoints**: land on one and it's where you respawn
+  - the **finish**: land on it and your time is shown
+- **Enemies:** wizard, apprentice and sage, each with a patrol radius shown as a ring, and the Cherub, which releases its Sages as usual.
+
+**Controls:**
+- **Looking around:** hold the right mouse button to look; WASD flies, E goes up, Q down, Shift goes fast. The mouse wheel dollies, and F frames the selected piece.
+- **Selecting and moving:** left-click a piece to select it, and drag it to slide it across the ground (1 m snap; hold Alt to move freely).
+  - The arrow keys nudge it along the grid, and Page Up / Page Down raise and lower it (hold Shift for ×10).
+  - R turns it 15° (Shift+R turns the other way).
+  - Ctrl+D duplicates it; Delete removes it.
+- **Exact values:** the inspector on the right edits position, size, rotation, colour and each piece's own settings.
+- **Files:** Ctrl+Z undoes, Ctrl+S saves, and **P** play-tests it with the real grapple, enemies and physics. In the pause menu, **Back to editor** returns you.
+
+**Your levels:**
+- Saved levels are kept in your browser (or app data) and appear on the level select with a ★.
+- **Copy JSON** copies the level, and in the browser also downloads it as a `.json` file. **Paste JSON** loads one.
+- Use those to move a level between computers, or send it to Claude to ship with the game in `data/levels/`. Shipped levels show in the editor's **Open…** list.
+
+**The format** is plain JSON, documented at the top of `scripts/world/custom_level.gd`. That file builds the pieces both for the editor and for play.
+
 ## The Nation (draft) and dev fly
 
 **The Nation (draft)** lays the whole Gordian Empire out from the casebook map (`scripts/world/nation.gd`). The map is scaled to 1:50, where one map unit is 10.73 m, and the states are then pulled in to 42% of that distance so the nation reads as one archipelago. Every state keeps its real bearing from Delos.
