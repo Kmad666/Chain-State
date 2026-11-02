@@ -1742,6 +1742,61 @@ func _test_editor() -> void:
 	ed._press(ed.cam.unproject_position(at))
 	ed._release()
 	check(ed.sel == box_id, "editor: clicking a piece selects it")
+	# drag-resize: grab the +X face handle and pull it 4 m out
+	ed.cam.position = at + Vector3(4, 14, 30)
+	ed.cam.look_at(at)
+	await get_tree().process_frame
+	var gs: Array = ed.grips()
+	check(gs.size() == 6, "editor: a selected shape shows six resize handles")
+	var sz0: Vector3 = CL.v3(ed.piece(box_id).size)
+	var ps0: Vector3 = CL.v3(ed.piece(box_id).pos)
+	var g0: Dictionary = gs[0]
+	var undo_n: int = ed._undo.size()
+	ed._press(ed.cam.unproject_position(g0.pos))
+	check(ed._drag.has("grip"), "editor: clicking a handle grabs it")
+	ed._grip_to(ed.cam.unproject_position(g0.pos + g0.dir * 4.0), false, false)
+	ed._release()
+	var sz1: Vector3 = CL.v3(ed.piece(box_id).size)
+	var ps1: Vector3 = CL.v3(ed.piece(box_id).pos)
+	var grow: float = sz1[g0.axis] - sz0[g0.axis]
+	check(absf(grow - 4.0) <= 0.5 and fmod(sz1[g0.axis], 0.5) == 0.0 and ps1.distance_to(ps0 + g0.dir * grow * 0.5) < 0.01,
+		"editor: dragging a face handle stretches the shape and keeps the far face put (grew %.1f m)" % grow)
+	check(ed._undo.size() == undo_n + 1, "editor: a handle drag is one undo step")
+	ed.undo()
+	check(CL.v3(ed.piece(box_id).size).is_equal_approx(sz0), "editor: undo restores the size")
+	# Shift: scale evenly
+	ed.select(box_id)
+	await get_tree().process_frame
+	gs = ed.grips()
+	ed._press(ed.cam.unproject_position(gs[0].pos))
+	ed._grip_to(ed.cam.unproject_position(gs[0].pos + gs[0].dir * 6.0), false, true)
+	ed._release()
+	var k: float = CL.v3(ed.piece(box_id).size).x / sz0.x
+	check(k > 1.5 and CL.v3(ed.piece(box_id).size).is_equal_approx(sz0 * k), "editor: Shift-dragging a handle scales the shape evenly (x%.2f)" % k)
+	ed.undo()
+	ed.select(box_id)
+	ed.cam.position = at + Vector3(9, 8, 14)
+	ed.cam.look_at(at)
+	for i in 3:
+		await get_tree().process_frame
+	await shot("64_resize_handles")
+	# island radius handle
+	var isl_id := ""
+	for p in ed.data.pieces:
+		if p.type == "island":
+			isl_id = p.id
+	ed.select(isl_id)
+	var ic: Vector3 = CL.v3(ed.piece(isl_id).pos)
+	ed.cam.position = ic + Vector3(0, 60, 20)
+	ed.cam.look_at(ic)
+	await get_tree().process_frame
+	gs = ed.grips()
+	ed._press(ed.cam.unproject_position(gs[0].pos))
+	ed._grip_to(ed.cam.unproject_position(ic + gs[0].dir * 23.0), false, false)
+	ed._release()
+	check(is_equal_approx(float(ed.piece(isl_id).r), 23.0), "editor: dragging an island's rim handle sets its radius (%.1f)" % float(ed.piece(isl_id).r))
+	ed.undo()
+	ed.select(box_id)
 	ed.duplicate_selected()
 	check(ed.sel != box_id and ed.piece(ed.sel).shape == "box", "editor: Ctrl+D duplicates the selection")
 	ed.delete_selected()

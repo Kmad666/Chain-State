@@ -274,6 +274,7 @@ Build your own levels in the game: **Level Editor** is at the bottom of the leve
 **Controls:**
 - **Looking around:** hold the right mouse button to look; WASD flies, E goes up, Q down, Shift goes fast. The mouse wheel dollies, and F frames the selected piece.
 - **Selecting and moving:** left-click a piece to select it, and drag it to slide it across the ground (1 m snap; hold Alt to move freely).
+- **Resizing by dragging:** a selected shape shows a handle on each face (red for X, green for Y, blue for Z). Drag one to stretch or shrink the shape along that axis; the opposite face stays put. Sizes snap to 0.5 m; hold Shift to scale evenly, or Alt to skip the snap. Islands and patrolling enemies show four gold handles on the rim or patrol ring: drag one to set the radius. Each drag is one undo step.
   - The arrow keys nudge it along the grid, and Page Up / Page Down raise and lower it (hold Shift for ×10).
   - R turns it 15° (Shift+R turns the other way).
   - Ctrl+D duplicates it; Delete removes it.

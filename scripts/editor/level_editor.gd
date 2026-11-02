@@ -9,6 +9,9 @@ extends Node3D
 ##           (1 m snap; hold Alt for free movement).
 ##           Arrows nudge it, Page Up / Down raise and lower it (Shift = x10),
 ##           R / Shift+R turn it 15 degrees, Ctrl+D duplicates, Delete removes.
+##           Drag a coloured handle on a shape's face to resize it along that axis
+##           (Shift scales evenly, Alt skips the 0.5 m snap); drag a gold handle on
+##           an island's rim or an enemy's patrol ring to change its radius.
 ## File:     Ctrl+S saves to your levels (kept in this browser), Ctrl+Z undoes,
 ##           P play-tests. Copy / Paste JSON moves a level between computers, or to
 ##           Claude to ship with the game.
@@ -31,6 +34,8 @@ var _drag := {}                   # {id, plane_y, offset, before}
 var _undo: Array = []
 var _next_id := 1
 var _box: MeshInstance3D          # the gold box round the selection
+var _grips: Array = []            # resize handle meshes (up to 6)
+var _hover_grip := -1
 var dirty := false
 
 # UI
@@ -61,6 +66,17 @@ func _ready() -> void:
 	bm.no_depth_test = true
 	_box.material_override = bm
 	add_child(_box)
+	for i in 6:
+		var g := MeshInstance3D.new()
+		g.mesh = BoxMesh.new()
+		var gm := StandardMaterial3D.new()
+		gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		gm.no_depth_test = true
+		gm.render_priority = 2
+		g.material_override = gm
+		g.visible = false
+		add_child(g)
+		_grips.append(g)
 	_build_ui()
 	_rebuild_all()
 	_frame_level()
@@ -319,8 +335,12 @@ func _unhandled_input(e: InputEvent) -> void:
 			_yaw -= e.relative.x * 0.004
 			_pitch = clampf(_pitch - e.relative.y * 0.004, -1.5, 1.5)
 			cam.rotation = Vector3(_pitch, _yaw, 0)
+		elif not _drag.is_empty() and _drag.has("grip"):
+			_grip_to(e.position, e.alt_pressed, e.shift_pressed)
 		elif not _drag.is_empty():
 			_drag_to(e.position, e.alt_pressed)
+		else:
+			_hover_grip = _grip_at(e.position)
 	elif e is InputEventKey and e.pressed and not e.echo:
 		_key(e)
 
@@ -392,6 +412,7 @@ func _process(dt: float) -> void:
 			var move := cam.global_basis * Vector3(v.x, 0, v.z)
 			cam.position += (move.normalized() * Vector2(v.x, v.z).length() + Vector3(0, v.y, 0)) * speed * dt
 	_draw_selection()
+	_draw_grips()
 
 
 func _ray(screen: Vector2, mask: int) -> Dictionary:
@@ -410,6 +431,12 @@ func _owner_id(n: Node) -> String:
 
 
 func _press(screen: Vector2) -> void:
+	# a resize handle on the selected piece wins over picking
+	var gi := _grip_at(screen)
+	if gi >= 0:
+		var g: Dictionary = grips()[gi]
+		_drag = {"grip": g, "id": sel, "start": piece(sel).duplicate(true), "before": JSON.stringify(data), "moved": false}
+		return
 	var hit := _ray(screen, PICK_MASK)
 	var id := _owner_id(hit.collider) if not hit.is_empty() else ""
 	select(id)
@@ -451,8 +478,130 @@ func _release() -> void:
 	if not _drag.is_empty() and _drag.moved:
 		_undo.append(_drag.before)
 		dirty = true
-		_rebuild(_drag.id)              # rebuild so physics shapes sit where the piece now is
+		if not _drag.has("grip"):
+			_rebuild(_drag.id)          # rebuild so physics shapes sit where the piece now is
 	_drag = {}
+
+
+# ---------------------------------------------------------------- resize handles
+## The resize handles of the selected piece, in world space:
+##   shapes:   a handle on each of the six faces; drag one to stretch or shrink
+##             the shape along that axis (the opposite face stays put),
+##             Shift to scale it evenly
+##   islands and patrolling enemies: four handles on the rim / patrol ring;
+##             drag one to change the radius
+## Each is {pos, dir (the axis it slides along), axis, kind, col}.
+func grips() -> Array:
+	var p := piece(sel)
+	if p.is_empty() or not nodes.has(sel):
+		return []
+	var out: Array = []
+	match String(p.type):
+		"shape":
+			var size := CL.v3(p.size)
+			var b: Basis = nodes[sel].global_basis.orthonormalized()
+			var c: Vector3 = nodes[sel].global_position
+			var cols := [Color(1.0, 0.35, 0.3), Color(0.4, 1.0, 0.4), Color(0.4, 0.6, 1.0)]
+			for axis in 3:
+				for sgn in [1.0, -1.0]:
+					var local := Vector3.ZERO
+					local[axis] = sgn
+					var dir: Vector3 = b * local
+					out.append({"pos": c + dir * size[axis] * 0.5, "dir": dir, "axis": axis, "kind": "size", "col": cols[axis]})
+		"island", "enemy":
+			if p.type == "enemy" and (p.get("enemy") == "cherub"):
+				return []
+			var key := "r" if p.type == "island" else "radius"
+			var r := float(p.get(key, 0.0))
+			var c := CL.v3(p.pos)
+			for k in 4:
+				var a := TAU * k / 4.0
+				var dir := Vector3(cos(a), 0, sin(a))
+				out.append({"pos": c + dir * maxf(r, 1.0), "dir": dir, "axis": -1, "kind": key, "col": Color(1.0, 0.8, 0.25)})
+	return out
+
+
+## Which handle is under the mouse (within a few pixels), or -1.
+func _grip_at(screen: Vector2) -> int:
+	var best := -1
+	var best_d := 16.0
+	var gs := grips()
+	for i in gs.size():
+		var w: Vector3 = gs[i].pos
+		if cam.is_position_behind(w):
+			continue
+		var d := cam.unproject_position(w).distance_to(screen)
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
+
+
+func _grip_to(screen: Vector2, free: bool, even: bool) -> void:
+	var g: Dictionary = _drag.grip
+	var p0: Dictionary = _drag.start
+	var p := piece(_drag.id)
+	if p.is_empty():
+		return
+	var changes := {}
+	if g.kind == "size":
+		# slide along the handle's axis: the closest point on that line to the mouse ray
+		var o := cam.project_ray_origin(screen)
+		var r := cam.project_ray_normal(screen)
+		var a: Vector3 = g.pos
+		var d: Vector3 = g.dir
+		var w := o - a
+		var rd := r.dot(d)
+		var denom := 1.0 - rd * rd
+		if denom < 0.0001:
+			return                                    # looking straight down the axis
+		var t := (w.dot(d) - w.dot(r) * rd) / denom
+		var size0 := CL.v3(p0.size)
+		var s0: float = size0[g.axis]
+		var s1 := maxf(0.2, s0 + t)
+		if not free:
+			s1 = maxf(0.5, snappedf(s1, 0.5))
+		if even:
+			var k := s1 / s0
+			changes["size"] = CL.arr(size0 * k)
+			changes["pos"] = p0.pos
+		else:
+			var size1 := size0
+			size1[g.axis] = s1
+			changes["size"] = CL.arr(size1)
+			changes["pos"] = CL.arr(CL.v3(p0.pos) + d * (s1 - s0) * 0.5)   # the far face stays put
+	else:
+		var c := CL.v3(p0.pos)
+		var at := _plane_point(screen, c.y)
+		var rad := Vector2(at.x - c.x, at.z - c.z).length()
+		rad = rad if free else roundf(rad)
+		changes[g.kind] = maxf(rad, 4.0 if g.kind == "r" else 0.0)
+	var same := true
+	for k in changes:
+		if JSON.stringify(changes[k]) != JSON.stringify(p.get(k)):
+			same = false
+	if same:
+		return
+	p.merge(changes, true)
+	_rebuild(_drag.id)
+	_drag.moved = true
+	_refresh_inspector()
+
+
+func _draw_grips() -> void:
+	var gs := grips() if _drag.is_empty() or _drag.has("grip") else []
+	for i in _grips.size():
+		var m: MeshInstance3D = _grips[i]
+		if i >= gs.size():
+			m.visible = false
+			continue
+		var g: Dictionary = gs[i]
+		var active: bool = i == _hover_grip or (_drag.has("grip") and _drag.grip.pos.is_equal_approx(g.pos))
+		m.visible = true
+		m.global_position = g.pos
+		var k := cam.global_position.distance_to(g.pos) * (0.034 if active else 0.024)
+		m.scale = Vector3.ONE * maxf(k, 0.15)
+		(m.material_override as StandardMaterial3D).albedo_color = Color.WHITE if active else g.col
 
 
 ## Where a new piece goes: on whatever the camera looks at, else 40 m ahead.
@@ -677,7 +826,7 @@ func _build_ui() -> void:
 	status.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55))
 	bl.add_child(status)
 	var keys := Label.new()
-	keys.text = "RMB look · WASD/QE fly · Shift fast · drag to move (Alt free) · arrows / PgUp PgDn nudge · R turn · Ctrl+D copy · Del · F frame"
+	keys.text = "RMB look · WASD/QE fly · drag to move · drag handles to resize (Shift even, Alt free) · arrows / PgUp PgDn nudge · R turn · Ctrl+D copy · Del · F frame"
 	keys.add_theme_color_override("font_color", Color(0.8, 0.85, 0.95, 0.75))
 	keys.add_theme_font_size_override("font_size", 13)
 	bl.add_child(keys)
