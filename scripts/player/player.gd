@@ -23,6 +23,7 @@ signal stun_started              # touched a magic projectile or a ward
 
 const Chain := preload("res://scripts/player/chain.gd")
 const Viewmodel := preload("res://scripts/player/viewmodel.gd")
+const Feel := preload("res://scripts/player/feel.gd")
 
 const LAYER_WORLD := 1          # grapple-able and solid
 const LAYER_NPC := 2            # solid, talk-able, NOT grapple-able
@@ -65,6 +66,15 @@ var tune := {
 	"aim_assist": 70.0,
 	"fov": 90.0,
 	"lock_cone": 30.0,
+	# game feel (each can be switched off in the pause menu)
+	"grapple_buffer": 0.15,          # s: a grapple click that finds nothing keeps trying this long while held
+	"jump_buffer": 0.12,             # s: Space just before landing still jumps when you touch down
+	"coyote_time": 0.12,             # s: you can still jump this long after running off an edge
+	"smooth_camera": 1.0,            # 1 = draw the camera between physics ticks (physics interpolation)
+	"screen_shake": 1.0,             # trauma shake strength (0 = off)
+	"hit_stop": 1.0,                 # 1 = a split-second freeze when magic strikes you
+	"speed_lines": 1.0,              # streaks round the screen at high speed (0 = off)
+	"particles": 1.0,                # 1 = sparks where the hook bites, dust on hard landings
 }
 const TUNING := [
 	{"key": "gravity", "label": "Gravity", "min": 4.0, "max": 30.0, "step": 0.5},
@@ -85,6 +95,15 @@ const TUNING := [
 	{"key": "aim_assist", "label": "Reticle size (aim assist)", "min": 0.0, "max": 160.0, "step": 5.0},
 	{"key": "fov", "label": "Field of view", "min": 70.0, "max": 110.0, "step": 1.0},
 	{"key": "lock_cone", "label": "Auto-aim lock cone (deg)", "min": 0.0, "max": 60.0, "step": 1.0},
+	{"section": "GAME FEEL"},
+	{"key": "grapple_buffer", "label": "Grapple buffer (s)", "min": 0.0, "max": 0.4, "step": 0.01},
+	{"key": "jump_buffer", "label": "Jump buffer (s)", "min": 0.0, "max": 0.3, "step": 0.01},
+	{"key": "coyote_time", "label": "Coyote time (s)", "min": 0.0, "max": 0.3, "step": 0.01},
+	{"key": "smooth_camera", "label": "Smooth camera (interpolation)", "min": 0.0, "max": 1.0, "step": 1.0, "toggle": true},
+	{"key": "screen_shake", "label": "Screen shake", "min": 0.0, "max": 2.0, "step": 0.1},
+	{"key": "hit_stop", "label": "Hit stop", "min": 0.0, "max": 1.0, "step": 1.0, "toggle": true},
+	{"key": "speed_lines", "label": "Speed lines", "min": 0.0, "max": 1.0, "step": 0.1},
+	{"key": "particles", "label": "Particles", "min": 0.0, "max": 1.0, "step": 1.0, "toggle": true},
 ]
 const PRESETS := [
 	{"name": "Float", "desc": "No gravity on the rope. Drift on your momentum.",
@@ -149,6 +168,12 @@ var _look_delta := Vector2.ZERO
 var _was_on_floor := true
 var _just_landed := false
 var _bob_t := 0.0
+var feel: Node                   # feel.gd: shake, hit stop, speed lines, particles
+var _grapple_buf := 0.0          # seconds a missed grapple click keeps retrying
+var _jump_buf := 0.0             # seconds a Space press waits for the ground
+var _coyote := 0.0               # seconds left to jump after leaving the ground
+var _phys_prev := Vector3.ZERO   # where the body was at the start of the last physics tick
+var _roll := 0.0
 
 
 func _ready() -> void:
@@ -178,8 +203,13 @@ func _ready() -> void:
 	chain.viewmodel = viewmodel
 	add_child(chain)
 
+	feel = Feel.new()
+	feel.player = self
+	add_child(feel)
+
 	spawn = global_transform
 	air_left = int(tune.air_grapples)
+	_phys_prev = global_position
 
 
 ## Top speed: walking pace plus the margin (16 m/s with the defaults).
@@ -212,7 +242,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			talk_requested.emit(look_npc)
 		else:
 			try_grapple()
+			# missed (nothing in reach yet): keep trying for a moment while it's held
+			_grapple_buf = 0.0 if hook_state == Chain.FLYING or attached else tune.grapple_buffer
 	elif event.is_action_released("grapple"):
+		_grapple_buf = 0.0
 		if not latching:
 			release()
 	elif event.is_action_pressed("interact"):
@@ -530,6 +563,9 @@ func _attach() -> void:
 	if not latching:
 		swings += 1
 	Sfx.play("land", -6.0, 1.7)          # the hook bites: a short, bright clack
+	if not latching:
+		feel.sparks(hook_goal, (global_position - hook_goal).normalized())
+		feel.add_trauma(0.22 if hook_node else 0.12)
 	hook_state = Chain.HOOKED
 	anchor = hook_goal
 	hook_tip = anchor
@@ -605,6 +641,7 @@ func chain_snapped(max_speed: float) -> void:
 	hook_state = Chain.RETURNING
 	velocity = velocity.limit_length(max_speed)
 	wrap_lock = false
+	feel.add_trauma(0.35)
 	snapped.emit()
 
 
@@ -624,6 +661,8 @@ func hit(_from_dir: Vector3) -> void:
 	velocity = Vector3(velocity.x * 0.15, minf(velocity.y, 0.0), velocity.z * 0.15)
 	Sfx.play("hurt", 0.0, 0.9)
 	Sfx.play("fall", -4.0, 0.6)
+	feel.add_trauma(0.7)
+	feel.hit_stop(0.08)
 	stun_started.emit()
 
 
@@ -646,6 +685,10 @@ func respawn() -> void:
 	velocity = Vector3.ZERO
 	hook_state = Chain.STOWED
 	air_left = int(tune.air_grapples)
+	_phys_prev = global_position
+	_grapple_buf = 0.0
+	_jump_buf = 0.0
+	_coyote = 0.0
 
 
 ## Drop the hook and stop (used when a conversation starts).
@@ -693,6 +736,7 @@ func _fly(dt: float) -> void:
 
 # ---------------------------------------------------------------- movement
 func _physics_process(dt: float) -> void:
+	_phys_prev = global_position
 	if flying:
 		_fly(dt)
 		return
@@ -718,17 +762,42 @@ func _physics_process(dt: float) -> void:
 		_swing(look_wish, dt)
 	elif is_on_floor():
 		_walk(wish, dt)
-		if Game.playing() and stunned <= 0.0 and Input.is_action_just_pressed("jump"):
-			velocity.y = tune.jump
-			Sfx.play("jump", -4.0)
 	else:
 		# air strafe: steer, but can't accelerate past air_speed in the wish direction
 		var cur := Vector3(velocity.x, 0, velocity.z).dot(wish)
 		if wish != Vector3.ZERO and cur < tune.air_speed:
 			velocity += wish * minf(tune.air_accel * dt, tune.air_speed - cur)
-	if not is_on_floor() and Game.playing() and stunned <= 0.0 and not latching \
-			and Input.is_action_just_pressed("jump") and land_below >= 0.0 and not wrap_lock:
+
+	# jump, with a buffer (Space just before touchdown) and coyote time (just after an edge)
+	var can_act: bool = Game.playing() and stunned <= 0.0
+	var jump_pressed: bool = can_act and Input.is_action_just_pressed("jump")
+	if jump_pressed:
+		_jump_buf = maxf(tune.jump_buffer, dt * 0.5)
+	var jumped := false
+	if can_act and not attached and _jump_buf > 0.0 and (is_on_floor() or _coyote > 0.0):
+		velocity.y = tune.jump
+		Sfx.play("jump", -4.0)
+		_jump_buf = 0.0
+		_coyote = 0.0
+		jumped = true
+	# Space in the air over land: the ground latch, unless you're about to land anyway
+	# (then the press waits in the jump buffer and jumps on touchdown)
+	var landing_soon: bool = velocity.y < -0.1 and land_below >= 0.0 and land_below / -velocity.y < tune.jump_buffer
+	if jump_pressed and not jumped and not is_on_floor() and not latching and land_below >= 0.0 \
+			and not wrap_lock and not landing_soon:
+		_jump_buf = 0.0
 		ground_latch()
+	_jump_buf = maxf(_jump_buf - dt, 0.0)
+
+	# grapple buffer: a click that found nothing keeps trying while the button's held
+	if _grapple_buf > 0.0:
+		_grapple_buf -= dt
+		if not Input.is_action_pressed("grapple") or not can_act or look_npc:
+			_grapple_buf = 0.0
+		elif hook_state != Chain.FLYING and not attached:
+			try_grapple()
+			if hook_state == Chain.FLYING:
+				_grapple_buf = 0.0
 
 	# Dash: snap your momentum toward where you look
 	dash_cd = maxf(dash_cd - dt, 0.0)
@@ -736,6 +805,7 @@ func _physics_process(dt: float) -> void:
 	if Game.playing() and stunned <= 0.0 and dash_cd == 0.0 and Input.is_action_just_pressed("dash") and tune.dash_speed > 0.0:
 		velocity = -cam.global_basis.z * maxf(velocity.length(), tune.dash_speed) * (1.0 + tune.release_boost)
 		dash_cd = 1.2
+		feel.add_trauma(0.1)
 
 	if Game.playing() and Input.is_action_just_pressed("restart"):
 		respawn()
@@ -765,12 +835,21 @@ func _physics_process(dt: float) -> void:
 				# harder landings are louder and a touch deeper
 				var k := clampf((fall_speed - 2.0) / 18.0, 0.0, 1.0)
 				Sfx.play("land", lerpf(-10.0, 0.0, k), lerpf(1.1, 0.8, k))
+				if fall_speed > 9.0:
+					feel.add_trauma(clampf((fall_speed - 9.0) / 22.0, 0.0, 0.55))
+					feel.dust(global_position + Vector3.DOWN * 0.9, clampf((fall_speed - 9.0) / 12.0, 0.3, 1.0))
 			var col := get_last_slide_collision()
 			if col:
 				landed_on.emit(col.get_collider())
 		if latching and attached:
 			release()
 	_was_on_floor = is_on_floor()
+	if is_on_floor() and not attached:
+		_coyote = tune.coyote_time
+	elif attached or jumped:
+		_coyote = 0.0
+	else:
+		_coyote = maxf(_coyote - dt, 0.0)
 	_update_hook(dt)
 	if global_position.y < fall_limit:
 		fell.emit()
@@ -834,6 +913,18 @@ func _swing(wish: Vector3, dt: float) -> void:
 		velocity += fix
 
 
+## How far behind the body the eye is drawn this frame (physics interpolation),
+## in the body's local space. Zero when smoothing is off or after a teleport.
+func eye_lag() -> Vector3:
+	if tune.smooth_camera < 0.5:
+		return Vector3.ZERO
+	var step := global_position - _phys_prev
+	if step.length() > 3.0:
+		return Vector3.ZERO           # a teleport, not motion
+	var f := Engine.get_physics_interpolation_fraction()
+	return global_basis.inverse() * (-step * (1.0 - f))
+
+
 # ---------------------------------------------------------------- per frame
 func _process(dt: float) -> void:
 	# crosshair: an NPC in talk range wins over a grapple target
@@ -881,7 +972,13 @@ func _process(dt: float) -> void:
 	var roll := 0.0 if is_on_floor() else clampf(-side_speed * CAM_ROLL, -CAM_ROLL_MAX, CAM_ROLL_MAX)
 	if wrap_lock:
 		roll *= 0.4          # a gentle lean only: circling at speed shouldn't tip the horizon
-	cam.rotation.z = lerp_angle(cam.rotation.z, roll, 1.0 - exp(-5.0 * dt))
+	_roll = lerp_angle(_roll, roll, 1.0 - exp(-5.0 * dt))
+	cam.rotation = Vector3(0, 0, _roll)
+	feel.update(dt)                     # adds the shake on top of the roll
+
+	# smooth camera: the body moves in physics ticks; draw the eye where it is
+	# between them, so motion is smooth on any refresh rate
+	head.position = Vector3(0, EYE_HEIGHT, 0) + eye_lag()
 
 	viewmodel.animate(dt, hook_state, hook_tip, velocity, is_on_floor(), _look_delta, _just_landed)
 	_look_delta = Vector2.ZERO

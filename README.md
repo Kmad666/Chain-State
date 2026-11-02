@@ -31,7 +31,7 @@
 | **E** while hooked to a caster | Lock your view on them while you swing round (A / D circle you round fast); **E** again frees it. Once they're bound, **E** **arrests** |
 | **F2** | Dialogue editor |
 | **F4** / **V** | Dev fly: noclip flight (WASD, Space up, Ctrl down, Shift fast) |
-| **F3** | Performance readout: FPS, the slowest recent frame, and the last hitch with what had just happened |
+| **F3** | Performance readout: FPS, the slowest recent frame, the last hitch with what had just happened, and the frame budget (script and physics time against one frame at your refresh rate, with draw calls) |
 | **R** | Back to the start |
 | **Esc** | Pause: controls, physics presets and live feel sliders |
 
@@ -43,6 +43,20 @@ Pause with **Esc**. On the right there's a slider for every movement number: gra
 1. **Float**: no gravity on the rope, so you drift on momentum.
 2. **Pendulum**: full gravity on a rigid rope, for classic Verlet swing arcs.
 3. **Bungee** (default): the rope pulls you in like an elastic band, with 60% gravity.
+
+### Game feel
+Under **GAME FEEL** in the same panel (`scripts/player/feel.gd` and the player's `tune`). Each one can be turned down or off:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Grapple buffer** | 0.15 s | A grapple click that finds nothing keeps trying while you hold the button, so sweeping onto a target a moment late still fires. |
+| **Jump buffer** | 0.12 s | Space pressed just before you land jumps the moment you touch down. When you're about to land, Space waits for the ground instead of firing the ground latch. |
+| **Coyote time** | 0.12 s | You can still jump for a moment after running off an edge. |
+| **Smooth camera** | On | Physics runs at 120 ticks a second; the camera is drawn where you are *between* ticks (physics interpolation), so motion is smooth on 144 Hz+ screens and through frame drops. Teleports aren't smoothed. |
+| **Screen shake** | 1.0 | Trauma shake from smooth noise: a light knock when the hook bites (more on a caster), on a dash, on hard landings, when the chain snaps, and a big one when magic strikes you. |
+| **Hit stop** | On | A 0.08 s freeze when magic strikes you. Nothing else freezes (arrests stay smooth). |
+| **Speed lines** | 1.0 | Faint streaks round the screen above ~1.4 × walk speed, converging on where you're heading. |
+| **Particles** | On | Silver sparks where the hook bites, and a puff of dust on hard landings. |
 
 ### How the rope works
 `scripts/player/player.gd` treats the rope as a Verlet distance constraint. Each physics tick (120 per second) it predicts where gravity and momentum would carry you. If that's past the rope length, it projects the point back onto the rope's sphere and derives your velocity from the correction. You get real pendulum swings, and reeling in pumps speed.

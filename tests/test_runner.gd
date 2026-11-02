@@ -18,11 +18,13 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick", "editor"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick", "editor", "feel"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
 		elif OS.get_environment("ONLY") == "editor":
 			await _test_editor()
+		elif OS.get_environment("ONLY") == "feel":
+			await _test_feel()
 		elif OS.get_environment("ONLY") == "brick":
 			await _test_brick()
 		elif OS.get_environment("ONLY") == "arm":
@@ -1133,6 +1135,7 @@ func _ready() -> void:
 	aw.queue_free()
 	await get_tree().process_frame
 	Game.level = "range"
+	await _test_feel()
 
 	print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))
 	get_tree().quit(1 if fails else 0)
@@ -1848,3 +1851,147 @@ func _test_editor() -> void:
 	Game.from_editor = false
 	cw.queue_free()
 	await get_tree().process_frame
+
+
+func _press_jump(p: Node) -> void:
+	Input.action_press("jump")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	Input.action_release("jump")
+
+
+func _test_feel() -> void:
+	print("== Game feel")
+	Game.level = "level_1"
+	var w = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(w)
+	for i in 60:
+		await get_tree().physics_frame
+	var p = w.player
+	var home: Vector3 = p.global_position
+	check(p.is_on_floor() and p.feel != null, "feel: the player has the feel module")
+	for k in ["grapple_buffer", "jump_buffer", "coyote_time", "smooth_camera", "screen_shake", "hit_stop", "speed_lines", "particles"]:
+		if not p.tune.has(k):
+			check(false, "feel: tuning has %s" % k)
+	var labels: Array = w.pause_menu.find_children("*", "Label", true, false).map(func(l): return l.text)
+	check(labels.has("GAME FEEL") and labels.has("On"), "feel: the pause menu has a GAME FEEL section with On / Off toggles")
+
+	# coyote time: just off the ground, Space still jumps
+	Sfx.played.clear()
+	p.global_position = home + Vector3(0, 0.6, 0)
+	await get_tree().physics_frame
+	check(not p.is_on_floor() and p._coyote > 0.0, "feel: stepping off the ground starts coyote time (%.2f s)" % p._coyote)
+	await _press_jump(p)
+	check(Sfx.played.has("jump") and p.velocity.y > p.tune.jump * 0.8, "feel: a jump just after leaving the ground still works")
+	for i in 120:
+		await get_tree().physics_frame
+		if p.is_on_floor():
+			break
+	p.release()
+	# ...and with coyote time off it doesn't
+	p.tune.coyote_time = 0.0
+	for i in 3:
+		await get_tree().physics_frame
+	Sfx.played.clear()
+	p.global_position = home + Vector3(0, 0.6, 0)
+	await get_tree().physics_frame
+	await _press_jump(p)
+	check(not Sfx.played.has("jump"), "feel: coyote time at 0 means no late jump")
+	p.tune.coyote_time = 0.12
+	p.respawn()
+	for i in 30:
+		await get_tree().physics_frame
+
+	# jump buffer: Space just before touchdown jumps on landing (and doesn't latch)
+	Sfx.played.clear()
+	p.global_position = home + Vector3(0, 1.0, 0)
+	p.velocity = Vector3(0, -12, 0)
+	await get_tree().physics_frame
+	await _press_jump(p)
+	var jumped := false
+	for i in 30:
+		await get_tree().physics_frame
+		if Sfx.played.has("jump"):
+			jumped = true
+			break
+	check(jumped and not p.latching, "feel: Space just before landing jumps on touchdown (no ground latch)")
+	p.respawn()
+	for i in 30:
+		await get_tree().physics_frame
+
+	# grapple buffer: click at empty sky, then sweep onto the island while holding
+	var far: Node3D = w.islands[1]
+	p.rotation.y += PI
+	p.head.rotation.x = deg_to_rad(80)
+	await get_tree().physics_frame
+	var ev := InputEventAction.new()
+	ev.action = "grapple"
+	ev.pressed = true
+	Input.action_press("grapple")
+	p._unhandled_input(ev)
+	check(p.hook_state == 0 and p._grapple_buf > 0.0, "feel: a grapple click on nothing is buffered")
+	_aim(p, far.global_position + Vector3(0, -2, 0))
+	for i in 3:
+		await get_tree().physics_frame
+	check(p.hook_state != 0, "feel: ...and fires when a target comes under the reticle a moment later")
+	Input.action_release("grapple")
+	p.release()
+	p.respawn()
+	await get_tree().physics_frame
+
+	# smooth camera
+	p._phys_prev = p.global_position - Vector3(0.1, 0, 0)
+	check(p.eye_lag().length() <= 0.11, "feel: the smoothed eye trails the body by at most one tick")
+	p._phys_prev = p.global_position - Vector3(10, 0, 0)
+	check(p.eye_lag() == Vector3.ZERO, "feel: a teleport isn't smoothed")
+	p.tune.smooth_camera = 0.0
+	p._phys_prev = p.global_position - Vector3(0.1, 0, 0)
+	check(p.eye_lag() == Vector3.ZERO, "feel: smooth camera can be switched off")
+	p.tune.smooth_camera = 1.0
+
+	# shake, hit stop, particles
+	p.feel.add_trauma(0.8)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(p.cam.h_offset != 0.0 or p.cam.v_offset != 0.0, "feel: trauma shakes the camera")
+	for i in 90:
+		await get_tree().process_frame
+	await get_tree().create_timer(1.0).timeout
+	check(p.feel.trauma == 0.0 and p.cam.h_offset == 0.0, "feel: the shake dies away")
+	p.tune.screen_shake = 0.0
+	p.feel.add_trauma(1.0)
+	await get_tree().process_frame
+	check(p.cam.h_offset == 0.0, "feel: screen shake 0 means no shake")
+	p.tune.screen_shake = 1.0
+	p.feel.trauma = 0.0
+	p.invuln = 0.0
+	p.hit(Vector3.FORWARD)
+	check(Engine.time_scale < 1.0, "feel: being struck freezes the moment (hit stop)")
+	await get_tree().create_timer(0.3, true, false, true).timeout
+	check(is_equal_approx(Engine.time_scale, 1.0), "feel: ...for a split second only")
+	p.stunned = 0.0
+	p.respawn()
+	var before: int = w.find_children("*", "CPUParticles3D", true, false).size()
+	p.feel.sparks(far.global_position, Vector3.UP)
+	p.feel.dust(p.global_position, 1.0)
+	check(w.find_children("*", "CPUParticles3D", true, false).size() == before + 2, "feel: hook sparks and landing dust")
+	p.tune.particles = 0.0
+	p.feel.sparks(far.global_position, Vector3.UP)
+	check(w.find_children("*", "CPUParticles3D", true, false).size() == before + 2, "feel: particles can be switched off")
+	p.tune.particles = 1.0
+
+	# speed lines
+	p.global_position = home + Vector3(0, 30, 0)
+	p.velocity = -p.global_basis.z * p.top_speed()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(p.feel._lines.strength > 0.5, "feel: speed lines at top speed (%.2f)" % p.feel._lines.strength)
+	await shot("65_speed_lines")
+	p.respawn()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(p.feel._lines.strength == 0.0, "feel: no speed lines standing still")
+	check(load("res://scripts/ui/perf_overlay.gd").budget_text().begins_with("budget"), "feel: F3 shows the frame budget")
+	w.queue_free()
+	await get_tree().process_frame
+	Game.level = "range"

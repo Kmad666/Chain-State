@@ -120,6 +120,14 @@ func _ready() -> void:
 	grid.add_theme_constant_override("h_separation", 12)
 	right.add_child(grid)
 	for spec in preload("res://scripts/player/player.gd").TUNING:
+		if spec.has("section"):
+			var h := Label.new()
+			h.text = spec.section
+			h.add_theme_color_override("font_color", Color(1.0, 0.72, 0.35))
+			grid.add_child(h)
+			grid.add_child(Control.new())
+			grid.add_child(Control.new())
+			continue
 		var l := Label.new()
 		l.text = spec.label
 		grid.add_child(l)
@@ -134,15 +142,18 @@ func _ready() -> void:
 		v.custom_minimum_size.x = 56
 		grid.add_child(v)
 		var key: String = spec.key
+		var step: float = -1.0 if spec.get("toggle", false) else spec.step     # -1: shown as On / Off
 		s.value_changed.connect(func(x):
-			v.text = _fmt(x, spec.step)
+			v.text = _fmt(x, step)
 			if player:
 				player.tune[key] = x
 				_save())
-		_sliders[key] = [s, v, spec.step]
+		_sliders[key] = [s, v, step]
 
 
 static func _fmt(x: float, step: float) -> String:
+	if step < 0.0:
+		return "On" if x >= 0.5 else "Off"
 	return str(int(x)) if step >= 1.0 else ("%.2f" % x)
 
 

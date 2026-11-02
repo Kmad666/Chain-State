@@ -2,6 +2,8 @@ extends Label
 ## F3: a small performance readout in the top-right corner.
 ##   FPS, the slowest frame in the last 5 seconds, and the last hitch (any frame
 ##   over HITCH_MS), with how long ago it was and what had just happened.
+##   The frame budget: how much of one frame (at the screen's refresh rate) the
+##   game's scripts and physics use, with draw calls and objects drawn.
 ## Hitches are also printed to the console ("[perf] ..."), visible in a browser's
 ## developer console on the web build.
 
@@ -23,7 +25,7 @@ func _ready() -> void:
 	offset_left = -520
 	offset_right = -16
 	offset_top = 12
-	offset_bottom = 90
+	offset_bottom = 140
 	horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_theme_font_size_override("font_size", 16)
 	add_theme_color_override("font_color", Color(0.85, 1.0, 0.8))
@@ -32,6 +34,26 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	_last_us = Time.get_ticks_usec()
+
+
+## One line: frame time against the budget, script and physics time, draw calls.
+static func budget_text() -> String:
+	var hz := DisplayServer.screen_get_refresh_rate()
+	if hz < 30.0:
+		hz = 60.0                     # unknown (the web build): assume 60 Hz
+	var budget := 1000.0 / hz
+	var proc := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	var phys := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	var used := proc + phys
+	var bar := ""
+	var cells := 10
+	var filled := clampi(roundi(used / budget * cells), 0, cells)
+	for i in cells:
+		bar += "|" if i < filled else "."
+	return "budget %.1f ms @%d Hz  [%s]  scripts %.1f · physics %.1f ms\ndraw calls %d · objects %d" % [
+		budget, roundi(hz), bar, proc, phys,
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))]
 
 
 func note(what: String) -> void:
@@ -67,5 +89,6 @@ func _process(_dt: float) -> void:
 			("  ·  after \"%s\"" % _hitch_what) if _hitch_what != "" else ""]
 	else:
 		txt += "\nno hitches over %d ms" % int(HITCH_MS)
+	txt += "\n" + budget_text()
 	text = txt
 	_recent = _recent if _clock - (_hitch_at if _hitch_at >= 0 else 0.0) < 30.0 else ""
