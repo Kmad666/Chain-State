@@ -38,11 +38,14 @@
 You get 3 grapples in the air by default; touching the ground refills them.
 
 ## Tuning the feel
-Pause with **Esc**. On the right there's a slider for every movement number: gravity, walk speed, jump, gravity while hooked, rope pull, swing push, reel speed, top speed above walk, reach, air grapples, hook speed, release boost, dash, mouse sensitivity and reticle size (aim assist). Changes apply instantly and are saved. Three presets give starting points:
+Pause with **Esc**. On the right there's a slider for every movement number: gravity, walk speed, jump, gravity while hooked, rope pull, swing push, reel speed, top speed above walk, reach, air grapples, hook speed, release boost, dash, mouse sensitivity and reticle size (aim assist). Changes apply instantly and are saved. Four presets give starting points:
 
 1. **Float**: no gravity on the rope, so you drift on momentum.
 2. **Pendulum**: full gravity on a rigid rope, for classic Verlet swing arcs.
 3. **Bungee** (default): the rope pulls you in like an elastic band, with 60% gravity.
+4. **Verlet**: slow, floaty arcade swinging in the style of Verlet Swing. Gravity is lighter (9), the rope never tugs you, the swing push is strong (24) so you steer every arc, air control is firm after you let go, the hook flies fast, top speed is a gentle 12 m/s and letting go adds no free boost. Speed comes from a good route, not the rope.
+
+Each preset also resets gravity, air control, reel speed, top speed, hook speed and release boost to its own values, so switching between them is clean.
 
 ### Game feel
 Under **GAME FEEL** in the same panel (`scripts/player/feel.gd` and the player's `tune`). Each one can be turned down or off:

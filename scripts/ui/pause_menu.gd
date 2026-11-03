@@ -182,7 +182,7 @@ func _refresh() -> void:
 
 
 func _apply_preset(p: Dictionary) -> void:
-	player.apply_values(p["values"])
+	player.apply_values(player.preset_values(p))
 	_refresh()
 	_preset_desc.text = "%s: %s" % [p.name, p.desc]
 	_save()

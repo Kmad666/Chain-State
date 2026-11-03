@@ -1991,6 +1991,15 @@ func _test_feel() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	check(p.feel._lines.strength == 0.0, "feel: no speed lines standing still")
+	var vp: Dictionary = {}
+	for pr in p.PRESETS:
+		if pr.name == "Verlet":
+			vp = pr
+	p.apply_values(p.preset_values(vp))
+	check(not vp.is_empty() and p.tune.gravity == 9.0 and p.tune.elastic == 0.0 and p.tune.pump == 24.0 and p.top_speed() == 12.0,
+		"feel: the Verlet preset (light gravity, no tug, strong steering, 12 m/s top)")
+	p.apply_values(p.preset_values(p.PRESETS[2]))
+	check(p.tune.gravity == 13.0 and p.tune.elastic == 1.4 and p.top_speed() == 16.0, "feel: switching back to Bungee restores its numbers")
 	check(load("res://scripts/ui/perf_overlay.gd").budget_text().begins_with("budget"), "feel: F3 shows the frame budget")
 	w.queue_free()
 	await get_tree().process_frame

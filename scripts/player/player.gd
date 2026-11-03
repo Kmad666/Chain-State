@@ -105,6 +105,9 @@ const TUNING := [
 	{"key": "speed_lines", "label": "Speed lines", "min": 0.0, "max": 1.0, "step": 0.1},
 	{"key": "particles", "label": "Particles", "min": 0.0, "max": 1.0, "step": 1.0, "toggle": true},
 ]
+## The numbers every preset sets besides its own, so switching presets is clean
+const PRESET_BASE := {"gravity": 13.0, "air_accel": 22.0, "air_speed": 6.0, "reel_speed": 7.0,
+	"top_over_walk": 10.0, "arrow_speed": 90.0, "release_boost": 0.15}
 const PRESETS := [
 	{"name": "Float", "desc": "No gravity on the rope. Drift on your momentum.",
 		"values": {"rope_gravity": 0.0, "elastic": 0.0, "pump": 7.0}},
@@ -112,7 +115,20 @@ const PRESETS := [
 		"values": {"rope_gravity": 1.0, "elastic": 0.0, "pump": 10.0}},
 	{"name": "Bungee", "desc": "Rope pulls you toward the hook like a stretchy band, 60% gravity. Fast and slingy.",
 		"values": {"rope_gravity": 0.6, "elastic": 1.4, "pump": 16.0}},
+	# Verlet Swing's feel: slow, relaxing and arcadey. Lighter gravity and a steady
+	# rope with no tug, so the swing is yours: a strong swing push to steer, firm air
+	# control after letting go, a quick hook, gentle top speed and no free release boost.
+	{"name": "Verlet", "desc": "Slow, floaty arcade swinging in the style of Verlet Swing. Light gravity, no rope tug, strong steering. Speed comes from your route, not the rope.",
+		"values": {"gravity": 9.0, "rope_gravity": 0.85, "elastic": 0.0, "pump": 24.0, "reel_speed": 9.0,
+			"top_over_walk": 6.0, "air_speed": 8.0, "air_accel": 30.0, "arrow_speed": 150.0, "release_boost": 0.0}},
 ]
+
+
+## The values a preset applies: the shared base, then its own.
+static func preset_values(preset: Dictionary) -> Dictionary:
+	var v: Dictionary = PRESET_BASE.duplicate()
+	v.merge(preset.values, true)
+	return v
 
 var head: Node3D
 var cam: Camera3D
