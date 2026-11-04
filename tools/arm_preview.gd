@@ -62,6 +62,26 @@ func _ready() -> void:
 	vm._dir = Vector3(-0.25, 0.55, -1.0).normalized()
 	vm._apply(0.0)
 	await _shot("game_fist")
+	# the same two under the night sky, to check the arm still reads in the dark
+	var night: Dictionary = World.SKIES["night"]
+	sky.sky_top_color = Color(0.02, 0.03, 0.08)
+	sky.sky_horizon_color = Color(0.08, 0.10, 0.18)
+	env.ambient_light_color = night.get("ambient_col", night.fog)
+	env.ambient_light_energy = night.ambient
+	sun.light_color = night.light
+	sun.light_energy = night.energy
+	await _shot("night_fist")
+	vm.grip = 0.0
+	vm._reach = 0.0
+	vm._dir = vm.REST_DIR.normalized()
+	vm._apply(0.0)
+	await _shot("night_rest")
+	sky.sky_top_color = s.top
+	sky.sky_horizon_color = s.horizon
+	env.ambient_light_color = s.ambient_col
+	env.ambient_light_energy = s.ambient
+	sun.light_color = s.light
+	sun.light_energy = s.energy
 	vm.queue_free()
 
 	# --- studio views of the arm alone

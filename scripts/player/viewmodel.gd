@@ -15,9 +15,10 @@ enum { STOWED, FLYING, HOOKED, RETURNING }   # same order as chain.gd
 
 const SUIT := Color(0.055, 0.055, 0.065)          # black wool
 const LINING := Color(0.02, 0.02, 0.025)
-const SHIRT := Color(0.86, 0.86, 0.84)            # white cotton
+const SHIRT := Color(0.74, 0.74, 0.72)            # white cotton (kept off-white so it doesn't glare)
 const LEATHER := Color(0.035, 0.032, 0.035)       # black glove leather
 const HORN := Color(0.03, 0.028, 0.03)            # cuff buttons
+const THREAD := Color(0.07, 0.07, 0.075)          # the glove's stitching
 
 const REST_POS := Vector3(0.23, -0.25, -0.05)     # elbow pivot, camera space
 const REST_DIR := Vector3(-0.16, 0.10, -1.0)      # forearm points a little in and up
@@ -45,7 +46,8 @@ func _ready() -> void:
 	arm.set_surface_override_material(ArmMesh.LINING, _cloth(LINING))
 	arm.set_surface_override_material(ArmMesh.SHIRT, _cotton(SHIRT))
 	arm.set_surface_override_material(ArmMesh.LEATHER, _leather(LEATHER))
-	arm.set_surface_override_material(ArmMesh.BUTTONS, _leather(HORN))
+	arm.set_surface_override_material(ArmMesh.BUTTONS, _horn(HORN))
+	arm.set_surface_override_material(ArmMesh.STITCH, _cotton(THREAD))
 	pivot.add_child(arm)
 	_apply(1.0)
 
@@ -128,33 +130,98 @@ func arm_xform() -> Transform3D:
 
 
 # ------------------------------------------------------------ materials
-## Black wool: matte, a faint sheen at grazing angles.
+## Surface detail is a fine normal map laid on in the arm's own space (triplanar,
+## local), so the grain stays put on the arm instead of sliding as it moves.
+
+static var _grain: Texture2D
+static var _weave: Texture2D
+
+
+## Pebbled glove leather: tiny cells about a millimetre across.
+static func _leather_grain() -> Texture2D:
+	if _grain == null:
+		var n := FastNoiseLite.new()
+		n.noise_type = FastNoiseLite.TYPE_CELLULAR
+		n.frequency = 0.06
+		n.cellular_return_type = FastNoiseLite.RETURN_DISTANCE2_SUB
+		n.fractal_type = FastNoiseLite.FRACTAL_NONE
+		var t := NoiseTexture2D.new()
+		t.width = 256
+		t.height = 256
+		t.seamless = true
+		t.as_normal_map = true
+		t.bump_strength = 6.0
+		t.noise = n
+		_grain = t
+	return _grain
+
+
+## Worsted wool: a faint, fine weave.
+static func _wool_weave() -> Texture2D:
+	if _weave == null:
+		var n := FastNoiseLite.new()
+		n.noise_type = FastNoiseLite.TYPE_SIMPLEX
+		n.frequency = 0.25
+		n.fractal_octaves = 2
+		var t := NoiseTexture2D.new()
+		t.width = 256
+		t.height = 256
+		t.seamless = true
+		t.as_normal_map = true
+		t.bump_strength = 3.0
+		t.noise = n
+		_weave = t
+	return _weave
+
+
+static func _detail(m: StandardMaterial3D, tex: Texture2D, strength: float, metres: float) -> void:
+	m.normal_enabled = true
+	m.normal_texture = tex
+	m.normal_scale = strength
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = false
+	m.uv1_scale = Vector3.ONE / metres         # one tile per this many metres
+	m.uv1_triplanar_sharpness = 2.0
+
+
+## Black wool: matte, a soft sheen at grazing angles, a faint weave.
 func _cloth(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = col
-	m.roughness = 0.92
-	m.metallic_specular = 0.2
+	m.roughness = 0.88
+	m.metallic_specular = 0.3
 	m.rim_enabled = true
-	m.rim = 0.25
-	m.rim_tint = 0.3
+	m.rim = 0.35
+	m.rim_tint = 0.4
+	_detail(m, _wool_weave(), 0.35, 0.03)
 	return m
 
 
-## Black leather: darker than the wool, with a soft highlight on its curves.
+## Black glove leather: a satin sheen rather than a gloss, broken up by the grain.
 func _leather(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = col
-	m.roughness = 0.38
-	m.metallic_specular = 0.55
-	m.clearcoat_enabled = true
-	m.clearcoat = 0.35
-	m.clearcoat_roughness = 0.35
+	m.roughness = 0.46
+	m.metallic_specular = 0.5
+	m.rim_enabled = true
+	m.rim = 0.15
+	m.rim_tint = 0.6
+	_detail(m, _leather_grain(), 0.45, 0.02)
 	return m
 
 
-## White shirt cotton: matte.
+## Horn buttons: smooth and polished.
+func _horn(col: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.roughness = 0.25
+	return m
+
+
+## Cotton (the shirt cuff, the glove's thread): matte.
 func _cotton(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = col
 	m.roughness = 0.85
+	_detail(m, _wool_weave(), 0.15, 0.02)
 	return m

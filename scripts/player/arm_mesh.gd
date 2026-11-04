@@ -8,17 +8,17 @@ class_name ArmMesh
 ## curled, and the blend shape "fist" closes it round the chain. Every vertex is
 ## built twice from the same recipe, once per pose, so the shape morphs cleanly.
 ##
-## Surfaces, in order: wool, lining, shirt, leather, buttons.
+## Surfaces, in order: wool, lining, shirt, leather, buttons, stitching.
 
-enum { WOOL, LINING, SHIRT, LEATHER, BUTTONS }
-const SURFACES := 5
-const SEG := 18                  # vertices round each ring
+enum { WOOL, LINING, SHIRT, LEATHER, BUTTONS, STITCH }
+const SURFACES := 6
+const SEG := 24                  # vertices round each ring
 
 ## Hand measurements (glove included): an adult man's hand, about 19 cm from the
 ## wrist crease to the middle fingertip and 8.8 cm across the knuckles.
 const WRIST_Z := -0.218
 const SLEEVE_END := -0.200
-const CUFF_END := -0.212
+const CUFF_END := -0.2075
 
 ## Fingers, index to little: knuckle (MCP) position, phalanx lengths
 ## (proximal, middle, distal), base radius, and the sideways splay in each pose.
@@ -71,6 +71,7 @@ func _build() -> ArrayMesh:
 		_finger(f)
 	_thumb()
 	_buttons()
+	_points()
 	var mesh := ArrayMesh.new()
 	mesh.blend_shape_mode = Mesh.BLEND_SHAPE_MODE_NORMALIZED     # the fist is a whole pose, not an offset
 	mesh.add_blend_shape("fist")
@@ -127,16 +128,7 @@ func _shirt() -> void:
 ## into a broad, flat hand; the palm side fuller at the heel than the back.
 ## Rows: centre, half-width, half-height above and below, squareness.
 func _glove() -> void:
-	var rows := [
-		[Vector3(0.0, -0.004, -0.160), 0.0315, 0.0250, 0.0250, 2.0],
-		[Vector3(0.0, -0.003, -0.205), 0.0290, 0.0215, 0.0215, 2.1],
-		[Vector3(0.0, -0.002, WRIST_Z), 0.0292, 0.0200, 0.0215, 2.2],
-		[Vector3(-0.001, -0.001, -0.236), 0.0360, 0.0175, 0.0225, 2.5],
-		[Vector3(-0.002, 0.000, -0.258), 0.0420, 0.0160, 0.0205, 2.7],
-		[Vector3(-0.001, 0.001, -0.282), 0.0445, 0.0150, 0.0175, 2.8],
-		[Vector3(0.000, 0.001, -0.300), 0.0450, 0.0140, 0.0150, 2.8],
-		[Vector3(0.000, 0.001, -0.310), 0.0425, 0.0120, 0.0125, 2.6],
-	]
+	var rows := _glove_rows()
 	# clenched, the palm's muscles bunch and its heel fills out under the fingers
 	var fist := []
 	for r in rows:
@@ -147,6 +139,19 @@ func _glove() -> void:
 		q[1] = r[1] * (1.0 - 0.04 * bunch)
 		fist.append(q)
 	_loft(LEATHER, rows, fist, Vector3.UP, false, true)
+
+
+func _glove_rows() -> Array:
+	return [
+		[Vector3(0.0, -0.004, -0.160), 0.0315, 0.0250, 0.0250, 2.0],
+		[Vector3(0.0, -0.003, -0.205), 0.0290, 0.0215, 0.0215, 2.1],
+		[Vector3(0.0, -0.002, WRIST_Z), 0.0292, 0.0200, 0.0215, 2.2],
+		[Vector3(-0.001, -0.001, -0.236), 0.0360, 0.0175, 0.0225, 2.5],
+		[Vector3(-0.002, 0.000, -0.258), 0.0420, 0.0160, 0.0205, 2.7],
+		[Vector3(-0.001, 0.001, -0.282), 0.0445, 0.0150, 0.0175, 2.8],
+		[Vector3(0.000, 0.001, -0.300), 0.0450, 0.0140, 0.0150, 2.8],
+		[Vector3(0.000, 0.001, -0.310), 0.0425, 0.0120, 0.0125, 2.6],
+	]
 
 
 ## One finger: a single tube from inside the palm through its three joints to a
@@ -240,6 +245,39 @@ func _buttons() -> void:
 		for r in rows:
 			rr.append(r + [up])
 		_loft_up(BUTTONS, rr, rr, false, true)
+
+
+## The three stitched "points" down the back of a dress glove, from the wrist
+## toward the knuckles of the index, middle and ring fingers.
+func _points() -> void:
+	for k in 3:
+		var x0 := -0.0150 + k * 0.0150
+		var rows := []
+		for i in 9:
+			var t := i / 8.0
+			var z := lerpf(-0.240, -0.292, t)
+			var x := x0 * lerpf(0.75, 1.0, t)
+			var y := _glove_top(x, z) + 0.0002
+			rows.append([Vector3(x, y, z), 0.00065, 0.00045, 0.0002, 2.0, Vector3.UP])
+		_loft_up(STITCH, rows, rows, true, true)
+
+
+## Height of the glove's back at (x, z), from the same rows the glove is lofted on.
+func _glove_top(x: float, z: float) -> float:
+	var rows := _glove_rows()
+	for i in rows.size() - 1:
+		var a: Array = rows[i]
+		var b: Array = rows[i + 1]
+		var za: float = (a[0] as Vector3).z
+		var zb: float = (b[0] as Vector3).z
+		if z <= za and z >= zb:
+			var t := inverse_lerp(za, zb, z)
+			var cy: float = lerpf((a[0] as Vector3).y, (b[0] as Vector3).y, t)
+			var rx: float = lerpf(a[1], b[1], t)
+			var ry: float = lerpf(a[2], b[2], t)
+			var n: float = lerpf(a[4], b[4], t)
+			return cy + ry * pow(maxf(1.0 - pow(absf(x) / rx, n), 0.0), 1.0 / n)
+	return 0.0
 
 
 # ------------------------------------------------------------------ lofting
