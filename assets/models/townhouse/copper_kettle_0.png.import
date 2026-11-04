@@ -18,7 +18,7 @@ dest_files=["res://.godot/imported/copper_kettle_0.png-0addc81019cfdb4306218ec2a
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

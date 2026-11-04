@@ -90,20 +90,41 @@ func part_b(kind: String, col: Color, pos: Vector3, size: Vector3, rot: Basis, s
 	body.add_child(cs)
 
 
+## Batches are split into CHUNK-metre cells, so the camera can skip the cells it isn't
+## looking at (one batch spanning a whole landmark is always drawn, even behind you).
+## Small batches stay whole: below MIN_SPLIT pieces a few draw calls cost more than
+## the culling saves.
+const CHUNK := 48.0
+const MIN_SPLIT := 24
+
+
 func flush() -> void:
 	for key in parts:
 		var bits: PackedStringArray = key.split("|")
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = _unit[bits[0]]
 		var xfs: Array = parts[key]
-		mm.instance_count = xfs.size()
-		for i in xfs.size():
-			mm.set_instance_transform(i, xfs[i])
-		var mi := MultiMeshInstance3D.new()
-		mi.multimesh = mm
-		mi.material_override = material_for(Color.html(bits[1]))
-		add_child(mi)
+		var cells := {}
+		if xfs.size() < MIN_SPLIT:
+			cells[Vector3i.ZERO] = xfs
+		else:
+			for xf in xfs:
+				var o: Vector3 = xf.origin
+				var c := Vector3i(floori(o.x / CHUNK), floori(o.y / CHUNK), floori(o.z / CHUNK))
+				if not cells.has(c):
+					cells[c] = []
+				cells[c].append(xf)
+		var mat := material_for(Color.html(bits[1]))
+		for c in cells:
+			var list: Array = cells[c]
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = _unit[bits[0]]
+			mm.instance_count = list.size()
+			for i in list.size():
+				mm.set_instance_transform(i, list[i])
+			var mi := MultiMeshInstance3D.new()
+			mi.multimesh = mm
+			mi.material_override = mat
+			add_child(mi)
 	parts.clear()
 
 
