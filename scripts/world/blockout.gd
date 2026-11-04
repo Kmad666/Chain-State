@@ -37,8 +37,8 @@ func _ready() -> void:
 	_unit.cone.radial_segments = 18
 	_unit.ball.radius = 0.5
 	_unit.ball.height = 1.0
-	_unit.ball.radial_segments = 16
-	_unit.ball.rings = 8
+	_unit.ball.radial_segments = 12      # half the triangles of 16 x 8; balls are trees,
+	_unit.ball.rings = 6                 # bushes and clouds, read from a distance
 	for k in ["prism", "cone", "pyramid"]:
 		_hull[k] = (_unit[k] as Mesh).create_convex_shape().points
 	build()
@@ -90,21 +90,59 @@ func part_b(kind: String, col: Color, pos: Vector3, size: Vector3, rot: Basis, s
 	body.add_child(cs)
 
 
+## Batches are split into cells on the ground plan, so the camera can skip the cells
+## it isn't looking at (one batch spanning a whole landmark is always drawn, even
+## behind you). Cells are at least CHUNK metres and grow so a batch makes at most
+## MAX_CELLS x MAX_CELLS of them; small batches stay whole, since below MIN_SPLIT
+## pieces the extra draw calls cost more than the culling saves.
+const CHUNK := 80.0
+const MAX_CELLS := 3
+const MIN_SPLIT := 48
+
+
 func flush() -> void:
 	for key in parts:
 		var bits: PackedStringArray = key.split("|")
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = _unit[bits[0]]
 		var xfs: Array = parts[key]
-		mm.instance_count = xfs.size()
-		for i in xfs.size():
-			mm.set_instance_transform(i, xfs[i])
-		var mi := MultiMeshInstance3D.new()
-		mi.multimesh = mm
-		mi.material_override = material_for(Color.html(bits[1]))
-		add_child(mi)
+		var cells := {}
+		if xfs.size() < MIN_SPLIT:
+			cells[Vector2i.ZERO] = xfs
+		else:
+			var lo := Vector2(INF, INF)
+			var hi := -lo
+			for xf in xfs:
+				var o: Vector3 = xf.origin
+				lo = Vector2(minf(lo.x, o.x), minf(lo.y, o.z))
+				hi = Vector2(maxf(hi.x, o.x), maxf(hi.y, o.z))
+			var span := hi - lo
+			var size := maxf(CHUNK, maxf(span.x, span.y) / MAX_CELLS + 0.01)
+			for xf in xfs:
+				var o: Vector3 = xf.origin
+				var c := Vector2i(floori((o.x - lo.x) / size), floori((o.z - lo.y) / size))
+				if not cells.has(c):
+					cells[c] = []
+				cells[c].append(xf)
+		var mat := material_for(Color.html(bits[1]))
+		for c in cells:
+			var list: Array = cells[c]
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = _unit[bits[0]]
+			mm.instance_count = list.size()
+			for i in list.size():
+				mm.set_instance_transform(i, list[i])
+			var mi := MultiMeshInstance3D.new()
+			mi.multimesh = mm
+			mi.material_override = mat
+			if not casts_shadow(Color.html(bits[1])):
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(mi)
 	parts.clear()
+
+
+## Override to keep a colour out of the shadow pass (clouds, haze, far-off scenery).
+func casts_shadow(_col: Color) -> bool:
+	return true
 
 
 ## Override for a different look per colour.

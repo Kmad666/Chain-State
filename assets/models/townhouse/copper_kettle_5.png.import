@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bt2qy3uf52441"
-path="res://.godot/imported/copper_kettle_5.png-13666a47d16b0971e26fe9cdc6472f5d.ctex"
+path.s3tc="res://.godot/imported/copper_kettle_5.png-13666a47d16b0971e26fe9cdc6472f5d.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "32de9f5400ddc5a7b347eb3499b535fd"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/townhouse/copper_kettle_5.png"
-dest_files=["res://.godot/imported/copper_kettle_5.png-13666a47d16b0971e26fe9cdc6472f5d.ctex"]
+dest_files=["res://.godot/imported/copper_kettle_5.png-13666a47d16b0971e26fe9cdc6472f5d.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

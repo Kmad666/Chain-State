@@ -202,6 +202,10 @@ func _build_environment() -> void:
 	sun = DirectionalLight3D.new()
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 150.0
+	# two cascades, not four: every shadow caster is drawn once per cascade, and four
+	# doubled the scene's triangles. The near one is sharp, the far one soft.
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_split_1 = 0.15
 	add_child(sun)
 
 	var saved := DEFAULT_SKY
@@ -1688,11 +1692,19 @@ func _build_copper_kettle() -> void:
 	kettle = (load(KETTLE_GLB) as PackedScene).instantiate()
 	add_child(kettle)
 	var skip := ["ivy", "curtain", "glass", "glassLit", "glassLit2", "shopGlassWarm", "lightPool", "awningGreenPlain", "flowersRed", "flowersPink", "leavesBox"]
+	# thin, see-through or flat-on-the-wall pieces: their shadows are invisible or noise,
+	# and alpha-tested cards (ivy, leaves, flowers) are the dearest things to shadow
+	var no_shadow := ["ivy", "curtain", "glass", "lampGlass", "lampWarm", "shopGlassWarm", "shopWarm",
+		"flowersRed", "flowersPink", "leavesBox", "frame", "setts", "slabs", "kerb", "gold", "signBoard"]
+	# one static body for the whole house: every solid mesh's triangles in one shape
+	var faces := PackedVector3Array()
 	var top := 0.0
 	for mi in kettle.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
 		var aabb := m.global_transform * m.get_aabb()
 		top = maxf(top, aabb.end.y)
+		if no_shadow.any(func(k): return String(m.name).begins_with(k)):
+			m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if String(m.name).begins_with("setts"):
 			# the exported street reads too bright under Godot's light: darken and weather it
 			var sm := (m.get_active_material(0) as BaseMaterial3D).duplicate() as BaseMaterial3D
@@ -1702,9 +1714,18 @@ func _build_copper_kettle() -> void:
 		var base := String(m.name).get_slice("_", 0)
 		if base in skip or skip.any(func(k): return String(m.name).begins_with(k)):
 			continue
-		m.create_trimesh_collision()
-	for sb in kettle.find_children("*", "StaticBody3D", true, false):
-		(sb as StaticBody3D).collision_layer = 1
+		var xf := kettle.global_transform.affine_inverse() * m.global_transform
+		for v in m.mesh.get_faces():
+			faces.append(xf * v)
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	var cshape := CollisionShape3D.new()
+	cshape.shape = shape
+	body.add_child(cshape)
+	kettle.add_child(body)
 	kettle_top = top
 	# a wide cobbled ground beyond the model's own street, so the edge is out of sight
 	var ground := StaticBody3D.new()
