@@ -5,8 +5,8 @@ extends Node
 ## Prints one line per level: load time, frame time, draw calls, objects, triangles,
 ## physics time, collision faces and shadow casters.
 
-const SETTLE := 60
-const SAMPLE := 120
+const SETTLE := 30
+const SAMPLE := 60
 
 
 func _ready() -> void:
