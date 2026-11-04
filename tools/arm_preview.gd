@@ -71,7 +71,7 @@ func _ready() -> void:
 	sun.light_color = night.light
 	sun.light_energy = night.energy
 	await _shot("night_fist")
-	vm.grip = 0.0
+	vm.grip = vm.HOLD
 	vm._reach = 0.0
 	vm._dir = vm.REST_DIR.normalized()
 	vm._apply(0.0)
@@ -94,7 +94,7 @@ func _ready() -> void:
 	add_child(key)
 	var holder = Viewmodel.new()
 	add_child(holder)
-	holder.grip = 0.0
+	holder.grip = holder.HOLD
 	holder.pivot.transform = Transform3D.IDENTITY
 	var arm: MeshInstance3D = holder.arm
 	var c := Vector3(-0.005, -0.015, -0.27)          # the hand's middle
@@ -107,7 +107,7 @@ func _ready() -> void:
 	}
 	sun.visible = false
 	for pose in ["rest", "fist"]:
-		arm.set_blend_shape_value(0, 0.0 if pose == "rest" else 1.0)
+		arm.set_blend_shape_value(0, holder.HOLD if pose == "rest" else 1.0)
 		for v in views:
 			cam.set_orthogonal(0.26, 0.02, 10.0)
 			var off: Vector3 = views[v][0]

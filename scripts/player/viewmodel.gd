@@ -3,8 +3,8 @@ extends Node3D
 ## centimetre of white shirt cuff, and a fitted black leather glove on a hand of
 ## real proportions (arm_mesh.gd builds it as one mesh).
 ##
-## The hand rests relaxed, fingers loosely curled, and clenches into a fist round
-## the chain while you swing (the mesh's "fist" blend shape). The chain lives
+## The hand holds the arrowhead lightly at rest, opens as it throws, and clenches
+## into a fist round the chain while you swing (the mesh's "fist" blend shape). The chain lives
 ## inside the hand: it spools out when fired and reels back in (chain.gd); at rest
 ## only the arrowhead's point shows.
 ##
@@ -20,8 +20,8 @@ const LEATHER := Color(0.035, 0.032, 0.035)       # black glove leather
 const HORN := Color(0.03, 0.028, 0.03)            # cuff buttons
 const THREAD := Color(0.07, 0.07, 0.075)          # the glove's stitching
 
-const REST_POS := Vector3(0.23, -0.25, -0.05)     # elbow pivot, camera space
-const REST_DIR := Vector3(-0.16, 0.10, -1.0)      # forearm points a little in and up
+const REST_POS := Vector3(0.22, -0.225, -0.06)     # elbow pivot, camera space
+const REST_DIR := Vector3(-0.16, 0.17, -1.0)      # forearm points a little in and up
 const WRIST_Z := ArmMesh.WRIST_Z                  # pivot-local, along -Z
 
 var pivot: Node3D
@@ -32,7 +32,8 @@ var _throw := 0.0                  # 0..1 punch-forward when the hook is fired
 var _reach := 0.0                  # 0..1 arm raised toward the anchor while hooked
 var _dir := REST_DIR.normalized()
 var _land := 0.0                   # dips the arm when you hit the ground
-var grip := 0.0                    # 0 relaxed hand .. 1 fist round the chain
+const HOLD := 0.42                 # the resting grip: fingers loosely round the arrowhead
+var grip := HOLD                   # 0 open hand .. 1 fist round the chain
 var arm: MeshInstance3D
 
 
@@ -76,8 +77,14 @@ func animate(dt: float, state: int, tip: Vector3, vel: Vector3, on_floor: bool,
 	var hooked := state == HOOKED
 	_reach = lerpf(_reach, 1.0 if hooked else 0.0, 1.0 - exp(-(10.0 if hooked else 6.0) * dt))
 
-	# the hand closes round the chain while you hang from it, and opens again after
-	grip = lerpf(grip, 1.0 if hooked else 0.0, 1.0 - exp(-(16.0 if hooked else 7.0) * dt))
+	# the hand follows the chain: a light hold on the arrowhead at rest, open as it
+	# lets fly, a full fist on the chain while you hang from it
+	var want_grip := HOLD
+	if throwing:
+		want_grip = 0.0
+	elif hooked:
+		want_grip = 1.0
+	grip = lerpf(grip, want_grip, 1.0 - exp(-(18.0 if want_grip > grip else 9.0) * dt))
 
 	var want := REST_DIR.normalized()
 	if state != STOWED:

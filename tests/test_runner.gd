@@ -1591,7 +1591,10 @@ func _test_arm() -> void:
 		await get_tree().physics_frame
 	var ap = aw.player
 	var vm = ap.viewmodel
-	check(vm.bones == 4 * 3 + 3, "arm: an anatomical hand, three phalanges per finger and a three-bone thumb (%d bones)" % vm.bones)
+	var am: ArrayMesh = vm.arm.mesh
+	check(am.get_surface_count() == ArmMesh.SURFACES and am.get_blend_shape_count() == 1 and am.get_blend_shape_name(0) == &"fist",
+		"arm: one mesh (sleeve, cuff, glove, stitching) with a fist pose to close into")
+	check(vm.grip > 0.3 and vm.grip < 0.6, "arm: at rest the hand holds the arrowhead lightly, not clenched (grip %.2f)" % vm.grip)
 	var wrist: Vector3 = vm.pivot.to_global(Vector3(0, 0, vm.WRIST_Z))
 	var ch = ap.chain
 	check(ch._mm.visible_instance_count == 0 and ch.arrow.global_position.distance_to(vm.fist_point()) < ch.ARROW_LEN,
@@ -1625,12 +1628,15 @@ func _test_arm() -> void:
 	await shot("59_chain_out")
 	for i in 60:
 		await get_tree().physics_frame
+	check(ap.hook_state != 2 or vm.grip > 0.8, "arm: hanging from the chain, the hand is clenched round it (grip %.2f)" % vm.grip)
+	await shot("61_arm_fist")
 	ap.release()
 	for i in 10:
 		await get_tree().physics_frame
 	await shot("60_chain_reeling")
 	for i in 240:
 		await get_tree().physics_frame
+	check(absf(vm.grip - vm.HOLD) < 0.1, "arm: let go, the hand relaxes back to its light hold (grip %.2f)" % vm.grip)
 	# a close look from the side, with a second camera beside the arm
 	var c := Camera3D.new()
 	c.near = 0.005
