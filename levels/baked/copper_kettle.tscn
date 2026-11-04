@@ -2,11 +2,11 @@
 
 [ext_resource type="PackedScene" path="res://assets/models/townhouse/copper_kettle.glb" id="1_jdtff"]
 
-[node name="CopperKettleBaked" type="Node3D" unique_id=552577082]
+[node name="CopperKettleBaked" type="Node3D" unique_id=573546188]
 
 [node name="House" type="Node3D" parent="." unique_id=1795632691 instance=ExtResource("1_jdtff")]
 
-[node name="BakeSun" type="DirectionalLight3D" parent="." unique_id=416227226]
+[node name="BakeSun" type="DirectionalLight3D" parent="." unique_id=2076577896]
 transform = Transform3D(-0.49999994, -0.68243736, 0.53317857, 0, 0.61566156, 0.7880108, -0.86602545, 0.39400533, -0.30783075, 0, 0, 0)
 light_color = Color(1, 0.97, 0.9, 1)
 light_energy = 1.1
@@ -14,7 +14,7 @@ light_angular_distance = 0.6
 light_bake_mode = 1
 shadow_enabled = true
 
-[node name="LightmapGI" type="LightmapGI" parent="." unique_id=2004664475]
+[node name="LightmapGI" type="LightmapGI" parent="." unique_id=1073514732]
 environment_mode = 3
 environment_custom_color = Color(0.62, 0.7, 0.92, 1)
 environment_custom_energy = 0.55
