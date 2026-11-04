@@ -1,12 +1,11 @@
 extends Node3D
 ## First-person arm: the detective's right forearm in a black suit sleeve, a
-## centimetre of white shirt cuff, and a fitted black leather glove on a hand of
-## real proportions (arm_mesh.gd builds it as one mesh).
+## centimetre of white shirt cuff, and a black leather glove closed in a fist on
+## the chain. The model is built by tools/arm_model/build_arm.py (a seamless hand,
+## meshed from a distance field) and dressed here in wool, cotton and leather.
 ##
-## The hand holds the arrowhead lightly at rest, opens as it throws, and clenches
-## into a fist round the chain while you swing (the mesh's "fist" blend shape). The chain lives
-## inside the hand: it spools out when fired and reels back in (chain.gd); at rest
-## only the arrowhead's point shows.
+## The chain lives inside the fist: it spools out when fired and reels back in
+## (chain.gd); at rest only the arrowhead's point shows.
 ##
 ## Lives under the camera. The player calls `animate()` every frame; the chain
 ## asks for `cuff_ring()`, `fist_point()` and `forward()` to know where to draw.
@@ -18,11 +17,14 @@ const LINING := Color(0.02, 0.02, 0.025)
 const SHIRT := Color(0.74, 0.74, 0.72)            # white cotton (kept off-white so it doesn't glare)
 const LEATHER := Color(0.035, 0.032, 0.035)       # black glove leather
 const HORN := Color(0.03, 0.028, 0.03)            # cuff buttons
-const THREAD := Color(0.07, 0.07, 0.075)          # the glove's stitching
 
-const REST_POS := Vector3(0.22, -0.225, -0.06)     # elbow pivot, camera space
-const REST_DIR := Vector3(-0.16, 0.17, -1.0)      # forearm points a little in and up
-const WRIST_Z := ArmMesh.WRIST_Z                  # pivot-local, along -Z
+const MODEL := "res://assets/models/arm/arm.glb"
+const REST_POS := Vector3(0.21, -0.215, -0.08)     # elbow pivot, camera space
+const REST_DIR := Vector3(-0.16, 0.12, -1.0)      # forearm points a little in and up
+const WRIST_Z := -0.215                           # pivot-local, along -Z
+## Where the chain runs out of the fist: the thumb side of the tunnel the fingers
+## close round (arm space).
+const CHAIN_EXIT := Vector3(-0.048, -0.032, -0.302)
 
 var pivot: Node3D
 var _t := 0.0
@@ -32,24 +34,15 @@ var _throw := 0.0                  # 0..1 punch-forward when the hook is fired
 var _reach := 0.0                  # 0..1 arm raised toward the anchor while hooked
 var _dir := REST_DIR.normalized()
 var _land := 0.0                   # dips the arm when you hit the ground
-const HOLD := 0.42                 # the resting grip: fingers loosely round the arrowhead
-var grip := HOLD                   # 0 open hand .. 1 fist round the chain
-var arm: MeshInstance3D
+var arm: Node3D
 
 
 func _ready() -> void:
 	pivot = Node3D.new()
 	add_child(pivot)
-	arm = MeshInstance3D.new()
-	arm.mesh = ArmMesh.build()
-	arm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	arm.set_surface_override_material(ArmMesh.WOOL, _cloth(SUIT))
-	arm.set_surface_override_material(ArmMesh.LINING, _cloth(LINING))
-	arm.set_surface_override_material(ArmMesh.SHIRT, _cotton(SHIRT))
-	arm.set_surface_override_material(ArmMesh.LEATHER, _leather(LEATHER))
-	arm.set_surface_override_material(ArmMesh.BUTTONS, _horn(HORN))
-	arm.set_surface_override_material(ArmMesh.STITCH, _cotton(THREAD))
+	arm = (load(MODEL) as PackedScene).instantiate()
 	pivot.add_child(arm)
+	dress(arm)
 	_apply(1.0)
 
 
@@ -77,15 +70,6 @@ func animate(dt: float, state: int, tip: Vector3, vel: Vector3, on_floor: bool,
 	var hooked := state == HOOKED
 	_reach = lerpf(_reach, 1.0 if hooked else 0.0, 1.0 - exp(-(10.0 if hooked else 6.0) * dt))
 
-	# the hand follows the chain: a light hold on the arrowhead at rest, open as it
-	# lets fly, a full fist on the chain while you hang from it
-	var want_grip := HOLD
-	if throwing:
-		want_grip = 0.0
-	elif hooked:
-		want_grip = 1.0
-	grip = lerpf(grip, want_grip, 1.0 - exp(-(18.0 if want_grip > grip else 9.0) * dt))
-
 	var want := REST_DIR.normalized()
 	if state != STOWED:
 		var local := cam.global_basis.inverse() * (tip - cam.global_position)
@@ -109,17 +93,21 @@ func _apply(walk: float) -> void:
 	p += Vector3(-0.03, 0.10, -0.02) * _reach              # raise to hold the chain
 	p.y -= 0.035 * _land
 	pivot.position = p
-	if arm:
-		set_pose(arm, grip)
 	var up := Vector3.UP if absf(_dir.y) < 0.95 else Vector3.BACK
 	pivot.basis = Basis.looking_at(_dir, up).rotated(_dir, -0.35 * (1.0 - _reach))  # knuckles tilt in at rest
 
 
-## Close a hand mesh to `g` (0 open .. 1 fist), blending between its keyed poses.
-static func set_pose(mi: MeshInstance3D, g: float) -> void:
-	var w := ArmMesh.weights(g)
-	for i in w.size():
-		mi.set_blend_shape_value(i, w[i])
+## Give the model's parts their materials (by mesh name) and keep the arm out of
+## the shadow pass.
+func dress(model: Node) -> void:
+	var mats := {"glove": _leather(LEATHER), "sleeve": _cloth(SUIT), "lining": _cloth(LINING),
+		"shirt": _cotton(SHIRT), "buttons": _horn(HORN)}
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for k in mats:
+			if String(m.name).begins_with(k):
+				m.material_override = mats[k]
 
 
 ## World-space point on top of the glove's wrist strap (the buckle).
@@ -130,7 +118,7 @@ func cuff_ring() -> Vector3:
 ## World-space point at the front of the fist, where the chain leaves the hand
 ## (between the curled fingers and the thumb).
 func fist_point() -> Vector3:
-	return pivot.to_global(ArmMesh.CHAIN_RELAXED.lerp(ArmMesh.CHAIN_FIST, grip))
+	return pivot.to_global(CHAIN_EXIT)
 
 
 ## World-space direction the forearm points.
@@ -148,6 +136,7 @@ func arm_xform() -> Transform3D:
 ## local), so the grain stays put on the arm instead of sliding as it moves.
 
 static var _grain: Texture2D
+static var _crease: Texture2D
 static var _weave: Texture2D
 
 
@@ -168,6 +157,27 @@ static func _leather_grain() -> Texture2D:
 		t.noise = n
 		_grain = t
 	return _grain
+
+
+## Worn glove leather: a net of fine creases a few millimetres apart, where the
+## leather has flexed (ridged noise reads as crinkles rather than bumps).
+static func _leather_crease() -> Texture2D:
+	if _crease == null:
+		var n := FastNoiseLite.new()
+		n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		n.frequency = 0.03
+		n.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+		n.fractal_octaves = 2
+		n.fractal_gain = 0.4
+		var t := NoiseTexture2D.new()
+		t.width = 512
+		t.height = 512
+		t.seamless = true
+		t.as_normal_map = true
+		t.bump_strength = 1.6
+		t.noise = n
+		_crease = t
+	return _crease
 
 
 ## Worsted wool: a faint, fine weave.
@@ -220,7 +230,16 @@ func _leather(col: Color) -> StandardMaterial3D:
 	m.rim_enabled = true
 	m.rim = 0.15
 	m.rim_tint = 0.6
-	_detail(m, _leather_grain(), 0.45, 0.02)
+	_detail(m, _leather_grain(), 0.40, 0.02)
+	# the creases ride on a second, larger tiling, laid on the same way
+	m.detail_enabled = true
+	m.detail_normal = _leather_crease()
+	m.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+	m.uv2_triplanar = true
+	m.uv2_world_triplanar = false
+	m.uv2_scale = Vector3.ONE / 0.07
+	m.uv2_triplanar_sharpness = 2.0
+	m.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL     # no detail colour: white times black stays black
 	return m
 
 
