@@ -6,7 +6,7 @@ extends SceneTree
 ## <name>.exr next to it; the level loads the baked scene and lights only moving
 ## things (you, NPCs, the chain) in real time, with no real-time shadows.
 
-const World := preload("res://scripts/world/world.gd")
+const KETTLE_GLB := "res://assets/models/townhouse/copper_kettle.glb"
 
 
 func _init() -> void:
@@ -17,7 +17,7 @@ func _init() -> void:
 
 ## The sky a level is baked under: its sun and the light from the dome.
 static func sun_for(sky_id: String) -> DirectionalLight3D:
-	var s: Dictionary = World.SKIES[sky_id]
+	var s: Dictionary = Skies.LIST[sky_id]
 	var sun := DirectionalLight3D.new()
 	sun.name = "BakeSun"
 	var dir := Basis.from_euler(Vector3(deg_to_rad(s.elev), -s.u * TAU, 0)) * Vector3.FORWARD
@@ -31,7 +31,7 @@ static func sun_for(sky_id: String) -> DirectionalLight3D:
 
 
 static func lightmap_for(sky_id: String, texel_scale := 1.0) -> LightmapGI:
-	var s: Dictionary = World.SKIES[sky_id]
+	var s: Dictionary = Skies.LIST[sky_id]
 	var lm := LightmapGI.new()
 	lm.name = "LightmapGI"
 	lm.quality = LightmapGI.BAKE_QUALITY_MEDIUM
@@ -57,9 +57,9 @@ func _save(root: Node3D, path: String) -> void:
 func _kettle() -> void:
 	var root := Node3D.new()
 	root.name = "CopperKettleBaked"
-	var house: Node3D = (load(World.KETTLE_GLB) as PackedScene).instantiate()
+	var house: Node3D = (load(KETTLE_GLB) as PackedScene).instantiate()
 	house.name = "House"
 	root.add_child(house)
-	root.add_child(sun_for(World.DEFAULT_SKY))
-	root.add_child(lightmap_for(World.DEFAULT_SKY))
+	root.add_child(sun_for(Skies.DEFAULT))
+	root.add_child(lightmap_for(Skies.DEFAULT))
 	_save(root, "res://levels/baked/copper_kettle.tscn")
