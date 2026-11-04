@@ -90,12 +90,14 @@ func part_b(kind: String, col: Color, pos: Vector3, size: Vector3, rot: Basis, s
 	body.add_child(cs)
 
 
-## Batches are split into CHUNK-metre cells, so the camera can skip the cells it isn't
-## looking at (one batch spanning a whole landmark is always drawn, even behind you).
-## Small batches stay whole: below MIN_SPLIT pieces a few draw calls cost more than
-## the culling saves.
-const CHUNK := 48.0
-const MIN_SPLIT := 24
+## Batches are split into cells on the ground plan, so the camera can skip the cells
+## it isn't looking at (one batch spanning a whole landmark is always drawn, even
+## behind you). Cells are at least CHUNK metres and grow so a batch makes at most
+## MAX_CELLS x MAX_CELLS of them; small batches stay whole, since below MIN_SPLIT
+## pieces the extra draw calls cost more than the culling saves.
+const CHUNK := 80.0
+const MAX_CELLS := 3
+const MIN_SPLIT := 48
 
 
 func flush() -> void:
@@ -104,11 +106,19 @@ func flush() -> void:
 		var xfs: Array = parts[key]
 		var cells := {}
 		if xfs.size() < MIN_SPLIT:
-			cells[Vector3i.ZERO] = xfs
+			cells[Vector2i.ZERO] = xfs
 		else:
+			var lo := Vector2(INF, INF)
+			var hi := -lo
 			for xf in xfs:
 				var o: Vector3 = xf.origin
-				var c := Vector3i(floori(o.x / CHUNK), floori(o.y / CHUNK), floori(o.z / CHUNK))
+				lo = Vector2(minf(lo.x, o.x), minf(lo.y, o.z))
+				hi = Vector2(maxf(hi.x, o.x), maxf(hi.y, o.z))
+			var span := hi - lo
+			var size := maxf(CHUNK, maxf(span.x, span.y) / MAX_CELLS + 0.01)
+			for xf in xfs:
+				var o: Vector3 = xf.origin
+				var c := Vector2i(floori((o.x - lo.x) / size), floori((o.z - lo.y) / size))
 				if not cells.has(c):
 					cells[c] = []
 				cells[c].append(xf)
