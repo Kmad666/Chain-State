@@ -4,9 +4,12 @@ class_name ArmMesh
 ## (metres; -Z runs from the elbow to the fingertips, +Y is the back of the hand,
 ## -X the thumb side of this right hand, palm down).
 ##
-## Two poses share one topology: the base mesh is a relaxed hand, fingers loosely
-## curled, and the blend shape "fist" closes it round the chain. Every vertex is
-## built twice from the same recipe, once per pose, so the shape morphs cleanly.
+## The hand's poses share one topology: the base mesh is a relaxed hand, fingers
+## loosely curled, and three blend shapes close it step by step ("hold", "close",
+## "fist") at the grips in KEYS. Each pose is built from the same recipe with its
+## joints bent properly, and the arm blends only between neighbouring poses: a
+## fingertip swinging 250 degrees would flatten if blended straight from open to
+## fist, but across one step it keeps its shape. `weights()` maps a grip to them.
 ##
 ## Surfaces, in order: wool, lining, shirt, leather, buttons, stitching.
 
@@ -23,7 +26,7 @@ const CUFF_END := -0.2075
 ## Fingers, index to little: knuckle (MCP) position, phalanx lengths
 ## (proximal, middle, distal), base radius, and the sideways splay in each pose.
 const FINGERS := [
-	{"mcp": Vector3(-0.0305, 0.0010, -0.3125), "len": [0.044, 0.026, 0.021], "r": 0.0099, "splay": [-0.10, -0.03]},
+	{"mcp": Vector3(-0.0305, 0.0010, -0.3125), "len": [0.041, 0.025, 0.019], "r": 0.0099, "splay": [-0.10, -0.03]},
 	{"mcp": Vector3(-0.0100, 0.0030, -0.3165), "len": [0.044, 0.027, 0.020], "r": 0.0102, "splay": [-0.02, 0.0]},
 	{"mcp": Vector3(0.0110, 0.0015, -0.3125), "len": [0.041, 0.026, 0.019], "r": 0.0096, "splay": [0.05, 0.02]},
 	{"mcp": Vector3(0.0300, -0.0020, -0.3015), "len": [0.032, 0.019, 0.017], "r": 0.0086, "splay": [0.12, 0.05]},
@@ -39,16 +42,43 @@ const THUMB_RELAXED := [Vector3(-0.024, -0.009, -0.226), Vector3(-0.045, -0.022,
 	Vector3(-0.050, -0.032, -0.289), Vector3(-0.046, -0.038, -0.314)]
 const THUMB_FIST := [Vector3(-0.024, -0.009, -0.226), Vector3(-0.050, -0.032, -0.282),
 	Vector3(-0.040, -0.050, -0.318), Vector3(-0.012, -0.052, -0.332)]
-const THUMB_R := [0.0175, 0.0128, 0.0117, 0.0106]
+const THUMB_R := [0.0185, 0.0134, 0.0119, 0.0106]
 
 ## Where the chain leaves the hand in each pose (between thumb and index).
 const CHAIN_RELAXED := Vector3(-0.024, -0.030, -0.330)
 const CHAIN_FIST := Vector3(-0.022, -0.036, -0.326)
 
 
+## The grips the poses are built at: open, the resting hold on the arrowhead,
+## half closed, a fist.
+const KEYS := [0.0, 0.42, 0.72, 1.0]
+const SHAPES := ["hold", "close", "fist"]
+
+
 class Surf:
-	var v := [PackedVector3Array(), PackedVector3Array()]     # base pose, fist pose
+	var v := []                      # one PackedVector3Array per pose in KEYS
 	var idx := PackedInt32Array()
+
+	func _init() -> void:
+		for k in KEYS.size():
+			v.append(PackedVector3Array())
+
+
+## Blend shape weights for a grip between 0 (open) and 1 (fist): only the two
+## poses either side of it, so the hand moves pose to pose.
+static func weights(grip: float) -> Array:
+	var w := [0.0, 0.0, 0.0]
+	grip = clampf(grip, 0.0, 1.0)
+	for i in KEYS.size() - 1:
+		var a: float = KEYS[i]
+		var b: float = KEYS[i + 1]
+		if grip <= b or i == KEYS.size() - 2:
+			var t := inverse_lerp(a, b, grip)
+			if i > 0:
+				w[i - 1] = 1.0 - t
+			w[i] = t
+			return w
+	return w
 
 
 var surfs: Array = []
@@ -73,12 +103,14 @@ func _build() -> ArrayMesh:
 	_buttons()
 	_points()
 	var mesh := ArrayMesh.new()
-	mesh.blend_shape_mode = Mesh.BLEND_SHAPE_MODE_NORMALIZED     # the fist is a whole pose, not an offset
-	mesh.add_blend_shape("fist")
+	mesh.blend_shape_mode = Mesh.BLEND_SHAPE_MODE_NORMALIZED     # each shape is a whole pose, not an offset
+	for n in SHAPES:
+		mesh.add_blend_shape(n)
 	for s in surfs:
-		var base := _arrays(s, 0)
-		var fist := _arrays(s, 1)
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, base, [fist])
+		var shapes := []
+		for k in range(1, KEYS.size()):
+			shapes.append(_arrays(s, k))
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _arrays(s, 0), shapes)
 	return mesh
 
 
@@ -96,7 +128,7 @@ func _sleeve() -> void:
 		# the cloth hangs: the sleeve's underside sags a little more toward the cuff
 		rows.append([Vector3(0.0, -0.004 * t, z), rx, ry, ry * (1.0 + 0.06 * t), 2.0])
 	folds = 0.0035
-	_loft(WOOL, rows, rows, Vector3.UP, true, false)
+	_loft(WOOL, [rows], Vector3.UP, true, false)
 	folds = 0.0
 	# the turned-in edge, then the lining back inside
 	var end: Array = rows[-1]
@@ -104,13 +136,13 @@ func _sleeve() -> void:
 		[end[0], end[1], end[2], end[3], 2.0],
 		[end[0] + Vector3(0, 0, 0.0015), end[1] * 0.965, end[2] * 0.965, end[3] * 0.965, 2.0],
 	]
-	_loft(WOOL, lip, lip, Vector3.UP, false, false)
+	_loft(WOOL, [lip], Vector3.UP, false, false)
 	var lining := [
 		[end[0] + Vector3(0, 0, 0.0015), end[1] * 0.965, end[2] * 0.965, end[3] * 0.965, 2.0],
 		[end[0] + Vector3(0, 0, 0.05), end[1] * 0.965, end[2] * 0.965, end[3] * 0.965, 2.0],
 	]
 	inside = true
-	_loft(LINING, lining, lining, Vector3.UP, false, false)
+	_loft(LINING, [lining], Vector3.UP, false, false)
 	inside = false
 
 
@@ -121,7 +153,7 @@ func _shirt() -> void:
 		rows.append([Vector3(0.0, -0.005, z), 0.0395, 0.0355, 0.0365, 2.4])
 	rows.append([Vector3(0.0, -0.005, CUFF_END - 0.0012), 0.0378, 0.0338, 0.0348, 2.4])
 	rows.append([Vector3(0.0, -0.005, CUFF_END + 0.004), 0.034, 0.029, 0.030, 2.4])
-	_loft(SHIRT, rows, rows, Vector3.UP, false, false)
+	_loft(SHIRT, [rows], Vector3.UP, false, false)
 
 
 ## The glove from inside the cuff to the knuckles: round at the wrist, spreading
@@ -129,16 +161,19 @@ func _shirt() -> void:
 ## Rows: centre, half-width, half-height above and below, squareness.
 func _glove() -> void:
 	var rows := _glove_rows()
-	# clenched, the palm's muscles bunch and its heel fills out under the fingers
-	var fist := []
-	for r in rows:
-		var q: Array = r.duplicate()
-		var z: float = (r[0] as Vector3).z
-		var bunch := smoothstep(-0.225, -0.26, z)
-		q[3] = r[3] * (1.0 + 0.32 * bunch)
-		q[1] = r[1] * (1.0 - 0.04 * bunch)
-		fist.append(q)
-	_loft(LEATHER, rows, fist, Vector3.UP, false, true)
+	# clenching, the palm's muscles bunch and its heel fills out under the fingers
+	var poses := []
+	for f in KEYS:
+		var pose := []
+		for r in rows:
+			var q: Array = r.duplicate()
+			var z: float = (r[0] as Vector3).z
+			var bunch: float = smoothstep(-0.225, -0.26, z) * f
+			q[3] = r[3] * (1.0 + 0.32 * bunch)
+			q[1] = r[1] * (1.0 - 0.04 * bunch)
+			pose.append(q)
+		poses.append(pose)
+	_loft(LEATHER, poses, Vector3.UP, false, true)
 
 
 func _glove_rows() -> Array:
@@ -164,9 +199,11 @@ func _finger(f: int) -> void:
 	var joints := [0.0, lens[0], lens[0] + lens[1]]
 	var n := 30
 	var poses := []
-	for pose in 2:
-		var bends: Array = RELAXED[f] if pose == 0 else FIST[f]
-		var splay: float = d.splay[pose]
+	for g in KEYS:
+		var bends := []
+		for j in 3:
+			bends.append(lerpf(RELAXED[f][j], FIST[f][j], g))
+		var splay: float = lerpf(d.splay[0], d.splay[1], g)
 		var fwd := Basis(Vector3.UP, -splay) * Vector3.FORWARD
 		var side := Basis(Vector3.UP, -splay) * Vector3.RIGHT      # the axis the finger curls about
 		var rows := []
@@ -193,15 +230,17 @@ func _finger(f: int) -> void:
 			var tipward := smoothstep(total * 0.7, total, s)
 			rows.append([p, r * 1.07, r * lerpf(0.86, 0.74, tipward), r * 1.0, lerpf(2.2, 2.5, tipward), up])
 		poses.append(rows)
-	_loft_up(LEATHER, poses[0], poses[1], false, true)
+	_loft_up(LEATHER, poses, false, true)
 
 
 ## The thumb: thick at its base where the thenar muscle fills the palm, along a
 ## smooth curve through its joints.
 func _thumb() -> void:
 	var poses := []
-	for pose in 2:
-		var pts: Array = THUMB_RELAXED if pose == 0 else THUMB_FIST
+	for g in KEYS:
+		var pts := []
+		for j in 4:
+			pts.append((THUMB_RELAXED[j] as Vector3).lerp(THUMB_FIST[j], g))
 		var rows := []
 		var per := 8
 		for seg in 3:
@@ -224,7 +263,7 @@ func _thumb() -> void:
 				up = (up - dir * up.dot(dir)).normalized()
 				rows.append([p, r * 1.04, r * 0.92, r * 1.0, 2.1, up])
 		poses.append(rows)
-	_loft_up(LEATHER, poses[0], poses[1], true, true)
+	_loft_up(LEATHER, poses, true, true)
 
 
 ## Four horn buttons on the outer side of the cuff.
@@ -244,7 +283,7 @@ func _buttons() -> void:
 		var rr := []
 		for r in rows:
 			rr.append(r + [up])
-		_loft_up(BUTTONS, rr, rr, false, true)
+		_loft_up(BUTTONS, [rr], false, true)
 
 
 ## The three stitched "points" down the back of a dress glove, from the wrist
@@ -259,7 +298,7 @@ func _points() -> void:
 			var x := x0 * lerpf(0.75, 1.0, t)
 			var y := _glove_top(x, z) + 0.0002
 			rows.append([Vector3(x, y, z), 0.00065, 0.00045, 0.0002, 2.0, Vector3.UP])
-		_loft_up(STITCH, rows, rows, true, true)
+		_loft_up(STITCH, [rows], true, true)
 
 
 ## Height of the glove's back at (x, z), from the same rows the glove is lofted on.
@@ -282,25 +321,26 @@ func _glove_top(x: float, z: float) -> float:
 
 # ------------------------------------------------------------------ lofting
 
-## A loft along -Z-ish rows whose ring "up" is a fixed direction.
-func _loft(surf: int, a: Array, b: Array, up: Vector3, cap_start: bool, cap_end: bool) -> void:
-	var aa := []
-	var bb := []
-	for r in a:
-		aa.append(r + [up])
-	for r in b:
-		bb.append(r + [up])
-	_loft_up(surf, aa, bb, cap_start, cap_end)
+## A loft whose ring "up" is a fixed direction. `poses` holds the rows for each
+## pose in KEYS, or one set of rows for a part that doesn't move.
+func _loft(surf: int, poses: Array, up: Vector3, cap_start: bool, cap_end: bool) -> void:
+	var out := []
+	for rows in poses:
+		var rr := []
+		for r in rows:
+			rr.append(r + [up])
+		out.append(rr)
+	_loft_up(surf, out, cap_start, cap_end)
 
 
 ## Rings through rows [centre, half-width, half-height up, half-height down,
 ## squareness, up direction], once per pose, joined into one tube.
-func _loft_up(surf: int, pose_a: Array, pose_b: Array, cap_start: bool, cap_end: bool) -> void:
+func _loft_up(surf: int, poses: Array, cap_start: bool, cap_end: bool) -> void:
 	var s: Surf = surfs[surf]
 	var start: int = s.v[0].size()
 	var rings := 0
-	for pose in 2:
-		var rows: Array = pose_a if pose == 0 else pose_b
+	for pose in KEYS.size():
+		var rows: Array = poses[pose] if poses.size() > 1 else poses[0]
 		var all := rows.duplicate()
 		if cap_end:
 			all.append_array(_cap(rows, rows.size() - 1, 1.0))
@@ -371,11 +411,11 @@ func _cap(rows: Array, at: int, dir: float) -> Array:
 	var r: Array = rows[at]
 	var nb: Array = rows[at - 1] if dir > 0.0 else rows[1]
 	var t: Vector3 = ((r[0] - nb[0]) as Vector3).normalized()
-	var depth := minf(r[1], minf(r[2], r[3])) * 0.9
+	var depth: float = (r[1] + r[2] + r[3]) / 3.0          # a full round end, not a flat cap
 	var out := []
-	for k in [1, 2, 3, 4]:
-		var phi: float = k / 4.0 * PI * 0.5
-		var shrink := cos(phi) if k < 4 else 0.02
+	for k in [1, 2, 3, 4, 5, 6]:
+		var phi: float = k / 6.0 * PI * 0.5
+		var shrink := maxf(cos(phi), 0.0)
 		var row := r.duplicate()
 		row[0] = r[0] + t * depth * sin(phi)
 		row[1] = r[1] * shrink

@@ -1592,8 +1592,11 @@ func _test_arm() -> void:
 	var ap = aw.player
 	var vm = ap.viewmodel
 	var am: ArrayMesh = vm.arm.mesh
-	check(am.get_surface_count() == ArmMesh.SURFACES and am.get_blend_shape_count() == 1 and am.get_blend_shape_name(0) == &"fist",
-		"arm: one mesh (sleeve, cuff, glove, stitching) with a fist pose to close into")
+	check(am.get_surface_count() == ArmMesh.SURFACES and am.get_blend_shape_count() == 3 and am.get_blend_shape_name(2) == &"fist",
+		"arm: one mesh (sleeve, cuff, glove, stitching) with hold, close and fist poses")
+	var w: Array = ArmMesh.weights(vm.HOLD)
+	check(is_equal_approx(w[0], 1.0) and w[1] == 0.0 and w[2] == 0.0 and ArmMesh.weights(1.0)[2] == 1.0,
+		"arm: the resting grip and the fist are exact poses, not blends")
 	check(vm.grip > 0.3 and vm.grip < 0.6, "arm: at rest the hand holds the arrowhead lightly, not clenched (grip %.2f)" % vm.grip)
 	var wrist: Vector3 = vm.pivot.to_global(Vector3(0, 0, vm.WRIST_Z))
 	var ch = ap.chain

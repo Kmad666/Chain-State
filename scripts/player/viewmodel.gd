@@ -110,9 +110,16 @@ func _apply(walk: float) -> void:
 	p.y -= 0.035 * _land
 	pivot.position = p
 	if arm:
-		arm.set_blend_shape_value(0, grip)
+		set_pose(arm, grip)
 	var up := Vector3.UP if absf(_dir.y) < 0.95 else Vector3.BACK
 	pivot.basis = Basis.looking_at(_dir, up).rotated(_dir, -0.35 * (1.0 - _reach))  # knuckles tilt in at rest
+
+
+## Close a hand mesh to `g` (0 open .. 1 fist), blending between its keyed poses.
+static func set_pose(mi: MeshInstance3D, g: float) -> void:
+	var w := ArmMesh.weights(g)
+	for i in w.size():
+		mi.set_blend_shape_value(i, w[i])
 
 
 ## World-space point on top of the glove's wrist strap (the buckle).
