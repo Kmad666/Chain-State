@@ -293,6 +293,8 @@ func _build_world() -> void:
 			_build_sea_wall()
 		"brick_spire":
 			_build_brick_spire()
+		"copper_kettle":
+			_build_copper_kettle()
 		"custom":
 			_build_custom(Game.custom)
 		_:
@@ -925,7 +927,8 @@ func _on_landed(body: Node) -> void:
 		return
 	if body and ((spire and body.get_parent() == spire) or (cloud_tree and body.get_parent() == cloud_tree) \
 			or (citadel and body.get_parent() == citadel) or (keep and (body.get_parent() == keep or body == keep)) \
-			or (sea_wall and body.get_parent() == sea_wall) or (brick and body.get_parent() == brick)):
+			or (sea_wall and body.get_parent() == sea_wall) or (brick and body.get_parent() == brick) \
+			or (kettle and kettle.is_ancestor_of(body))):
 		_spire_landed()
 		return
 	if body and body.has_meta("ascent_cp"):
@@ -962,6 +965,9 @@ func course_text() -> String:
 		var t := custom_time
 		return "%s      CHECKPOINT %d / %d      TIME %d:%04.1f      FALLS %d" % [custom_name.to_upper(), custom_cp, custom_cps,
 			int(t / 60.0), fmod(t, 60.0), falls]
+	if kettle and not (player and player.flying):
+		return "THE COPPER KETTLE      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
+			roundi(spire_best), roundi(kettle_top), falls]
 	if brick and not (player and player.flying):
 		return "THE BRICK SPIRE      HEIGHT %d m      BEST %d m  of  %d      FALLS %d" % [maxi(0, roundi(player.global_position.y)),
 			roundi(spire_best), roundi(brick.top_point().y), falls]
@@ -1006,6 +1012,7 @@ var citadel: Node3D = null         # the White Citadel
 var keep: Node3D = null            # the Keep Isles
 var sea_wall: Node3D = null        # the Sea Wall
 var brick: Node3D = null           # the Brick Spire
+var kettle: Node3D = null          # the Copper Kettle townhouse (imported model)
 # a custom level from the Level Editor
 var custom_name := ""
 var custom_cherubs: Array = []
@@ -1486,10 +1493,10 @@ func _spire_landed() -> void:
 		spire_best = y
 		player.spawn = Transform3D(player.global_basis.orthonormalized(), player.global_position + Vector3(0, 0.5, 0))
 		hud.toast("Checkpoint  ·  %d m" % roundi(y), 1.5)
-	var top_line := 250.0 if cloud_tree else (140.0 if citadel or keep else (330.0 if sea_wall else (200.0 if brick else 200.0)))
+	var top_line := 21.0 if kettle else 250.0 if cloud_tree else (140.0 if citadel or keep else (330.0 if sea_wall else (200.0 if brick else 200.0)))
 	if y > top_line and not finished:
 		finished = true
-		var what := "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else ("ATOP THE SEA TOWER" if sea_wall else ("ON THE SPIRE'S CORNICE" if brick else "THE HEIGHTS OF SPIRE TOWN"))))
+		var what := "AT THE CHIMNEY POTS" if kettle else "IN THE CLOUDS" if cloud_tree else ("ATOP THE WHITE CITADEL" if citadel else ("ON THE KEEP'S WALLS" if keep else ("ATOP THE SEA TOWER" if sea_wall else ("ON THE SPIRE'S CORNICE" if brick else "THE HEIGHTS OF SPIRE TOWN"))))
 		hud.toast("%s: %d m, %d falls" % [what, roundi(y), falls], 6.0)
 
 
@@ -1668,6 +1675,60 @@ func _sea_wall_look() -> void:
 ## start on a stone landing in front and climb from the loggias and cornices to the
 ## main tower's cap. Fall into the sea and you're back at your checkpoint.
 const BRICK_SINK := 30.0              # how deep the tower's foot stands in the water
+
+# ---------------------------------------------------------------- the Copper Kettle
+## A townhouse modelled in three.js from a design sheet (design/townhouse/) and exported
+## as a .glb: limestone ashlar, a green café front, a slate mansard with stone dormers
+## and four chimney stacks. Every mesh gets trimesh collision on the world layer, so the
+## whole building can be stood on and grappled. Ivy, curtains and glass are left out.
+const KETTLE_GLB := "res://assets/models/townhouse/copper_kettle.glb"
+var kettle_top := 0.0
+
+func _build_copper_kettle() -> void:
+	kettle = (load(KETTLE_GLB) as PackedScene).instantiate()
+	add_child(kettle)
+	var skip := ["ivy", "curtain", "glass", "glassLit", "glassLit2", "shopGlassWarm", "lightPool", "awningGreenPlain", "flowersRed", "flowersPink", "leavesBox"]
+	var top := 0.0
+	for mi in kettle.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		var aabb := m.global_transform * m.get_aabb()
+		top = maxf(top, aabb.end.y)
+		if String(m.name).begins_with("setts"):
+			# the exported street reads too bright under Godot's light: darken and weather it
+			var sm := (m.get_active_material(0) as BaseMaterial3D).duplicate() as BaseMaterial3D
+			sm.albedo_color = Color(0.5, 0.48, 0.46)
+			sm.uv1_scale = Vector3(1.6, 1.6, 1.6)
+			m.material_override = sm
+		var base := String(m.name).get_slice("_", 0)
+		if base in skip or skip.any(func(k): return String(m.name).begins_with(k)):
+			continue
+		m.create_trimesh_collision()
+	for sb in kettle.find_children("*", "StaticBody3D", true, false):
+		(sb as StaticBody3D).collision_layer = 1
+	kettle_top = top
+	# a wide cobbled ground beyond the model's own street, so the edge is out of sight
+	var ground := StaticBody3D.new()
+	ground.collision_layer = 8
+	var gm := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1200, 1200)
+	gm.mesh = pm
+	gm.material_override = Mats.lit(Color(0.36, 0.35, 0.33))
+	gm.position.y = -0.16
+	ground.add_child(gm)
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(1200, 0.2, 1200)
+	cs.shape = bs
+	cs.position.y = -0.26
+	ground.add_child(cs)
+	add_child(ground)
+	# start on the pavement across from the café corner, looking at it
+	start_pos = Vector3(19.0, 1.0, 10.5)
+	var d := Vector3(7, 0, -5) - start_pos
+	start_yaw = atan2(-d.x, -d.z)
+	spire_best = start_pos.y
+
 
 func _build_brick_spire() -> void:
 	brick = BrickTower.new()

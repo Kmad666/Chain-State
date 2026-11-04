@@ -1,3 +1,4 @@
+import sys
 import glob, json, os, sys
 here = os.path.dirname(os.path.abspath(__file__))
 mode = sys.argv[1] if len(sys.argv) > 1 else "dev"
@@ -21,9 +22,20 @@ code = header + "\n".join(open(f).read() for f in sorted(glob.glob(os.path.join(
 tpl = open(os.path.join(here, "template.html")).read()
 if mode in ("dev", "site"):
     tpl = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>\n' + tpl + "\n</body></html>"
+if mode in ("prod", "site"):
+    # bundle three.js and the addons into one plain script, so the page loads nothing from outside
+    import subprocess
+    entry = os.path.join(here, "_entry.mjs"); open(entry, "w").write(code)
+    nm = os.path.join(here, "node_modules")   # npm install three@0.160.0 esbuild@0.24.0
+    subprocess.run([nm + "/.bin/esbuild", entry, "--bundle", "--minify", "--format=iife", "--outfile=" + os.path.join(here, "_bundle.js"),
+                    "--alias:three=" + nm + "/three/build/three.module.js", "--alias:three/addons=" + nm + "/three/examples/jsm",
+                    "--log-level=warning"], check=True)
+    bundle = open(os.path.join(here, "_bundle.js")).read().replace("</script", "<\\/script")
+    out = tpl.replace("{{IMPORTMAP}}", "").replace('<script type="module">\n{{CODE}}\n</script>', "<script>\n" + bundle + "\n</script>")
+    name = "index.html" if mode == "site" else ("kettenkiez.html" if "berlin" in here else "townhouse.html")
+    open(os.path.join(here, name), "w").write(out)
+    print(name, len(out)); sys.exit(0)
 out = tpl.replace("{{IMPORTMAP}}", '<script type="importmap">' + json.dumps({"imports": imap}) + "</script>").replace("{{CODE}}", code)
-# dev: index-dev.html against a local node_modules (npm install three@0.160.0)
-# site: index.html for the GitHub Pages copy; prod: the body-only page published as a Claude artifact
-name = {"dev": "index-dev.html", "site": "index.html"}.get(mode, "kettenkiez.html")
+name = "index.html" if mode == "dev" else "kettenkiez.html"
 open(os.path.join(here, name), "w").write(out)
 print(name, len(out))

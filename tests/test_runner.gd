@@ -18,13 +18,15 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick", "editor", "feel"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick", "editor", "feel", "kettle"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
 		elif OS.get_environment("ONLY") == "editor":
 			await _test_editor()
 		elif OS.get_environment("ONLY") == "feel":
 			await _test_feel()
+		elif OS.get_environment("ONLY") == "kettle":
+			await _test_kettle()
 		elif OS.get_environment("ONLY") == "brick":
 			await _test_brick()
 		elif OS.get_environment("ONLY") == "arm":
@@ -1136,6 +1138,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	Game.level = "range"
 	await _test_feel()
+	await _test_kettle()
 
 	print("== %s" % ("ALL PASSED" if fails == 0 else "%d FAILED" % fails))
 	get_tree().quit(1 if fails else 0)
@@ -2002,5 +2005,28 @@ func _test_feel() -> void:
 	check(p.tune.gravity == 13.0 and p.tune.elastic == 1.4 and p.top_speed() == 16.0, "feel: switching back to Bungee restores its numbers")
 	check(load("res://scripts/ui/perf_overlay.gd").budget_text().begins_with("budget"), "feel: F3 shows the frame budget")
 	w.queue_free()
+	await get_tree().process_frame
+	Game.level = "range"
+
+
+func _test_kettle() -> void:
+	print("== The Copper Kettle")
+	Game.level = "copper_kettle"
+	var kw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(kw)
+	for i in 60:
+		await get_tree().physics_frame
+	var kp = kw.player
+	var meshes: Array = kw.kettle.find_children("*", "MeshInstance3D", true, false) if kw.kettle else []
+	check(kw.kettle != null and meshes.size() > 30, "kettle: the townhouse model loads (%d meshes)" % meshes.size())
+	check(kp.is_on_floor() and kp.global_position.y < 3.0, "kettle: you start on the pavement")
+	check(kw.kettle_top > 20.0 and kw.kettle_top < 30.0, "kettle: about 21 m to the ridge, chimneys above (%.1f m)" % kw.kettle_top)
+	var space = kw.get_world_3d().direct_space_state
+	var roof: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(7, 60, -5), Vector3(7, 0, -5), 1))
+	check(not roof.is_empty() and roof.position.y > 20.0, "kettle: the roof is solid and grapple-able (%.1f m)" % (roof.position.y if not roof.is_empty() else -1.0))
+	var wall: Dictionary = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(3.8, 9.0, 20), Vector3(3.8, 9.0, -1), 1))
+	check(not wall.is_empty() and absf(wall.position.z) < 1.0, "kettle: the front wall is solid")
+	await shot("70_copper_kettle")
+	kw.queue_free()
 	await get_tree().process_frame
 	Game.level = "range"
