@@ -37,8 +37,8 @@ func _ready() -> void:
 	_unit.cone.radial_segments = 18
 	_unit.ball.radius = 0.5
 	_unit.ball.height = 1.0
-	_unit.ball.radial_segments = 16
-	_unit.ball.rings = 8
+	_unit.ball.radial_segments = 12      # half the triangles of 16 x 8; balls are trees,
+	_unit.ball.rings = 6                 # bushes and clouds, read from a distance
 	for k in ["prism", "cone", "pyramid"]:
 		_hull[k] = (_unit[k] as Mesh).create_convex_shape().points
 	build()
@@ -124,8 +124,15 @@ func flush() -> void:
 			var mi := MultiMeshInstance3D.new()
 			mi.multimesh = mm
 			mi.material_override = mat
+			if not casts_shadow(Color.html(bits[1])):
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			add_child(mi)
 	parts.clear()
+
+
+## Override to keep a colour out of the shadow pass (clouds, haze, far-off scenery).
+func casts_shadow(_col: Color) -> bool:
+	return true
 
 
 ## Override for a different look per colour.

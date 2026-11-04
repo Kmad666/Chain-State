@@ -323,6 +323,12 @@ func _knight() -> void:
 
 
 ## Materials: matte and saturated, white clouds lit by their own colour.
+## The cumulus is hundreds of big balls: drawing them into the shadow map cost more
+## than the rest of the level, and its shadow fell on open sea.
+func casts_shadow(col: Color) -> bool:
+	return col != CLOUD
+
+
 func material_for(col: Color) -> Material:
 	if _near(col, CLOUD):
 		var m := StandardMaterial3D.new()

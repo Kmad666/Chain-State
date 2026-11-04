@@ -202,6 +202,10 @@ func _build_environment() -> void:
 	sun = DirectionalLight3D.new()
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 150.0
+	# two cascades, not four: every shadow caster is drawn once per cascade, and four
+	# doubled the scene's triangles. The near one is sharp, the far one soft.
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_split_1 = 0.15
 	add_child(sun)
 
 	var saved := DEFAULT_SKY
