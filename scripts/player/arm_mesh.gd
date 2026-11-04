@@ -31,19 +31,19 @@ const FINGERS := [
 ## Joint bends (MCP, PIP, DIP), degrees: a hand at rest curls a little more toward
 ## the little finger; a fist folds the fingers flat against the palm.
 const RELAXED := [[16.0, 30.0, 16.0], [20.0, 34.0, 18.0], [24.0, 40.0, 20.0], [28.0, 46.0, 22.0]]
-const FIST := [[88.0, 104.0, 62.0], [90.0, 104.0, 62.0], [92.0, 104.0, 62.0], [94.0, 104.0, 62.0]]
+const FIST := [[84.0, 110.0, 74.0], [86.0, 110.0, 74.0], [88.0, 110.0, 74.0], [90.0, 110.0, 76.0]]
 
 ## Thumb joints (CMC, MCP, IP, tip) in each pose, and its radii along the way:
 ## a fat base (the thenar muscle) narrowing to the tip.
 const THUMB_RELAXED := [Vector3(-0.024, -0.009, -0.226), Vector3(-0.045, -0.022, -0.260),
 	Vector3(-0.050, -0.032, -0.289), Vector3(-0.046, -0.038, -0.314)]
-const THUMB_FIST := [Vector3(-0.024, -0.009, -0.226), Vector3(-0.049, -0.032, -0.262),
-	Vector3(-0.041, -0.058, -0.292), Vector3(-0.014, -0.066, -0.308)]
+const THUMB_FIST := [Vector3(-0.024, -0.009, -0.226), Vector3(-0.050, -0.032, -0.282),
+	Vector3(-0.040, -0.050, -0.318), Vector3(-0.012, -0.052, -0.332)]
 const THUMB_R := [0.0175, 0.0128, 0.0117, 0.0106]
 
 ## Where the chain leaves the hand in each pose (between thumb and index).
 const CHAIN_RELAXED := Vector3(-0.024, -0.030, -0.330)
-const CHAIN_FIST := Vector3(-0.028, -0.050, -0.334)
+const CHAIN_FIST := Vector3(-0.022, -0.036, -0.326)
 
 
 class Surf:
@@ -53,6 +53,7 @@ class Surf:
 
 var surfs: Array = []
 var inside := false              # the next loft is seen from within (the lining)
+var folds := 0.0                 # cloth drape on the next loft: fold depth in metres at its start
 
 
 static func build() -> ArrayMesh:
@@ -86,13 +87,16 @@ func _build() -> ArrayMesh:
 ## open end turned in to a dark lining.
 func _sleeve() -> void:
 	var rows := []
-	for i in 9:
-		var t := i / 8.0
+	for i in 25:
+		var t := i / 24.0
 		var z := lerpf(0.30, SLEEVE_END, t)
-		var rx := lerpf(0.068, 0.0490, t)
-		var ry := lerpf(0.063, 0.0455, t)
-		rows.append([Vector3(0.0, -0.004 * t, z), rx, ry, ry, 2.0])
+		var rx := lerpf(0.066, 0.0450, t)
+		var ry := lerpf(0.061, 0.0420, t)
+		# the cloth hangs: the sleeve's underside sags a little more toward the cuff
+		rows.append([Vector3(0.0, -0.004 * t, z), rx, ry, ry * (1.0 + 0.06 * t), 2.0])
+	folds = 0.0035
 	_loft(WOOL, rows, rows, Vector3.UP, true, false)
+	folds = 0.0
 	# the turned-in edge, then the lining back inside
 	var end: Array = rows[-1]
 	var lip := [
@@ -113,9 +117,9 @@ func _sleeve() -> void:
 func _shirt() -> void:
 	var rows := []
 	for z in [-0.17, CUFF_END]:
-		rows.append([Vector3(0.0, -0.005, z), 0.0425, 0.0385, 0.0385, 2.4])
-	rows.append([Vector3(0.0, -0.005, CUFF_END - 0.0012), 0.0405, 0.0365, 0.0365, 2.4])
-	rows.append([Vector3(0.0, -0.005, CUFF_END + 0.004), 0.036, 0.031, 0.031, 2.4])
+		rows.append([Vector3(0.0, -0.005, z), 0.0395, 0.0355, 0.0365, 2.4])
+	rows.append([Vector3(0.0, -0.005, CUFF_END - 0.0012), 0.0378, 0.0338, 0.0348, 2.4])
+	rows.append([Vector3(0.0, -0.005, CUFF_END + 0.004), 0.034, 0.029, 0.030, 2.4])
 	_loft(SHIRT, rows, rows, Vector3.UP, false, false)
 
 
@@ -133,7 +137,16 @@ func _glove() -> void:
 		[Vector3(0.000, 0.001, -0.300), 0.0450, 0.0140, 0.0150, 2.8],
 		[Vector3(0.000, 0.001, -0.310), 0.0425, 0.0120, 0.0125, 2.6],
 	]
-	_loft(LEATHER, rows, rows, Vector3.UP, false, true)
+	# clenched, the palm's muscles bunch and its heel fills out under the fingers
+	var fist := []
+	for r in rows:
+		var q: Array = r.duplicate()
+		var z: float = (r[0] as Vector3).z
+		var bunch := smoothstep(-0.225, -0.26, z)
+		q[3] = r[3] * (1.0 + 0.32 * bunch)
+		q[1] = r[1] * (1.0 - 0.04 * bunch)
+		fist.append(q)
+	_loft(LEATHER, rows, fist, Vector3.UP, false, true)
 
 
 ## One finger: a single tube from inside the palm through its three joints to a
@@ -171,7 +184,9 @@ func _finger(f: int) -> void:
 				r *= 1.0 + 0.07 * exp(-pow((s - joints[j]) / 0.006, 2.0))
 			if s < 0.0:
 				r *= lerpf(1.0, 0.92, -s / back)
-			rows.append([p, r * 1.06, r * 0.90, r * 0.98, 2.15, up])
+			# flatter over the back, fuller over the pad, flattest toward the tip
+			var tipward := smoothstep(total * 0.7, total, s)
+			rows.append([p, r * 1.07, r * lerpf(0.86, 0.74, tipward), r * 1.0, lerpf(2.2, 2.5, tipward), up])
 		poses.append(rows)
 	_loft_up(LEATHER, poses[0], poses[1], false, true)
 
@@ -212,8 +227,8 @@ func _buttons() -> void:
 	for k in 4:
 		var z := -0.188 + k * 0.0135
 		var t := inverse_lerp(0.30, SLEEVE_END, z)
-		var rx := lerpf(0.068, 0.0490, t)
-		var ry := lerpf(0.063, 0.0455, t)
+		var rx := lerpf(0.066, 0.0450, t)
+		var ry := lerpf(0.061, 0.0420, t)
 		var a := deg_to_rad(-28.0)
 		var c := Vector3(cos(a) * rx, -0.004 * t + sin(a) * ry, z)
 		var normal := Vector3(cos(a) / rx, sin(a) / ry, 0).normalized()
@@ -272,7 +287,10 @@ func _loft_up(surf: int, pose_a: Array, pose_b: Array, cap_start: bool, cap_end:
 				var n: float = r[4]
 				var x: float = signf(c) * pow(absf(c), 2.0 / n) * r[1]
 				var y: float = signf(sn) * pow(absf(sn), 2.0 / n) * (r[2] if sn > 0.0 else r[3])
-				s.v[pose].append(r[0] + side * x + up * y)
+				var off := side * x + up * y
+				if folds > 0.0:
+					off += off.normalized() * _fold(ang, (r[0] as Vector3).z, i / float(all.size() - 1))
+				s.v[pose].append(r[0] + off)
 	# faces, wound so they face outward (checked on the first quad)
 	# (tested on a ring halfway along: the rings of a domed cap are too small to trust)
 	var flip := false
@@ -298,6 +316,16 @@ func _loft_up(surf: int, pose_a: Array, pose_b: Array, cap_start: bool, cap_end:
 				s.idx.append_array([a, b, c, b, d, c])
 			else:
 				s.idx.append_array([a, c, b, b, c, d])
+
+
+## Wool drape: long soft folds running down the sleeve, deeper at the elbow, with
+## a few shallow rings where the sleeve gathers above the cuff.
+func _fold(ang: float, z: float, along: float) -> float:
+	var deep := folds * lerpf(1.0, 0.3, along)
+	var f := deep * (0.55 * sin(3.0 * ang + z * 9.0) + 0.3 * sin(5.0 * ang - z * 14.0 + 1.3) + 0.15 * sin(8.0 * ang + 2.1))
+	var gather := smoothstep(-0.09, -0.15, z) * smoothstep(-0.205, -0.185, z)
+	f += folds * 0.35 * gather * sin(z * 260.0) * (0.6 + 0.4 * sin(2.0 * ang))
+	return f
 
 
 ## Rings closing a tube end in a dome (dir 1 = past the last row, -1 = before the first).

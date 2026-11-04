@@ -19,7 +19,7 @@ const SHIRT := Color(0.86, 0.86, 0.84)            # white cotton
 const LEATHER := Color(0.035, 0.032, 0.035)       # black glove leather
 const HORN := Color(0.03, 0.028, 0.03)            # cuff buttons
 
-const REST_POS := Vector3(0.24, -0.27, -0.10)     # elbow pivot, camera space
+const REST_POS := Vector3(0.23, -0.25, -0.05)     # elbow pivot, camera space
 const REST_DIR := Vector3(-0.16, 0.10, -1.0)      # forearm points a little in and up
 const WRIST_Z := ArmMesh.WRIST_Z                  # pivot-local, along -Z
 
