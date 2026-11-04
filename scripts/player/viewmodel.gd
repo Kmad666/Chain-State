@@ -21,6 +21,9 @@ const HORN := Color(0.03, 0.028, 0.03)            # cuff buttons
 const MODEL := "res://assets/models/arm/arm.glb"
 const REST_POS := Vector3(0.21, -0.215, -0.08)     # elbow pivot, camera space
 const REST_DIR := Vector3(-0.16, 0.12, -1.0)      # forearm points a little in and up
+## A touch of turn past facing the eye square on, so the knuckles' edge still
+## shows and the fist reads as a fist (radians, about the forearm).
+const FACE_ROLL := 0.25
 const WRIST_Z := -0.215                           # pivot-local, along -Z
 ## Where the chain runs out of the fist: the thumb side of the tunnel the fingers
 ## close round (arm space).
@@ -93,8 +96,12 @@ func _apply(walk: float) -> void:
 	p += Vector3(-0.03, 0.10, -0.02) * _reach              # raise to hold the chain
 	p.y -= 0.035 * _land
 	pivot.position = p
-	var up := Vector3.UP if absf(_dir.y) < 0.95 else Vector3.BACK
-	pivot.basis = Basis.looking_at(_dir, up).rotated(_dir, -0.35 * (1.0 - _reach))  # knuckles tilt in at rest
+	# roll the forearm so the palm side of the fist, its curled fingers and the
+	# thumb across them, faces the camera (the arm's -Y toward the eye)
+	var to_eye := -p.normalized()
+	var palm := to_eye - _dir * to_eye.dot(_dir)
+	var up := -palm.normalized() if palm.length_squared() > 0.0001 else Vector3.UP
+	pivot.basis = Basis.looking_at(_dir, up).rotated(_dir, FACE_ROLL)
 
 
 ## Give the model's parts their materials (by mesh name) and keep the arm out of
