@@ -1688,9 +1688,18 @@ const BRICK_SINK := 30.0              # how deep the tower's foot stands in the 
 const KETTLE_GLB := "res://assets/models/townhouse/copper_kettle.glb"
 var kettle_top := 0.0
 
+const KETTLE_BAKED := "res://levels/baked/copper_kettle.tscn"
+
 func _build_copper_kettle() -> void:
-	kettle = (load(KETTLE_GLB) as PackedScene).instantiate()
-	add_child(kettle)
+	if ResourceLoader.exists(KETTLE_BAKED):
+		# the lightmapped house (tools/bake.sh): shadows and bounce light are baked in
+		var baked: Node3D = (load(KETTLE_BAKED) as PackedScene).instantiate()
+		add_child(baked)
+		_use_baked_light(baked)
+		kettle = baked.get_node("House")
+	else:
+		kettle = (load(KETTLE_GLB) as PackedScene).instantiate()
+		add_child(kettle)
 	var skip := ["ivy", "curtain", "glass", "glassLit", "glassLit2", "shopGlassWarm", "lightPool", "awningGreenPlain", "flowersRed", "flowersPink", "leavesBox"]
 	# thin, see-through or flat-on-the-wall pieces: their shadows are invisible or noise,
 	# and alpha-tested cards (ivy, leaves, flowers) are the dearest things to shadow
@@ -1749,6 +1758,16 @@ func _build_copper_kettle() -> void:
 	var d := Vector3(7, 0, -5) - start_pos
 	start_yaw = atan2(-d.x, -d.z)
 	spire_best = start_pos.y
+
+
+## A baked level: its lightmap carries the sun, the shadows and the sky's bounce, so
+## the live sun drops its real-time shadows and lights only what moves (you, the
+## chain, NPCs). The sun used for the bake stays out of the live scene.
+func _use_baked_light(baked: Node) -> void:
+	for l in baked.find_children("*", "DirectionalLight3D", true, false):
+		l.queue_free()
+	sun.shadow_enabled = false
+	sun.light_bake_mode = Light3D.BAKE_STATIC     # skipped on lightmapped surfaces, so they aren't lit twice
 
 
 func _build_brick_spire() -> void:
