@@ -14,6 +14,7 @@ Everything made for Chain State that isn't the game itself (the Kenney assets li
 | (not stored) | The White Citadel's reference is by snowskadi: http://snowskadi.deviantart.com/. It's the artist's watermarked work, so it's credited here rather than copied into this public repo. |
 | [Nation Layout Map](https://claude.ai/artifact/XxhFxT5Y1vTrvmZWF8di9T) | The live, editable top-down map of the Nation draft. It edits the same layout as `data/nation_layout.json`: ask Claude to apply it. |
 | `models/brick_spire/` | **The Brick Spire as a Blender model:** `.blend`, `.glb` and a preview render, exported from the game. |
+| `berlin/` | **Kettenkiez**, a walkable three.js study of a Berlin Gründerzeit crossroads (Prenzlauer Berg style), with its generator source. See `berlin/README.md`. |
 | `level-grid/chain-state-level-grid.xlsx` | **The level-grid template**: 41 × 41 squares at 10 m each, with a legend, an example and a details sheet. |
 
 These are snapshots. The live, editable originals are in Claude:
