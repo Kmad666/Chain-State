@@ -1,0 +1,93 @@
+<title>Copper Kettle Townhouse</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Libre+Caslon+Text:ital@0;1&display=swap">
+<style>
+/* Layout: the district fills the window; one folding control plate floats top-left, styled after a Berlin enamel street sign. */
+:root {
+  color-scheme: dark;
+  --ink: #f1eee6;          /* enamel white */
+  --plate: rgba(18, 22, 20, 0.82);
+  --rule: rgba(241, 238, 230, 0.18);
+  --muted: #b9b4a8;
+  --accent: #e6c97a;       /* lantern gold */
+  --chip: rgba(241, 238, 230, 0.08);
+  --din: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
+  --serif: "Libre Caslon Text", Georgia, serif;
+}
+html, body { height: 100%; }
+body { margin: 0; background: #1a1f24; color: var(--ink); font-family: var(--din); overflow: hidden; }
+[hidden] { display: none !important; }
+#view { position: fixed; inset: 0; }
+#view canvas { display: block; touch-action: none; }
+
+.panel { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px));
+  width: min(340px, calc(100vw - 32px)); background: var(--plate); border: 1px solid var(--rule); border-radius: 10px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.sign { margin: 12px 12px 10px; background: #f4f2ec; color: #111; border: 3px solid #111; outline: 2px solid #f4f2ec;
+  border-radius: 4px; padding: 6px 12px 7px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.sign b { font-weight: 700; font-size: 26px; letter-spacing: .01em; line-height: 1; }
+.sign small { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.body { padding: 0 14px 14px; display: grid; gap: 12px; }
+.panel.folded .body { display: none; }
+.lede { font-family: var(--serif); font-style: italic; font-size: 13.5px; line-height: 1.45; color: var(--muted); margin: 0; }
+h2 { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font: 500 14px var(--din); color: var(--ink); background: var(--chip); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
+.row { display: flex; align-items: center; gap: 10px; }
+input[type=range] { flex: 1; accent-color: #e6c97a; }
+output { font: 600 16px var(--din); font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; color: var(--accent); }
+label.tog { display: flex; align-items: center; gap: 8px; font-size: 14.5px; cursor: pointer; }
+input[type=checkbox] { accent-color: #e6c97a; width: 16px; height: 16px; }
+.btn { font: 600 14px var(--din); background: transparent; color: var(--ink); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.note { font-size: 13px; color: var(--muted); min-height: 1em; }
+.foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#panelToggle { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 6px; background: #111; color: #f4f2ec; border: 0; cursor: pointer; font: 700 16px var(--din); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--plate); border: 1px solid var(--rule); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--ink);
+  max-width: calc(100vw - 32px); text-align: center; pointer-events: none; }
+
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1a1f24; z-index: 5; }
+.load { width: min(360px, calc(100vw - 48px)); display: grid; gap: 10px; }
+.load .sign { margin: 0; }
+.track { height: 4px; background: rgba(255,255,255,.12); border-radius: 4px; overflow: hidden; }
+#loadBar { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#loadStatus { font-size: 14px; color: var(--muted); }
+@media (max-width: 520px) { .sign b { font-size: 21px; } .panel.folded { width: auto; } }
+@media (prefers-reduced-motion: reduce) { #loadBar { transition: none; } }
+</style>
+
+<div id="view"></div>
+
+<div id="loading">
+  <div class="load">
+    <div class="sign"><b>The Copper Kettle</b><small>Townhouse</small></div>
+    <div class="track"><div id="loadBar"></div></div>
+    <div id="loadStatus">Cutting the limestone…</div>
+  </div>
+</div>
+
+<section class="panel" id="panel" aria-label="Townhouse controls">
+  <div class="sign"><b>Copper Kettle</b><small>5 storeys + attic</small></div>
+  <button id="panelToggle" aria-expanded="true" aria-controls="panel" title="Fold the panel">–</button>
+  <div class="body">
+    <p class="lede">A limestone townhouse built from a design sheet: 14&nbsp;×&nbsp;10&nbsp;m, 21&nbsp;m tall, a tea room behind a green shopfront, flats above, a slate mansard with stone dormers.</p>
+    <div><h2>View</h2><div class="chips" id="views"></div></div>
+    <div>
+      <h2>Time of day</h2>
+      <div class="row"><input id="hour" type="range" min="6" max="21.5" step="0.25" aria-label="Time of day"><output id="hourOut">15:30</output></div>
+    </div>
+    <div class="row"><label class="tog"><input type="checkbox" id="aoToggle" checked> Ambient occlusion</label></div>
+    <div class="foot"><span>Front, Right, Rear, Left and Roof plan are true elevations</span></div>
+  </div>
+</section>
+
+{{IMPORTMAP}}
+<script type="module">
+{{CODE}}
+</script>
