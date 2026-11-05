@@ -12,6 +12,11 @@ uniform vec3 env_top : source_color = vec3(0.55, 0.72, 0.94);
 uniform vec3 env_horizon : source_color = vec3(0.69, 0.77, 0.95);
 uniform vec3 env_ground : source_color = vec3(0.10, 0.11, 0.09);
 uniform float strength = 1.0;
+// steel rather than mirror silver: how much of the sky's colour to drain out, a
+// floor of light so the shadowed side never goes black, and how broad the shine is
+uniform float desat = 0.35;
+uniform float lift = 0.0;
+uniform float rough = 0.06;
 
 void fragment() {
 	vec3 n = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
@@ -23,11 +28,12 @@ void fragment() {
 	vec3 env = y > 0.0 ? sky : ground;
 	env += env_horizon * 0.6 * exp(-abs(y) * 60.0);           // bright horizon line
 	float lum = dot(env, vec3(0.299, 0.587, 0.114));
-	env = mix(env, vec3(lum), 0.35);                          // silver, not tinted glass
+	env = mix(env, vec3(lum), desat);                         // silver, not tinted glass
+	env = env * (1.0 - lift) + vec3(lift);
 	float fres = 0.65 + 0.35 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0);
 	ALBEDO = tint * 0.3;   // keep the renderer's own sky reflection low so it doesn't wash out
 	METALLIC = 1.0;
-	ROUGHNESS = 0.06;
+	ROUGHNESS = rough;
 	SPECULAR = 1.0;
 	EMISSION = env * tint * fres * strength;
 }

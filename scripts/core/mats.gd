@@ -39,6 +39,21 @@ static func polished(color: Color) -> ShaderMaterial:
 	return _cache[key]
 
 
+## Worked steel (the chain): the polished shader made grey and a little satin,
+## so it reads as steel under any sky instead of taking on the sky's colour.
+static func steel() -> ShaderMaterial:
+	var key := "P_steel"
+	if not _cache.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = preload("res://shaders/chrome.gdshader")
+		m.set_shader_parameter("tint", Color(0.80, 0.81, 0.83))
+		m.set_shader_parameter("desat", 0.85)
+		m.set_shader_parameter("lift", 0.16)
+		m.set_shader_parameter("rough", 0.22)
+		_cache[key] = m
+	return _cache[key]
+
+
 ## Point every polished material's fake reflections at the current sky.
 static func set_chrome_env(top: Color, horizon: Color, ground: Color, strength := 1.0) -> void:
 	for k in _cache:

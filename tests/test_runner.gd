@@ -1600,6 +1600,13 @@ func _test_arm() -> void:
 		var g: Mesh = parts.glove.mesh
 		check(g.get_surface_count() == 1 and parts.glove.material_override != null,
 			"arm: the glove is one seamless surface, dressed in leather")
+	check(not vm.shown(), "arm: out of view while the chain is stowed")
+	var coil: MultiMesh = vm.coil.multimesh
+	var turns_ok := coil.instance_count > 50
+	var spread := 0.0
+	for i in coil.instance_count:
+		spread = maxf(spread, coil.get_instance_transform(i).origin.distance_to(Vector3(0, 0, -0.12)))
+	check(turns_ok and spread < 0.6, "arm: the chain is wound round the forearm (%d links in the coil)" % coil.instance_count)
 	var wrist: Vector3 = vm.pivot.to_global(Vector3(0, 0, vm.WRIST_Z))
 	var ch = ap.chain
 	check(ch._mm.visible_instance_count == 0 and ch.arrow.global_position.distance_to(vm.fist_point()) < ch.ARROW_LEN,
@@ -1607,7 +1614,7 @@ func _test_arm() -> void:
 	# fire it 12 m out: the links spool out of the fist behind the arrowhead
 	var out_tip: Vector3 = vm.fist_point() + vm.forward() * 12.0
 	ch.update(0.016, ch.FLYING, out_tip)
-	var n_out: int = ch._mm.visible_instance_count
+	var n_out: int = ch.link_count()
 	var first: Vector3 = ch.first_link.origin
 	var last_x: Transform3D = ch.last_link
 	check(n_out > 150 and first.distance_to(out_tip) < 0.5 and last_x.origin.distance_to(vm.fist_point()) < 0.1,
@@ -1615,7 +1622,7 @@ func _test_arm() -> void:
 	check(last_x.basis.get_scale().x < 0.9, "chain: the last links shrink as they slip into the glove")
 	# reeling in: half as far out, fewer links, laid from the arrow end
 	ch.update(0.016, ch.RETURNING, vm.fist_point() + vm.forward() * 6.0)
-	check(ch._mm.visible_instance_count < n_out * 0.6, "chain: reeling in, the links disappear into the hand (%d left)" % ch._mm.visible_instance_count)
+	check(ch.link_count() < n_out * 0.6, "chain: reeling in, the links disappear into the hand (%d left)" % ch.link_count())
 	ch.update(0.016, ch.STOWED, Vector3.ZERO)
 	check((vm.fist_point() - wrist).dot(vm.forward()) > 0.06, "arm: the fist is ahead of the wrist, where the arrowhead rests")
 	ap.cam.fov = 70.0
@@ -1630,6 +1637,7 @@ func _test_arm() -> void:
 	ap.try_grapple()
 	for i in 5:
 		await get_tree().physics_frame
+	check(vm.shown(), "arm: up in view as soon as the chain is fired")
 	await shot("59_chain_out")
 	for i in 60:
 		await get_tree().physics_frame
@@ -1640,6 +1648,10 @@ func _test_arm() -> void:
 	await shot("60_chain_reeling")
 	for i in 240:
 		await get_tree().physics_frame
+	check(not vm.shown(), "arm: away again once the chain is stowed")
+	vm.always_show = true
+	for i in 20:
+		await get_tree().process_frame
 	# a close look from the side, with a second camera beside the arm
 	var c := Camera3D.new()
 	c.near = 0.005

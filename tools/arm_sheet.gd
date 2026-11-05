@@ -38,6 +38,7 @@ func _ready() -> void:
 	var arm: Node3D = load("res://assets/models/arm/arm.glb").instantiate()
 	rig.add_child(arm)
 	vm.dress(arm)
+	rig.add_child(Viewmodel.build_coil())
 
 	var cam := Camera3D.new()
 	add_child(cam)

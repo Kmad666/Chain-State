@@ -5,21 +5,27 @@ extends Node3D
 ## in, each link slipping into the hand until only the point is left.
 ##
 ## The player owns the hook's position and state (it matters for physics);
-## this node only draws it. Links are one MultiMesh: one draw call however long.
+## this node only draws it. The links (chain_links.gd) are two MultiMeshes, a
+## draw call each however long: real links for the first few metres out of the
+## fist, coarse runs of four beyond, where a link is only a few pixels.
 
 enum { STOWED, FLYING, HOOKED, RETURNING }
 
 const SILVER := Color(0.80, 0.83, 0.90)
 const SILVER_BRIGHT := Color(0.93, 0.95, 1.0)
-const LINK_SPACING := 0.06
-const MAX_LINKS := 900
+const LINK_SPACING := ChainLinks.PITCH
+const NEAR := 3.0              # metres of chain out of the fist drawn link by link
+const MAX_LINKS := int(NEAR / ChainLinks.PITCH) + 4
+const MAX_RUNS := int(130.0 / (ChainLinks.PITCH * ChainLinks.RUN)) + 2
 const ARROW_LEN := 0.20        # tip to the ring the chain hangs from (first-person scale)
 const STOW_SHOW := 0.85       # how much of the arrowhead shows out of the fist at rest (its tail stays inside)
 const SLIP := 0.05             # links shrink into the hand over this last stretch
 
 var viewmodel: Node3D
-var _mm: MultiMesh
+var _mm: MultiMesh              # the near links
 var _links: MultiMeshInstance3D
+var _far: MultiMesh             # the runs of four beyond
+var _far_links: MultiMeshInstance3D
 var arrow: Node3D
 var _t := 0.0
 var _tension := 0.0            # 0 = slack, 1 = pulled taut
@@ -33,15 +39,26 @@ func _ready() -> void:
 
 	_mm = MultiMesh.new()
 	_mm.transform_format = MultiMesh.TRANSFORM_3D
-	_mm.mesh = _link_mesh()
+	_mm.mesh = ChainLinks.link_mesh()
 	_mm.instance_count = MAX_LINKS
 	_mm.visible_instance_count = 0
 	_links = MultiMeshInstance3D.new()
 	_links.multimesh = _mm
-	_links.material_override = Mats.polished(SILVER)
+	_links.material_override = Mats.steel()
 	_links.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_links.custom_aabb = AABB(Vector3(-5000, -5000, -5000), Vector3(10000, 10000, 10000))
 	add_child(_links)
+	_far = MultiMesh.new()
+	_far.transform_format = MultiMesh.TRANSFORM_3D
+	_far.mesh = ChainLinks.run_mesh()
+	_far.instance_count = MAX_RUNS
+	_far.visible_instance_count = 0
+	_far_links = MultiMeshInstance3D.new()
+	_far_links.multimesh = _far
+	_far_links.material_override = Mats.steel()
+	_far_links.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_far_links.custom_aabb = _links.custom_aabb
+	add_child(_far_links)
 
 	arrow = Node3D.new()
 	add_child(arrow)
@@ -83,8 +100,10 @@ func update(dt: float, state: int, tip: Vector3, _aim_dir := Vector3.ZERO) -> vo
 	# are laid from the arrow end, so they ride out with the arrowhead and vanish
 	# into the hand as it reels in
 	var pts := PackedVector3Array()
+	arrow.visible = state != STOWED and viewmodel.shown()   # put away with the arm
 	if state == STOWED:
 		_mm.visible_instance_count = 0          # all of it is inside the hand
+		_far.visible_instance_count = 0
 		return
 	# a ripple runs along it while it flies or recoils, and it sags a touch when slack
 	var seg := tail - fist
@@ -108,9 +127,16 @@ func update(dt: float, state: int, tip: Vector3, _aim_dir := Vector3.ZERO) -> vo
 
 
 func _place_links(pts: PackedVector3Array, fist: Vector3) -> void:
+	# laid from the arrow end, so the links ride out with the arrowhead
+	var total := 0.0
+	for k in pts.size() - 1:
+		total += pts[k].distance_to(pts[k + 1])
 	var n := 0
+	var runs := 0
+	var run_end := -1               # the last link the latest run covers
 	var carried := 0.0
 	var next_at := 0.0
+	var i := 0
 	for k in pts.size() - 1:
 		var a := pts[k]
 		var b := pts[k + 1]
@@ -121,45 +147,43 @@ func _place_links(pts: PackedVector3Array, fist: Vector3) -> void:
 		var helper := Vector3.UP if absf(z.y) < 0.95 else Vector3.RIGHT
 		var x0 := helper.cross(z).normalized()
 		var y0 := z.cross(x0)
-		while next_at <= carried + seg_len and n < MAX_LINKS:
+		while next_at <= carried + seg_len:
 			var p := a + z * (next_at - carried)
-			# every other link turned 90 degrees, like a real chain
-			var basis := Basis(x0, y0, z) if n % 2 == 0 else Basis(y0, -x0, z)
-			# the last few centimetres before the fist, each link shrinks as it slips into the glove
-			var into := clampf(p.distance_to(fist) / SLIP, 0.0, 1.0)
-			if into < 1.0:
-				basis = basis.scaled(Vector3.ONE * maxf(into, 0.05))
-			var xf := Transform3D(basis, p)
-			_mm.set_instance_transform(n, xf)
-			if n == 0:
-				first_link = xf
-			last_link = xf
-			n += 1
+			var left := total - next_at                   # chain still to go to the fist
+			if i > run_end and i % ChainLinks.RUN == 0 and left > NEAR + LINK_SPACING * (ChainLinks.RUN - 1) and runs < MAX_RUNS:
+				# far off: a run of four in one, pointing back along the chain to the fist
+				var rx := Transform3D(Basis(x0, y0, z), p)
+				_far.set_instance_transform(runs, rx)
+				if n == 0 and runs == 0:
+					first_link = rx
+				runs += 1
+				run_end = i + ChainLinks.RUN - 1
+			elif i > run_end and n < MAX_LINKS:
+				# every other link turned 90 degrees, like a real chain
+				var basis := Basis(x0, y0, z) if i % 2 == 0 else Basis(y0, -x0, z)
+				# the last few centimetres before the fist, each link shrinks as it slips into the glove
+				var into := clampf(p.distance_to(fist) / SLIP, 0.0, 1.0)
+				if into < 1.0:
+					basis = basis.scaled(Vector3.ONE * maxf(into, 0.05))
+				var xf := Transform3D(basis, p)
+				_mm.set_instance_transform(n, xf)
+				if n == 0 and runs == 0:
+					first_link = xf
+				last_link = xf
+				n += 1
+			i += 1
 			next_at += LINK_SPACING
 		carried += seg_len
 	_mm.visible_instance_count = n
+	_far.visible_instance_count = runs
+
+
+## How many links are out (near ones, plus four for every far run).
+func link_count() -> int:
+	return _mm.visible_instance_count + _far.visible_instance_count * ChainLinks.RUN
 
 
 # ------------------------------------------------------------ meshes
-## A fine oval chain link, long along Z, made of 8 bars.
-static func _link_mesh() -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var a := 0.040     # half length
-	var b := 0.022     # half width
-	var w := 0.011     # wire thickness
-	for i in 8:
-		var t0 := TAU * i / 8.0
-		var t1 := TAU * (i + 1) / 8.0
-		var p0 := Vector3(cos(t0) * b, 0, sin(t0) * a)
-		var p1 := Vector3(cos(t1) * b, 0, sin(t1) * a)
-		var d := p1 - p0
-		var bar := BoxMesh.new()
-		bar.size = Vector3(w, w, d.length() + w * 0.5)
-		st.append_from(bar, 0, Transform3D(Basis.looking_at(d.normalized(), Vector3.UP), (p0 + p1) * 0.5))
-	return st.commit()
-
-
 ## Slim diamond arrowhead. Tip at the origin pointing -Z; the body trails back
 ## along +Z to a small ring at +ARROW_LEN where the chain attaches.
 static func _arrow_mesh() -> ArrayMesh:
