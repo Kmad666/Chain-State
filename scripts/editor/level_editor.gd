@@ -220,7 +220,7 @@ func add_piece(type: String, sub := "") -> Dictionary:
 	var p := CL.make_piece(type, sub, at, _new_id())
 	# rest things on the surface they're dropped on
 	match type:
-		"shape":
+		"shape", "prop":
 			var size := CL.v3(p.size)
 			p.pos = CL.arr(at + Vector3(0, size.y * 0.5, 0))
 		"anchor":
@@ -291,7 +291,7 @@ func turn_selected(deg: float) -> void:
 	var p := piece(sel)
 	if p.is_empty():
 		return
-	if p.type == "shape":
+	if p.type in ["shape", "prop"]:
 		var r := CL.v3(p.rot)
 		r.y = fposmod(r.y + deg, 360.0)
 		set_fields({"rot": CL.arr(r)})
@@ -308,6 +308,8 @@ func _label(p: Dictionary) -> String:
 	match String(p.get("type", "")):
 		"shape":
 			return String(p.get("shape", "shape")).capitalize()
+		"prop":
+			return String(CL.props().get(String(p.get("prop", "")), {}).get("label", "Prop"))
 		"enemy":
 			return String(p.get("enemy", "enemy")).capitalize()
 		"anchor":
@@ -497,7 +499,7 @@ func grips() -> Array:
 		return []
 	var out: Array = []
 	match String(p.type):
-		"shape":
+		"shape", "prop":
 			var size := CL.v3(p.size)
 			var b: Basis = nodes[sel].global_basis.orthonormalized()
 			var c: Vector3 = nodes[sel].global_position
@@ -784,14 +786,21 @@ func _build_ui() -> void:
 	left.offset_top = 52
 	left.offset_right = 170
 	left.offset_bottom = -34
+	var pal_scroll := ScrollContainer.new()
+	pal_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	left.add_child(pal_scroll)
 	var pal := VBoxContainer.new()
+	pal.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pal.add_theme_constant_override("separation", 3)
-	left.add_child(pal)
+	pal_scroll.add_child(pal)
 	pal.add_child(_tag("TERRAIN"))
 	pal.add_child(_btn("Island", func(): add_piece("island")))
 	pal.add_child(_tag("SHAPES"))
 	for s in CL.SHAPES:
 		pal.add_child(_btn(String(s).capitalize(), func(): add_piece("shape", s)))
+	pal.add_child(_tag("ROMAN"))
+	for k in CL.props():
+		pal.add_child(_btn(String(CL.props()[k].label).trim_suffix(" column"), func(): add_piece("prop", k)))
 	pal.add_child(_tag("GRAPPLE"))
 	pal.add_child(_btn("Anchor", func(): add_piece("anchor", "")))
 	pal.add_child(_btn("Free anchor", func(): add_piece("anchor", "free")))
@@ -901,6 +910,28 @@ func _refresh_inspector() -> void:
 			cp.custom_minimum_size = Vector2(80, 28)
 			cp.popup_closed.connect(func(): set_fields({"color": "#" + cp.color.to_html(false)}))
 			_row("Colour", cp)
+		"prop":
+			var info: Dictionary = CL.props().get(String(p.prop), {})
+			_vec_row("Size (m)", CL.v3(p.size), func(v): set_fields({"size": CL.arr(v)}))
+			var natural: Array = info.get("size", p.size)
+			var scale_row := HBoxContainer.new()
+			scale_row.add_child(_btn("Natural size", func(): set_fields({"size": natural})))
+			scale_row.add_child(_btn("Scale ×1.5", func(): set_fields({"size": CL.arr(CL.v3(p.size) * 1.5)})))
+			scale_row.add_child(_btn("×0.67", func(): set_fields({"size": CL.arr(CL.v3(p.size) / 1.5)})))
+			inspector.add_child(scale_row)
+			_vec_row("Rotation (pitch, yaw, roll)", CL.v3(p.rot), func(v): set_fields({"rot": CL.arr(v)}))
+			var opt := OptionButton.new()
+			var keys: Array = CL.props().keys()
+			for k in keys:
+				opt.add_item(String(CL.props()[k].label))
+			opt.selected = keys.find(String(p.prop))
+			opt.item_selected.connect(func(i): set_fields({"prop": keys[i], "size": CL.props()[keys[i]].size}))
+			_row("Piece", opt)
+			var cp := ColorPickerButton.new()
+			cp.color = Color.html(String(p.get("color", "#f2ede4")))
+			cp.custom_minimum_size = Vector2(80, 28)
+			cp.popup_closed.connect(func(): set_fields({"color": "#" + cp.color.to_html(false)}))
+			_row("Stone tint", cp)
 		"anchor":
 			_check_row("Free (costs no air grapple)", bool(p.get("free", false)), func(v): set_fields({"free": v}))
 		"start":

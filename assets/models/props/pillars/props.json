@@ -1,0 +1,233 @@
+{
+ "tuscan": {
+  "label": "Tuscan column",
+  "file": "res://assets/models/props/pillars/tuscan.glb",
+  "size": [
+   1.197,
+   6.21,
+   1.197
+  ],
+  "collide": [
+   {
+    "box": [
+     1.197,
+     0.225,
+     1.197
+    ],
+    "at": [
+     0.0,
+     -2.9925,
+     0.0
+    ]
+   },
+   {
+    "cyl": 0.45,
+    "height": 5.625,
+    "at": [
+     0.0,
+     -0.0675,
+     0.0
+    ]
+   },
+   {
+    "box": [
+     0.9,
+     0.36,
+     0.9
+    ],
+    "at": [
+     0.0,
+     2.925,
+     0.0
+    ]
+   }
+  ]
+ },
+ "doric": {
+  "label": "Doric column",
+  "file": "res://assets/models/props/pillars/doric.glb",
+  "size": [
+   1.36,
+   7.927,
+   1.36
+  ],
+  "collide": [
+   {
+    "box": [
+     1.36,
+     0.1667,
+     1.36
+    ],
+    "at": [
+     0.0,
+     -3.88,
+     0.0
+    ]
+   },
+   {
+    "cyl": 0.5,
+    "height": 7.3333,
+    "at": [
+     0.0,
+     -0.13,
+     0.0
+    ]
+   },
+   {
+    "box": [
+     1.1,
+     0.4266,
+     1.1
+    ],
+    "at": [
+     0.0,
+     3.75,
+     0.0
+    ]
+   }
+  ]
+ },
+ "ionic": {
+  "label": "Ionic column",
+  "file": "res://assets/models/props/pillars/ionic.glb",
+  "size": [
+   1.411,
+   8.777,
+   1.36
+  ],
+  "collide": [
+   {
+    "box": [
+     1.36,
+     0.1667,
+     1.36
+    ],
+    "at": [
+     0.0,
+     -4.305,
+     0.0
+    ]
+   },
+   {
+    "cyl": 0.5,
+    "height": 8.2333,
+    "at": [
+     0.0,
+     -0.105,
+     0.0
+    ]
+   },
+   {
+    "box": [
+     1.3,
+     0.2739,
+     1.0
+    ],
+    "at": [
+     0.0,
+     4.1487,
+     0.0
+    ]
+   }
+  ]
+ },
+ "corinthian": {
+  "label": "Corinthian column",
+  "file": "res://assets/models/props/pillars/corinthian.glb",
+  "size": [
+   1.632,
+   11.761,
+   1.632
+  ],
+  "collide": [
+   {
+    "box": [
+     1.632,
+     0.2,
+     1.632
+    ],
+    "at": [
+     0.0,
+     -5.7807,
+     0.0
+    ]
+   },
+   {
+    "cyl": 0.6,
+    "height": 10.396,
+    "at": [
+     0.0,
+     -0.4827,
+     0.0
+    ]
+   },
+   {
+    "box": [
+     1.44,
+     1.1653,
+     1.44
+    ],
+    "at": [
+     0.0,
+     5.298,
+     0.0
+    ]
+   }
+  ]
+ },
+ "broken": {
+  "label": "Broken column",
+  "file": "res://assets/models/props/pillars/broken.glb",
+  "size": [
+   1.36,
+   3.665,
+   1.36
+  ],
+  "collide": [
+   {
+    "box": [
+     1.36,
+     0.1667,
+     1.36
+    ],
+    "at": [
+     0.0,
+     -1.7493,
+     0.0
+    ]
+   },
+   {
+    "cyl": 0.5,
+    "height": 3.4333,
+    "at": [
+     0.0,
+     0.0507,
+     0.0
+    ]
+   }
+  ]
+ },
+ "entablature": {
+  "label": "Entablature",
+  "file": "res://assets/models/props/pillars/entablature.glb",
+  "size": [
+   6.0,
+   1.59,
+   1.244
+  ],
+  "collide": [
+   {
+    "box": [
+     6.0,
+     1.59,
+     1.2445
+    ],
+    "at": [
+     0.0,
+     0.0,
+     -0.0048
+    ]
+   }
+  ]
+ }
+}

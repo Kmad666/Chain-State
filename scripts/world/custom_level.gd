@@ -13,15 +13,30 @@ extends RefCounted
 ##   checkpoint  a pad: land on it and it's where you respawn
 ##   finish      a gold pad: land on it to finish
 ##   enemy       enemy (wizard / apprentice / sage / cherub), radius (patrol, m)
+##   prop        prop (a model from PROPS_FILE, e.g. ionic), size [x, y, z] (its
+##               bounding box: it's scaled to fit), rot, color (a tint)
 
 const FloatingIsland := preload("res://scripts/world/floating_island.gd")
 const SwingAnchor := preload("res://scripts/world/swing_anchor.gd")
 
 const SHAPES := ["box", "cylinder", "cone", "ramp", "pyramid", "ball"]
+## Modelled props (tools/props/): name -> label, model file, natural size and
+## simple collision shapes.
+const PROPS_FILE := "res://assets/models/props/pillars/props.json"
 const ENEMIES := ["wizard", "apprentice", "sage", "cherub"]
 const PICK_LAYER := 16              # the editor picks pieces on this physics layer
 const USER_DIR := "user://levels"
 const SHIPPED_DIR := "res://data/levels"
+
+
+static var _props := {}
+
+
+## The modelled props, by name, in the order they're listed in.
+static func props() -> Dictionary:
+	if _props.is_empty() and FileAccess.file_exists(PROPS_FILE):
+		_props = JSON.parse_string(FileAccess.get_file_as_string(PROPS_FILE))
+	return _props
 
 
 static func v3(a) -> Vector3:
@@ -54,6 +69,9 @@ static func make_piece(type: String, sub: String, at: Vector3, id: String) -> Di
 			p.merge({"shape": sub, "size": arr(size), "rot": [0, 0, 0], "color": "#e8ecf2"})
 		"anchor":
 			p["free"] = sub == "free"
+		"prop":
+			var info: Dictionary = props().get(sub, {})
+			p.merge({"prop": sub, "size": info.get("size", [1, 1, 1]), "rot": [0, 0, 0], "color": "#f2ede4"})
 		"start":
 			p["yaw"] = 0.0
 		"enemy":
@@ -77,6 +95,8 @@ static func make(p: Dictionary, editor: bool) -> Node3D:
 			n = isl
 		"shape":
 			n = _shape(p)
+		"prop":
+			n = _prop(p)
 		"anchor":
 			var a := SwingAnchor.new()
 			a.free = bool(p.get("free", false))
@@ -142,6 +162,49 @@ static func _shape(p: Dictionary) -> Node3D:
 		hull.points = pts
 		cs.shape = hull
 	body.add_child(cs)
+	return body
+
+
+## A modelled prop: the model scaled to the piece's size, in marble tinted by its
+## colour, solid and grapple-able through a few simple collision shapes.
+static var _scenes := {}
+
+
+static func _prop(p: Dictionary) -> Node3D:
+	var info: Dictionary = props().get(String(p.get("prop", "")), {})
+	if info.is_empty():
+		return null
+	var natural := v3(info.size)
+	var size := v3(p.get("size", info.size))
+	size = Vector3(maxf(size.x, 0.1), maxf(size.y, 0.1), maxf(size.z, 0.1))
+	var s := size / natural
+	var rot := v3(p.get("rot", [0, 0, 0]))
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	body.rotation = Vector3(deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z))
+	var file := String(info.file)
+	if not _scenes.has(file):
+		_scenes[file] = load(file)
+	var model: Node3D = (_scenes[file] as PackedScene).instantiate()
+	model.scale = s
+	var mat := Mats.marble(Color.html(String(p.get("color", "#f2ede4"))))
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).material_override = mat
+	body.add_child(model)
+	for c in info.collide:
+		var cs := CollisionShape3D.new()
+		cs.position = v3(c.at) * s
+		if c.has("box"):
+			var b := BoxShape3D.new()
+			b.size = v3(c.box) * s
+			cs.shape = b
+		else:
+			var cy := CylinderShape3D.new()
+			cy.radius = float(c.cyl) * minf(s.x, s.z)
+			cy.height = float(c.height) * s.y
+			cs.shape = cy
+		body.add_child(cs)
 	return body
 
 

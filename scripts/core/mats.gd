@@ -54,6 +54,63 @@ static func steel() -> ShaderMaterial:
 	return _cache[key]
 
 
+static var _marble_tex: Texture2D
+static var _stone_bump: Texture2D
+
+
+## Weathered marble for carved stone (the Roman pillars): soft grey veins through a
+## warm white, laid on in world space so long pieces don't stretch it, and a fine
+## pitting in the surface. The model's own vertex colours carry its baked shading
+## (darker in the flutes and under the mouldings), multiplied in. `col` tints it.
+static func marble(col: Color) -> StandardMaterial3D:
+	var key := "S%s" % col
+	if not _cache.has(key):
+		if _marble_tex == null:
+			var n := FastNoiseLite.new()
+			n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+			n.frequency = 0.004
+			n.fractal_octaves = 5
+			n.domain_warp_enabled = true
+			n.domain_warp_amplitude = 60.0
+			n.domain_warp_frequency = 0.006
+			var ramp := Gradient.new()
+			ramp.offsets = PackedFloat32Array([0.0, 0.46, 0.5, 0.54, 1.0])
+			ramp.colors = PackedColorArray([Color(0.95, 0.94, 0.91), Color(0.93, 0.92, 0.89),
+				Color(0.70, 0.70, 0.70), Color(0.92, 0.91, 0.88), Color(0.97, 0.96, 0.93)])
+			var t := NoiseTexture2D.new()
+			t.width = 1024
+			t.height = 1024
+			t.seamless = true
+			t.noise = n
+			t.color_ramp = ramp
+			_marble_tex = t
+			var b := FastNoiseLite.new()
+			b.noise_type = FastNoiseLite.TYPE_CELLULAR
+			b.frequency = 0.05
+			var bt := NoiseTexture2D.new()
+			bt.width = 256
+			bt.height = 256
+			bt.seamless = true
+			bt.as_normal_map = true
+			bt.bump_strength = 2.0
+			bt.noise = b
+			_stone_bump = bt
+		var m := StandardMaterial3D.new()
+		m.albedo_color = col
+		m.albedo_texture = _marble_tex
+		m.vertex_color_use_as_albedo = true
+		m.roughness = 0.62
+		m.normal_enabled = true
+		m.normal_texture = _stone_bump
+		m.normal_scale = 0.25
+		m.uv1_triplanar = true
+		m.uv1_world_triplanar = true
+		m.uv1_scale = Vector3.ONE / 2.5         # a vein pattern about 2.5 m across
+		m.uv1_triplanar_sharpness = 3.0
+		_cache[key] = m
+	return _cache[key]
+
+
 ## Point every polished material's fake reflections at the current sky.
 static func set_chrome_env(top: Color, horizon: Color, ground: Color, strength := 1.0) -> void:
 	for k in _cache:
