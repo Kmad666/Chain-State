@@ -47,6 +47,12 @@ var leash_range := 60.0            # ...and gives up once you're further than th
 var chase_speed := 4.0             # m/s while following you (slower than you: you can get away)
 var keep_dist := 10.0              # it closes in to about this far, no nearer
 var patrol_radius := 0.0           # > 0: patrol a circle this wide round home, instead of a path
+## A Cherub's sage circles the player instead of a fixed spot: this far out, this
+## high above them, round one way or the other (+1 / -1). 0 radius: off.
+var orbit_radius := 0.0
+var orbit_height := 6.0
+var orbit_turn := 1.0
+const ORBIT_ARRIVE := 18.0         # m/s while it's still flying in to you
 var home := Vector3.ZERO
 var cuts_chain := false            # wizard: each lap short of the last burns the chain
 var chasing := false
@@ -317,6 +323,18 @@ func _physics_process(dt: float) -> void:
 
 
 func _patrol(dt: float) -> void:
+	if orbit_radius > 0.0 and player != null and is_instance_valid(player):
+		# circle the player, keeping within reach of the chain; quick while it's
+		# still flying in, steady once it's on its circle
+		var c: Vector3 = player.global_position
+		var off := global_position - c
+		off.y = 0.0
+		var a := atan2(off.z, off.x) + orbit_turn * speed * dt / orbit_radius
+		var goal := c + Vector3(cos(a) * orbit_radius, orbit_height + sin(_t * 1.3) * 1.5, sin(a) * orbit_radius)
+		var to_o := goal - global_position
+		var far := to_o.length() > 6.0
+		global_position += to_o.limit_length((ORBIT_ARRIVE if far else maxf(speed, to_o.length() * 3.0)) * dt)
+		return
 	if patrol_radius > 0.0:
 		# a wide circle round home: steer for a point a little ahead on it
 		_patrol_a += speed * dt / patrol_radius

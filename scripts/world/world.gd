@@ -1034,28 +1034,31 @@ var nation = null                  # the Nation draft's builder (place names for
 ## Cherub Test: one plain grassy island (about 120 m across) and a Cherub hovering
 ## high off its north edge. Walk toward it to wake it.
 func _build_cherub_test() -> void:
-	var isl = _island(Vector3.ZERO, 60.0, 3131)
+	var isl = _island(Vector3.ZERO, 95.0, 3131)
 	isl.collision_layer = Player.LAYER_LAND
 	if bullets == null:
 		bullets = BulletField.new()
 		add_child(bullets)
 	cherub = Cherub.new()
-	cherub.position = Vector3(0, 70, -110)
+	cherub.position = Vector3(0, 46, -102)      # just off the island's north edge
 	add_child(cherub)
 	cherub.field = bullets
 	cherub.spawn_sage = _spawn_sage
 	cherub.spent.connect(func(): hud.toast("The Cherub is spent. Its eye closes.", 6.0))
-	start_pos = Vector3(0, 1.0, 50)
+	start_pos = Vector3(0, 1.0, 80)
 	start_yaw = 0.0                     # facing north, toward it
 
 
-## A Sage released from the Cherub's eye, flying out to hover at `hover`.
+## A Sage released from the Cherub's eye: it flies out to you and circles you,
+## near enough to hook and bind (each on its own circle, so they don't bunch).
 func _spawn_sage(from: Vector3, hover: Vector3) -> Node:
 	var s := Sentry.new()
 	s.kind = "sage"
 	s.path = PackedVector3Array([hover])
-	s.patrol_radius = 5.0
-	s.speed = 8.0
+	s.orbit_radius = randf_range(9.0, 15.0)
+	s.orbit_height = randf_range(4.0, 9.0)
+	s.orbit_turn = 1.0 if randf() < 0.5 else -1.0
+	s.speed = 7.0
 	s.field = bullets
 	s.player = player
 	add_child(s)

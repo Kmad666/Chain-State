@@ -18,7 +18,7 @@ func check(cond: bool, what: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick", "editor", "feel", "kettle"]:     # quick runs
+	if OS.get_environment("ONLY") in ["nation", "spire", "tree", "citadel", "keep", "seawall", "arm", "brick", "editor", "feel", "kettle", "cherub"]:     # quick runs
 		if OS.get_environment("ONLY") == "nation":
 			await _test_nation()
 		elif OS.get_environment("ONLY") == "editor":
@@ -27,6 +27,8 @@ func _ready() -> void:
 			await _test_feel()
 		elif OS.get_environment("ONLY") == "kettle":
 			await _test_kettle()
+		elif OS.get_environment("ONLY") == "cherub":
+			await _test_cherub()
 		elif OS.get_environment("ONLY") == "brick":
 			await _test_brick()
 		elif OS.get_environment("ONLY") == "arm":
@@ -716,80 +718,7 @@ func _ready() -> void:
 	tw.queue_free()
 	await get_tree().process_frame
 
-	print("== Cherub")
-	Game.level = "cherub_test"
-	var chw = load("res://scenes/world.tscn").instantiate()
-	get_tree().root.add_child(chw)
-	for i in 30:
-		await get_tree().physics_frame
-	var chp = chw.player
-	var cb = chw.cherub
-	chp.invuln = 999.0
-	check(cb.state == "idle", "cherub: asleep until you come near")
-	await shot("38_cherub_far")
-	chp.global_position = Vector3(0, 1, 0)        # walk in toward it
-	for i in 120 * 4:
-		await get_tree().physics_frame
-	check(cb.state == "fight", "cherub: it wakes, stares you down and casts its cone")
-	var to_p: Vector3 = (chp.global_position - cb.global_position).normalized()
-	check(cb.axis.dot(to_p) > 0.95, "cherub: the cone points at you")
-	var bl: float = cb.CONE_LENGTH * tan(deg_to_rad(cb.CONE_HALF))
-	check(bl > 120.0, "cherub: the cone is island-sized (%d m across at its mouth)" % roundi(bl * 2.0))
-	check(cb.is_trapped(chp.global_position), "cherub: you're inside it")
-	# try to leave: the wall pushes you back in
-	var side: Vector3 = cb.axis.cross(Vector3.UP).normalized()
-	chp.global_position += side * 150.0
-	chp.velocity = side * 15.0
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	check(cb.is_trapped(chp.global_position + side * -0.3) and chp.velocity.dot(side) <= 0.01, "cherub: you can't leave the cone (its wall stops you)")
-	chp.global_position = Vector3(0, 1, 0)
-	for i in 120 * 6:
-		await get_tree().physics_frame
-	var nb: int = chw.bullets.count()
-	check(nb > 40 and nb < 600, "cherub: a bullet-hell barrage down the cone (%d orbs in flight)" % nb)
-	check(cb.sages.size() >= 1 and cb.sages.size() <= cb.MAX_SAGES, "cherub: it releases sages (%d out, at most %d)" % [cb.sages.size(), cb.MAX_SAGES])
-	await shot("39_cherub_fight")
-	chp.global_position = Vector3(25, 1, 25)
-	_aim(chp, cb.global_position + Vector3(-40, -30, 40))
-	for i in 3:
-		await get_tree().process_frame
-	await shot("41_cherub_cone_wall")
-	chp.global_position = Vector3(0, 1, 0)
-	var sg = cb.sages[0]
-	for i in 120 * 2:
-		await get_tree().physics_frame              # let it reach its hover spot
-	check(sg.is_in_group("grapple_target") and sg.wraps_needed == 1 and chp.is_magic(sg), "sage: grapple-able (free), one lap to bind")
-	_aim(chp, sg.global_position)
-	await shot("40_sage")
-	chp.global_position = sg.global_position + Vector3(8, -1, 0)
-	check(_hook_on(chp, sg), "sage: hook it")
-	var wc4: Vector3 = sg.global_position
-	for k in 26:
-		sg._track_wrap(wc4 + Vector3(cos(TAU * k / 24.0) * 8.0, -1.0, sin(TAU * k / 24.0) * 8.0))
-	check(sg.ready_to_arrest, "sage: one lap binds it")
-	chp.interact()
-	check(sg.is_subdued and cb.arrested == 1, "sage: E arrests it (1 of %d)" % cb.SAGES_TO_WIN)
-	# arrest four more (as they come) and the Cherub is spent
-	var guard := 0
-	while cb.arrested < cb.SAGES_TO_WIN and guard < 120 * 60:
-		guard += 1
-		await get_tree().physics_frame
-		for x in cb.sages:
-			if is_instance_valid(x) and not x.is_subdued and x._hooked_by == null and cb.arrested < cb.SAGES_TO_WIN:
-				chp.global_position = x.global_position + Vector3(8, -1, 0)
-				if _hook_on(chp, x):
-					var c5: Vector3 = x.global_position
-					for k in 26:
-						x._track_wrap(c5 + Vector3(cos(TAU * k / 24.0) * 8.0, -1.0, sin(TAU * k / 24.0) * 8.0))
-					chp.interact()
-				break
-	for i in 30:
-		await get_tree().physics_frame
-	check(cb.state == "spent" and chw.bullets.count() == 0, "cherub: five sages arrested and it's spent: the barrage stops")
-	check(not cb.is_trapped(chp.global_position), "cherub: the cone lets you go")
-	chw.queue_free()
-	await get_tree().process_frame
+	await _test_cherub()
 
 	await _test_nation()
 	await _test_spire()
@@ -2051,3 +1980,89 @@ func _test_kettle() -> void:
 	kw.queue_free()
 	await get_tree().process_frame
 	Game.level = "range"
+
+
+func _test_cherub() -> void:
+	print("== Cherub")
+	Game.level = "cherub_test"
+	var chw = load("res://scenes/world.tscn").instantiate()
+	get_tree().root.add_child(chw)
+	for i in 30:
+		await get_tree().physics_frame
+	var chp = chw.player
+	var cb = chw.cherub
+	chp.invuln = 999.0
+	check(cb.state == "idle", "cherub: asleep until you come near")
+	await shot("38_cherub_far")
+	chp.global_position = Vector3(0, 1, 0)        # walk in toward it
+	for i in 120 * 4:
+		await get_tree().physics_frame
+	check(cb.state == "fight", "cherub: it wakes, stares you down and casts its cone")
+	var to_p: Vector3 = (chp.global_position - cb.global_position).normalized()
+	check(cb.axis.dot(to_p) > 0.95, "cherub: the cone points at you")
+	var bl: float = cb.CONE_LENGTH * tan(deg_to_rad(cb.CONE_HALF))
+	check(bl > 120.0, "cherub: the cone is island-sized (%d m across at its mouth)" % roundi(bl * 2.0))
+	check(cb.is_trapped(chp.global_position), "cherub: you're inside it")
+	# try to leave: the wall pushes you back in
+	var side: Vector3 = cb.axis.cross(Vector3.UP).normalized()
+	chp.global_position += side * 150.0
+	chp.velocity = side * 15.0
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	check(cb.is_trapped(chp.global_position + side * -0.3) and chp.velocity.dot(side) <= 0.01, "cherub: you can't leave the cone (its wall stops you)")
+	chp.global_position = Vector3(0, 1, 0)
+	for i in 120 * 6:
+		await get_tree().physics_frame
+	var nb: int = chw.bullets.count()
+	check(nb > 40 and nb < 600, "cherub: a bullet-hell barrage down the cone (%d orbs in flight)" % nb)
+	check(cb.sages.size() >= 1 and cb.sages.size() <= cb.MAX_SAGES, "cherub: it releases sages (%d out, at most %d)" % [cb.sages.size(), cb.MAX_SAGES])
+	await shot("39_cherub_fight")
+	# played straight, no teleporting: standing still, the sages come to you and
+	# circle within reach of the chain
+	var near := 0
+	for x in cb.sages:
+		if is_instance_valid(x):
+			var dx: float = x.global_position.distance_to(chp.global_position)
+			if dx <= x.subdue_range() and dx <= chp.tune.grapple_range:
+				near += 1
+	check(near >= 1, "sage: it flies in and circles you, within reach to hook and bind (%d of %d)" % [near, cb.sages.size()])
+	chp.global_position = Vector3(25, 1, 25)
+	_aim(chp, cb.global_position + Vector3(-40, -30, 40))
+	for i in 3:
+		await get_tree().process_frame
+	await shot("41_cherub_cone_wall")
+	chp.global_position = Vector3(0, 1, 0)
+	var sg = cb.sages[0]
+	for i in 120 * 2:
+		await get_tree().physics_frame              # let it reach its hover spot
+	check(sg.is_in_group("grapple_target") and sg.wraps_needed == 1 and chp.is_magic(sg), "sage: grapple-able (free), one lap to bind")
+	_aim(chp, sg.global_position)
+	await shot("40_sage")
+	chp.global_position = sg.global_position + Vector3(8, -1, 0)
+	check(_hook_on(chp, sg), "sage: hook it")
+	var wc4: Vector3 = sg.global_position
+	for k in 26:
+		sg._track_wrap(wc4 + Vector3(cos(TAU * k / 24.0) * 8.0, -1.0, sin(TAU * k / 24.0) * 8.0))
+	check(sg.ready_to_arrest, "sage: one lap binds it")
+	chp.interact()
+	check(sg.is_subdued and cb.arrested == 1, "sage: E arrests it (1 of %d)" % cb.SAGES_TO_WIN)
+	# arrest four more (as they come) and the Cherub is spent
+	var guard := 0
+	while cb.arrested < cb.SAGES_TO_WIN and guard < 120 * 60:
+		guard += 1
+		await get_tree().physics_frame
+		for x in cb.sages:
+			if is_instance_valid(x) and not x.is_subdued and x._hooked_by == null and cb.arrested < cb.SAGES_TO_WIN:
+				chp.global_position = x.global_position + Vector3(8, -1, 0)
+				if _hook_on(chp, x):
+					var c5: Vector3 = x.global_position
+					for k in 26:
+						x._track_wrap(c5 + Vector3(cos(TAU * k / 24.0) * 8.0, -1.0, sin(TAU * k / 24.0) * 8.0))
+					chp.interact()
+				break
+	for i in 30:
+		await get_tree().physics_frame
+	check(cb.state == "spent" and chw.bullets.count() == 0, "cherub: five sages arrested and it's spent: the barrage stops")
+	check(not cb.is_trapped(chp.global_position), "cherub: the cone lets you go")
+	chw.queue_free()
+	await get_tree().process_frame
