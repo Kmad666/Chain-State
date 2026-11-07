@@ -1,0 +1,7 @@
+node_modules/
+index-dev.html
+kettenkiez.html
+townhouse.html
+_entry.mjs
+_bundle.js
+package*.json
